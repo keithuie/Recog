@@ -1,0 +1,644 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MachineIQ - Anomaly Detection Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        header {
+            text-align: center;
+            color: white;
+            margin-bottom: 30px;
+        }
+
+        h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+
+        .subtitle {
+            font-size: 1.1em;
+            opacity: 0.9;
+        }
+
+        .dashboard {
+            display: grid;
+            grid-template-columns: 350px 1fr;
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+
+        .panel {
+            background: white;
+            border-radius: 12px;
+            padding: 20px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+
+        .panel h2 {
+            color: #667eea;
+            margin-bottom: 15px;
+            font-size: 1.3em;
+            border-bottom: 2px solid #f0f0f0;
+            padding-bottom: 10px;
+        }
+
+        .control-panel {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        .section {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 8px;
+        }
+
+        .section h3 {
+            color: #495057;
+            font-size: 1em;
+            margin-bottom: 12px;
+        }
+
+        .form-group {
+            margin-bottom: 12px;
+        }
+
+        label {
+            display: block;
+            font-size: 0.9em;
+            color: #495057;
+            margin-bottom: 5px;
+            font-weight: 500;
+        }
+
+        input, select {
+            width: 100%;
+            padding: 8px 12px;
+            border: 1px solid #dee2e6;
+            border-radius: 6px;
+            font-size: 0.9em;
+        }
+
+        button {
+            width: 100%;
+            padding: 12px;
+            border: none;
+            border-radius: 6px;
+            font-size: 1em;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn-secondary {
+            background: #6c757d;
+            color: white;
+        }
+
+        .btn-secondary:hover {
+            background: #5a6268;
+        }
+
+        .btn-success {
+            background: #28a745;
+            color: white;
+        }
+
+        .btn-success:hover {
+            background: #218838;
+        }
+
+        .btn-danger {
+            background: #dc3545;
+            color: white;
+        }
+
+        .btn-danger:hover {
+            background: #c82333;
+        }
+
+        button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+        .status-badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 0.85em;
+            font-weight: 600;
+            margin-left: 10px;
+        }
+
+        .status-success {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .status-warning {
+            background: #fff3cd;
+            color: #856404;
+        }
+
+        .status-info {
+            background: #d1ecf1;
+            color: #0c5460;
+        }
+
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 10px;
+            margin-top: 10px;
+        }
+
+        .stat-item {
+            background: white;
+            padding: 10px;
+            border-radius: 6px;
+            text-align: center;
+        }
+
+        .stat-value {
+            font-size: 1.5em;
+            font-weight: 700;
+            color: #667eea;
+        }
+
+        .stat-label {
+            font-size: 0.8em;
+            color: #6c757d;
+            margin-top: 5px;
+        }
+
+        .chart-container {
+            position: relative;
+            height: 400px;
+            margin-bottom: 20px;
+        }
+
+        .alert {
+            padding: 12px;
+            border-radius: 6px;
+            margin-bottom: 15px;
+            display: none;
+        }
+
+        .alert.show {
+            display: block;
+        }
+
+        .alert-success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        .alert-error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+
+        .alert-info {
+            background: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+
+        .loading {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid rgba(255,255,255,.3);
+            border-radius: 50%;
+            border-top-color: white;
+            animation: spin 1s ease-in-out infinite;
+            margin-left: 10px;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .results-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 15px;
+        }
+
+        .results-table th,
+        .results-table td {
+            padding: 10px;
+            text-align: left;
+            border-bottom: 1px solid #dee2e6;
+        }
+
+        .results-table th {
+            background: #f8f9fa;
+            font-weight: 600;
+            color: #495057;
+        }
+
+        .anomaly-yes {
+            color: #dc3545;
+            font-weight: 600;
+        }
+
+        .anomaly-no {
+            color: #28a745;
+        }
+
+        @media (max-width: 900px) {
+            .dashboard {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>MachineIQ</h1>
+            <div class="subtitle">Industrial Machinery Condition Monitoring</div>
+        </header>
+
+        <div class="dashboard">
+            <!-- Control Panel -->
+            <div class="panel control-panel">
+                <h2>Control Panel</h2>
+
+                <div id="alerts"></div>
+
+                <!-- Status Section -->
+                <div class="section">
+                    <h3>System Status</h3>
+                    <div id="status">
+                        <span class="status-badge status-warning">Not Initialized</span>
+                    </div>
+                    <div class="stats">
+                        <div class="stat-item">
+                            <div class="stat-value" id="stat-states">0</div>
+                            <div class="stat-label">States</div>
+                        </div>
+                        <div class="stat-item">
+                            <div class="stat-value" id="stat-channels">0</div>
+                            <div class="stat-label">Channels</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Data Generation -->
+                <div class="section">
+                    <h3>1. Generate Training Data</h3>
+                    <div class="form-group">
+                        <label>Samples</label>
+                        <input type="number" id="train-samples" value="1000" min="100" max="10000">
+                    </div>
+                    <div class="form-group">
+                        <label>Channels</label>
+                        <input type="number" id="train-channels" value="6" min="2" max="20">
+                    </div>
+                    <button class="btn-secondary" onclick="generateData()">Generate Data</button>
+                </div>
+
+                <!-- Training -->
+                <div class="section">
+                    <h3>2. Train Detector</h3>
+                    <div class="form-group">
+                        <label>Kernel Type</label>
+                        <select id="kernel-type">
+                            <option value="triangular">Triangular</option>
+                            <option value="parabolic" selected>Parabolic</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Number of Bins</label>
+                        <input type="number" id="n-bins" value="64" min="5" max="128">
+                    </div>
+                    <button class="btn-primary" id="train-btn" onclick="trainDetector()" disabled>Train Detector</button>
+                </div>
+
+                <!-- Monitoring -->
+                <div class="section">
+                    <h3>3. Monitor Stream</h3>
+                    <div class="form-group">
+                        <label>Test Samples</label>
+                        <input type="number" id="test-samples" value="100" min="10" max="1000">
+                    </div>
+                    <div class="form-group">
+                        <label>Anomaly Ratio</label>
+                        <input type="number" id="anomaly-ratio" value="0.1" min="0" max="1" step="0.05">
+                    </div>
+                    <button class="btn-success" id="monitor-btn" onclick="monitorStream()" disabled>Monitor Stream</button>
+                </div>
+
+                <!-- Reset -->
+                <div class="section">
+                    <button class="btn-danger" onclick="resetSystem()">Reset System</button>
+                </div>
+            </div>
+
+            <!-- Visualization Panel -->
+            <div class="panel">
+                <h2>Real-Time Monitoring</h2>
+                <div class="chart-container">
+                    <canvas id="anomalyChart"></canvas>
+                </div>
+
+                <h2>Recent Detections</h2>
+                <div style="max-height: 300px; overflow-y: auto;">
+                    <table class="results-table">
+                        <thead>
+                            <tr>
+                                <th>#</th>
+                                <th>Match Score</th>
+                                <th>Anomaly</th>
+                                <th>Anomaly Score</th>
+                            </tr>
+                        </thead>
+                        <tbody id="results-table">
+                            <tr>
+                                <td colspan="4" style="text-align: center; color: #6c757d;">No results yet</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Use relative API path for same-origin requests
+        const API_BASE = '/api';
+        let chart = null;
+
+        // Initialize chart
+        function initChart() {
+            const ctx = document.getElementById('anomalyChart').getContext('2d');
+            chart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: [],
+                    datasets: [{
+                        label: 'Match Score',
+                        data: [],
+                        borderColor: '#667eea',
+                        backgroundColor: 'rgba(102, 126, 234, 0.1)',
+                        borderWidth: 2,
+                        tension: 0.4,
+                        fill: true
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            display: true
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            max: 1,
+                            title: {
+                                display: true,
+                                text: 'Match Score'
+                            }
+                        },
+                        x: {
+                            title: {
+                                display: true,
+                                text: 'Sample #'
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        // Show alert
+        function showAlert(message, type = 'info') {
+            const alertsDiv = document.getElementById('alerts');
+            const alert = document.createElement('div');
+            alert.className = `alert alert-${type} show`;
+            alert.textContent = message;
+            alertsDiv.appendChild(alert);
+
+            setTimeout(() => {
+                alert.remove();
+            }, 5000);
+        }
+
+        // Update status
+        async function updateStatus() {
+            try {
+                const response = await fetch(`${API_BASE}/status`);
+                const data = await response.json();
+
+                const statusDiv = document.getElementById('status');
+                if (data.is_trained) {
+                    statusDiv.innerHTML = '<span class="status-badge status-success">Trained & Ready</span>';
+                    document.getElementById('monitor-btn').disabled = false;
+                } else if (data.detector_initialized) {
+                    statusDiv.innerHTML = '<span class="status-badge status-warning">Initialized</span>';
+                } else {
+                    statusDiv.innerHTML = '<span class="status-badge status-warning">Not Initialized</span>';
+                }
+
+                document.getElementById('stat-states').textContent = data.num_states || 0;
+                document.getElementById('stat-channels').textContent = data.num_channels || 0;
+            } catch (error) {
+                console.error('Failed to update status:', error);
+            }
+        }
+
+        // Generate training data
+        async function generateData() {
+            const nSamples = document.getElementById('train-samples').value;
+            const nChannels = document.getElementById('train-channels').value;
+
+            try {
+                showAlert('Generating training data...', 'info');
+                const response = await fetch(`${API_BASE}/generate-data`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        n_samples: parseInt(nSamples),
+                        n_channels: parseInt(nChannels),
+                        anomaly_ratio: 0.0
+                    })
+                });
+
+                const data = await response.json();
+                if (data.success) {
+                    showAlert(`Generated ${data.n_samples} samples with ${data.n_channels} channels`, 'success');
+                    document.getElementById('train-btn').disabled = false;
+                } else {
+                    showAlert(`Error: ${data.error}`, 'error');
+                }
+            } catch (error) {
+                showAlert(`Failed to generate data: ${error.message}`, 'error');
+            }
+        }
+
+        // Train detector
+        async function trainDetector() {
+            const kernel = document.getElementById('kernel-type').value;
+            const nBins = document.getElementById('n-bins').value;
+
+            try {
+                showAlert('Training detector...', 'info');
+                const response = await fetch(`${API_BASE}/train`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        kernel: kernel,
+                        n_bins: parseInt(nBins)
+                    })
+                });
+
+                const data = await response.json();
+                if (data.success) {
+                    showAlert(`Training complete! ${data.n_states} unique states learned`, 'success');
+                    await updateStatus();
+                } else {
+                    showAlert(`Training failed: ${data.error}`, 'error');
+                }
+            } catch (error) {
+                showAlert(`Training error: ${error.message}`, 'error');
+            }
+        }
+
+        // Monitor stream
+        async function monitorStream() {
+            const nSamples = document.getElementById('test-samples').value;
+            const anomalyRatio = document.getElementById('anomaly-ratio').value;
+
+            try {
+                showAlert('Monitoring stream...', 'info');
+                const response = await fetch(`${API_BASE}/monitor-stream`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        n_samples: parseInt(nSamples),
+                        anomaly_ratio: parseFloat(anomalyRatio)
+                    })
+                });
+
+                const data = await response.json();
+                if (data.success) {
+                    showAlert(`Monitored ${data.n_samples} samples, detected ${data.anomaly_count} anomalies`, 'success');
+                    updateChart(data.results);
+                    updateResultsTable(data.results);
+                } else {
+                    showAlert(`Monitoring failed: ${data.error}`, 'error');
+                }
+            } catch (error) {
+                showAlert(`Monitoring error: ${error.message}`, 'error');
+            }
+        }
+
+        // Update chart with results
+        function updateChart(results) {
+            const scores = results.map(r => r.score);
+            const labels = results.map((_, i) => i + 1);
+
+            chart.data.labels = labels;
+            chart.data.datasets[0].data = scores;
+            chart.update();
+        }
+
+        // Update results table
+        function updateResultsTable(results) {
+            const tbody = document.getElementById('results-table');
+            tbody.innerHTML = '';
+
+            // Show last 20 results
+            const recentResults = results.slice(-20).reverse();
+
+            recentResults.forEach((result, idx) => {
+                const row = tbody.insertRow();
+                row.insertCell(0).textContent = results.length - idx;
+                row.insertCell(1).textContent = result.score.toFixed(3);
+
+                const anomalyCell = row.insertCell(2);
+                anomalyCell.className = result.is_anomaly ? 'anomaly-yes' : 'anomaly-no';
+                anomalyCell.textContent = result.is_anomaly ? 'YES' : 'No';
+
+                row.insertCell(3).textContent = result.anomaly_score.toFixed(3);
+            });
+        }
+
+        // Reset system
+        async function resetSystem() {
+            if (!confirm('Reset the system? This will clear all training data and results.')) {
+                return;
+            }
+
+            try {
+                const response = await fetch(`${API_BASE}/reset`, {
+                    method: 'POST'
+                });
+
+                const data = await response.json();
+                if (data.success) {
+                    showAlert('System reset complete', 'success');
+                    chart.data.labels = [];
+                    chart.data.datasets[0].data = [];
+                    chart.update();
+                    document.getElementById('results-table').innerHTML = '<tr><td colspan="4" style="text-align: center; color: #6c757d;">No results yet</td></tr>';
+                    document.getElementById('train-btn').disabled = true;
+                    document.getElementById('monitor-btn').disabled = true;
+                    await updateStatus();
+                }
+            } catch (error) {
+                showAlert(`Reset failed: ${error.message}`, 'error');
+            }
+        }
+
+        // Initialize on load
+        window.onload = async () => {
+            initChart();
+            await updateStatus();
+            showAlert('MachineIQ Dashboard loaded. Generate data to begin.', 'info');
+        };
+    </script>
+</body>
+</html>
