@@ -1,0 +1,9 @@
+name: machineiq
+services:
+  - name: miq
+    github:
+      repo: keithuie/Recog
+      branch: main
+      deploy_on_push: true
+    dockerfile_path: Dockerfile
+    instance_size_slug: basic-xxs
