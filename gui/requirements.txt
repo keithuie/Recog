@@ -1,2 +1,7 @@
+# Web Dashboard
 flask==3.0.0
 flask-cors==4.0.0
+
+# Desktop Application
+PyQt6>=6.5.0
+pyqtgraph>=0.13.0
