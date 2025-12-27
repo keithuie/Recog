@@ -153,6 +153,8 @@ class ModelConfigPage(QWidget):
 
     config_changed = pyqtSignal(dict)
     train_requested = pyqtSignal()
+    training_started = pyqtSignal()
+    training_completed = pyqtSignal(object)  # Emits detector
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -424,3 +426,28 @@ class ModelConfigPage(QWidget):
             self.training_status.setStyleSheet(f"color: {COLORS['success']};")
         else:
             self.training_status.setStyleSheet(f"color: {COLORS['text_secondary']};")
+
+    @property
+    def threshold_spin(self):
+        """Alias for threshold_slider for compatibility"""
+        return self.threshold_slider
+
+    def add_group_card(self, name: str, channels: list):
+        """Add a channel group card from external source (e.g., wizard)"""
+        if name in self._group_widgets:
+            return
+
+        colors = get_chart_colors()
+        color = colors[len(self._group_widgets) % len(colors)]
+
+        group_widget = ChannelGroupWidget(name, color)
+        group_widget.set_channels(channels)
+
+        group_widget.delete_requested.connect(self._delete_group)
+        group_widget.group_changed.connect(self._on_config_changed)
+
+        self._group_widgets[name] = group_widget
+        self.groups_container.insertWidget(
+            self.groups_container.count() - 1,
+            group_widget
+        )

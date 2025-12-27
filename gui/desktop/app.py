@@ -143,10 +143,18 @@ class MachineIQApp:
 
         # Apply data source config
         data_source = config.get('data_source', {})
-        if data_source.get('source_type') == 'CSV File Upload':
+        source_type = data_source.get('source_type', '')
+
+        if source_type == 'CSV File Upload':
             file_path = data_source.get('file_path')
             if file_path:
-                self.data_manager.load_csv_file(file_path)
+                self._setup_csv_source(file_path, data_source.get('timestamp_column', 'timestamp'))
+
+        elif source_type == 'REST API':
+            url = data_source.get('url')
+            interval = data_source.get('interval', 5)
+            if url:
+                self._setup_api_source(url, interval)
 
         # Apply model config
         model = config.get('model', {})
@@ -203,16 +211,120 @@ class MachineIQApp:
 
         logger.info("Wizard configuration applied successfully")
 
+    def _setup_csv_source(self, filepath: str, timestamp_col: str = 'timestamp'):
+        """Set up CSV data source"""
+        from .core import CSVDataSource, DataPlayer
+
+        logger.info(f"Setting up CSV source: {filepath}")
+
+        # Create data player if needed
+        if not self.data_player:
+            self.data_player = DataPlayer()
+            self.data_player.add_data_callback(self._on_data_received)
+
+        # Create CSV source
+        source = CSVDataSource("CSV File", filepath)
+        source.set_timestamp_column(timestamp_col)
+
+        self.data_player.add_source(source)
+        self.data_player.set_active_source("CSV File")
+
+        if self.data_player.connect():
+            channels = self.data_player.channels
+            logger.info(f"CSV loaded with channels: {channels}")
+
+            # Update dashboard with channels
+            self.dashboard.set_channels(channels)
+
+            # Update model config with available channels
+            self.model_config.set_available_channels(channels)
+
+            self.main_window.header.set_status("Data loaded", connected=True)
+            self.main_window.header.set_playback_enabled(True)
+        else:
+            logger.error("Failed to load CSV file")
+            self.main_window.header.set_status("Load failed", connected=False)
+
+    def _setup_api_source(self, url: str, interval: int = 5):
+        """Set up REST API data source"""
+        from .core import APIDataSource, DataPlayer
+
+        logger.info(f"Setting up API source: {url}")
+
+        # Create data player if needed
+        if not self.data_player:
+            self.data_player = DataPlayer()
+            self.data_player.add_data_callback(self._on_data_received)
+
+        # Create API source
+        source = APIDataSource("REST API", url, poll_interval=float(interval))
+        source.set_status_callback(self._on_api_status)
+
+        self.data_player.add_source(source)
+        self.data_player.set_active_source("REST API")
+
+        # Connect (this will test and discover channels)
+        if self.data_player.connect():
+            channels = self.data_player.channels
+            logger.info(f"API connected with channels: {channels}")
+
+            # Update dashboard with channels
+            self.dashboard.set_channels(channels)
+
+            # Update model config with available channels
+            self.model_config.set_available_channels(channels)
+
+            self.main_window.header.set_status("Monitoring", connected=True, monitoring=True)
+            self.main_window.header.set_playback_enabled(True)
+        else:
+            logger.error("Failed to connect to API")
+            self.main_window.header.set_status("Connection failed", connected=False)
+
+    def _on_api_status(self, status: str):
+        """Handle API status updates"""
+        self.main_window.header.set_status(status, connected=True, monitoring=True)
+
+    def _on_data_received(self, data_point):
+        """Handle incoming data from data player"""
+        import numpy as np
+
+        # Get recent data from buffer
+        buffer = self.data_player.buffer
+        if not buffer:
+            return
+
+        # Update each channel on dashboard
+        for channel in self.data_player.channels:
+            timestamps, values = self.data_player.get_channel_data(channel, limit=500)
+            if len(timestamps) > 0:
+                self.dashboard.update_channel_data(channel, timestamps, values)
+
+        # TODO: Run through detector and update match strength
+        # For now, simulate match strength
+        if len(buffer) > 10:
+            timestamps = np.array([p.unix_timestamp for p in buffer[-100:]])
+            # Simulate high match score (will be replaced with actual detector)
+            scores = np.ones(len(timestamps)) * 95 + np.random.randn(len(timestamps)) * 2
+            scores = np.clip(scores, 0, 100)
+            self.dashboard.update_match_strength(timestamps, scores)
+
     def _on_play(self):
         """Handle play button click"""
         if self.data_player:
-            self.data_player.play()
+            source = self.data_player.active_source
+            if source and hasattr(source, 'play'):
+                source.play()
             self.main_window.header.set_status("Monitoring", connected=True, monitoring=True)
 
     def _on_pause(self):
         """Handle pause button click"""
         if self.data_player:
-            self.data_player.pause()
+            source = self.data_player.active_source
+            if source:
+                if hasattr(source, 'pause'):
+                    source.pause()
+                elif hasattr(source, 'disconnect'):
+                    source.disconnect()
             self.main_window.header.set_status("Paused", connected=True)
 
     def _on_playback_started(self):

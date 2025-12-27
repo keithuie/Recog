@@ -311,17 +311,21 @@ class APIDataSource(DataSource):
     REST API data source for real-time streaming.
 
     Polls an API endpoint at regular intervals.
+    Supports flat JSON, GeoJSON, and nested structures.
     """
 
-    def __init__(self, name: str, url: str = None, poll_interval: float = 1.0):
+    def __init__(self, name: str, url: str = None, poll_interval: float = 5.0):
         super().__init__(name)
         self.url = url
         self.poll_interval = poll_interval
-        self.headers: Dict[str, str] = {}
+        self.headers: Dict[str, str] = {'User-Agent': 'MachineIQ/1.0'}
         self.auth_token: Optional[str] = None
         self._connected = False
         self._polling_thread: Optional[threading.Thread] = None
         self._stop_event = threading.Event()
+        self._data_path: Optional[str] = None  # JSON path to data array
+        self._channel_map: Dict[str, str] = {}  # channel -> json path
+        self._on_status_callback: Optional[Callable[[str], None]] = None
 
     def set_auth(self, token: str):
         """Set authentication token"""
@@ -332,28 +336,168 @@ class APIDataSource(DataSource):
         """Set custom header"""
         self.headers[key] = value
 
+    def set_status_callback(self, callback: Callable[[str], None]):
+        """Set callback for status updates"""
+        self._on_status_callback = callback
+
+    def _emit_status(self, status: str):
+        """Emit status to callback"""
+        if self._on_status_callback:
+            self._on_status_callback(status)
+
+    def _fetch_data(self) -> Optional[Any]:
+        """Fetch data from API"""
+        import urllib.request
+        req = urllib.request.Request(self.url, headers=self.headers)
+        with urllib.request.urlopen(req, timeout=15) as response:
+            return json.loads(response.read().decode())
+
+    def _extract_channels_from_response(self, data: Any) -> List[str]:
+        """Extract channel names from API response"""
+        channels = []
+
+        # Handle GeoJSON (USGS earthquake, etc.)
+        if isinstance(data, dict) and data.get('type') == 'FeatureCollection':
+            features = data.get('features', [])
+            if features and isinstance(features[0], dict):
+                props = features[0].get('properties', {})
+                # Extract numeric properties as channels
+                for key, value in props.items():
+                    if isinstance(value, (int, float)) and key not in ('time', 'updated', 'tz'):
+                        channels.append(key)
+                self._data_path = 'features'
+                self._channel_map = {ch: f'properties.{ch}' for ch in channels}
+            return channels
+
+        # Handle array of objects
+        if isinstance(data, list) and len(data) > 0:
+            item = data[0]
+            if isinstance(item, dict):
+                for key, value in item.items():
+                    if isinstance(value, (int, float)) and key not in ('timestamp', 'time'):
+                        channels.append(key)
+            return channels
+
+        # Handle flat dict
+        if isinstance(data, dict):
+            for key, value in data.items():
+                if isinstance(value, (int, float)) and key not in ('timestamp', 'time'):
+                    channels.append(key)
+            return channels
+
+        return channels
+
+    def _parse_data_point(self, data: Any) -> Optional[DataPoint]:
+        """Parse a data point from API response"""
+        timestamp = datetime.now()
+        values = {}
+
+        # Handle GeoJSON
+        if isinstance(data, dict) and data.get('type') == 'FeatureCollection':
+            features = data.get('features', [])
+            if not features:
+                return None
+
+            # Get most recent feature (first in list for USGS)
+            feature = features[0]
+            props = feature.get('properties', {})
+
+            # Try to get timestamp
+            if 'time' in props:
+                try:
+                    # USGS uses milliseconds since epoch
+                    ts_val = props['time']
+                    if isinstance(ts_val, (int, float)) and ts_val > 1e10:
+                        timestamp = datetime.fromtimestamp(ts_val / 1000)
+                    elif isinstance(ts_val, (int, float)):
+                        timestamp = datetime.fromtimestamp(ts_val)
+                except (ValueError, OSError):
+                    pass
+
+            # Extract channel values
+            for channel in self._channels:
+                path = self._channel_map.get(channel, channel)
+                try:
+                    if '.' in path:
+                        parts = path.split('.')
+                        val = props
+                        for part in parts[1:]:  # Skip 'properties'
+                            val = val.get(part, 0)
+                    else:
+                        val = props.get(channel, 0)
+                    values[channel] = float(val) if val is not None else 0.0
+                except (ValueError, TypeError, AttributeError):
+                    values[channel] = 0.0
+
+            return DataPoint(timestamp=timestamp, values=values)
+
+        # Handle flat dict or array
+        if isinstance(data, dict):
+            if 'timestamp' in data:
+                try:
+                    timestamp = datetime.fromisoformat(str(data['timestamp']))
+                except (ValueError, TypeError):
+                    pass
+
+            for channel in self._channels:
+                try:
+                    values[channel] = float(data.get(channel, 0))
+                except (ValueError, TypeError):
+                    values[channel] = 0.0
+
+            return DataPoint(timestamp=timestamp, values=values)
+
+        return None
+
+    def test_connection(self) -> tuple:
+        """
+        Test connection and discover channels.
+
+        Returns:
+            (success: bool, channels: List[str], message: str)
+        """
+        if not self.url:
+            return False, [], "No URL configured"
+
+        try:
+            data = self._fetch_data()
+            channels = self._extract_channels_from_response(data)
+            self._channels = channels
+
+            if channels:
+                return True, channels, f"Found {len(channels)} channels"
+            else:
+                return True, [], "Connected but no numeric channels found"
+
+        except Exception as e:
+            return False, [], f"Connection failed: {str(e)}"
+
     def connect(self) -> bool:
         """Start polling the API"""
         if not self.url:
             return False
 
         try:
-            # Test connection
-            import urllib.request
-            req = urllib.request.Request(self.url, headers=self.headers)
-            with urllib.request.urlopen(req, timeout=10) as response:
-                data = json.loads(response.read().decode())
-                # Extract channel names from first response
-                if isinstance(data, dict):
-                    self._channels = [k for k in data.keys() if k != 'timestamp']
+            self._emit_status("Connecting...")
 
+            # Test connection and discover channels
+            success, channels, message = self.test_connection()
+            if not success:
+                self._emit_status(f"Failed: {message}")
+                return False
+
+            self._channels = channels
             self._connected = True
             self._stop_event.clear()
+
+            self._emit_status(f"Connected: {len(channels)} channels")
+
             self._polling_thread = threading.Thread(target=self._poll_loop, daemon=True)
             self._polling_thread.start()
             return True
 
         except Exception as e:
+            self._emit_status(f"Error: {e}")
             print(f"API connection error: {e}")
             return False
 
@@ -363,34 +507,27 @@ class APIDataSource(DataSource):
         if self._polling_thread:
             self._polling_thread.join(timeout=2.0)
         self._connected = False
+        self._emit_status("Disconnected")
 
     def is_connected(self) -> bool:
         return self._connected
 
     def _poll_loop(self):
         """Background polling loop"""
-        import urllib.request
+        poll_count = 0
 
         while not self._stop_event.is_set():
             try:
-                req = urllib.request.Request(self.url, headers=self.headers)
-                with urllib.request.urlopen(req, timeout=10) as response:
-                    data = json.loads(response.read().decode())
+                data = self._fetch_data()
+                point = self._parse_data_point(data)
 
-                    # Parse response
-                    timestamp = datetime.now()
-                    if 'timestamp' in data:
-                        try:
-                            timestamp = datetime.fromisoformat(data['timestamp'])
-                        except (ValueError, TypeError):
-                            pass
-
-                    values = {k: float(v) for k, v in data.items() if k != 'timestamp'}
-
-                    point = DataPoint(timestamp=timestamp, values=values)
+                if point:
                     self._emit_data(point)
+                    poll_count += 1
+                    self._emit_status(f"Monitoring: {poll_count} updates")
 
             except Exception as e:
+                self._emit_status(f"Poll error: {str(e)[:50]}")
                 print(f"API poll error: {e}")
 
             self._stop_event.wait(self.poll_interval)

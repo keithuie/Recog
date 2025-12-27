@@ -78,12 +78,19 @@ class WizardStep(QFrame):
 class DataSourceStep(WizardStep):
     """Step 1: Configure data source"""
 
+    # Sample APIs for testing
+    SAMPLE_APIS = {
+        "-- Select sample API --": "",
+        "USGS Earthquake Data (GeoJSON)": "https://earthquake.usgs.gov/fdsnws/event/1/query?format=geojson&limit=10",
+    }
+
     def __init__(self, parent=None):
         super().__init__(
             "Connect Your Data",
             "Choose how you want to feed data into MachineIQ. You can upload CSV files for testing or connect to a live data source for real-time monitoring.",
             parent
         )
+        self._discovered_channels = []
         self._setup_content()
 
     def _setup_content(self):
@@ -129,18 +136,64 @@ class DataSourceStep(WizardStep):
 
         # API configuration
         self.api_group = QGroupBox("API Configuration")
-        api_layout = QFormLayout(self.api_group)
+        api_layout = QVBoxLayout(self.api_group)
 
+        # Sample APIs dropdown
+        sample_row = QHBoxLayout()
+        sample_row.addWidget(QLabel("Try a sample API:"))
+        self.sample_api_combo = QComboBox()
+        self.sample_api_combo.addItems(list(self.SAMPLE_APIS.keys()))
+        self.sample_api_combo.currentTextChanged.connect(self._on_sample_selected)
+        sample_row.addWidget(self.sample_api_combo)
+        api_layout.addLayout(sample_row)
+
+        # URL input
+        url_form = QFormLayout()
         self.api_url = QLineEdit()
         self.api_url.setPlaceholderText("https://api.example.com/data")
         self.api_url.textChanged.connect(lambda: self.completed.emit(self.is_valid()))
-        api_layout.addRow("Endpoint URL:", self.api_url)
+        url_form.addRow("Endpoint URL:", self.api_url)
 
         self.api_interval = QSpinBox()
         self.api_interval.setRange(1, 3600)
         self.api_interval.setValue(5)
         self.api_interval.setSuffix(" seconds")
-        api_layout.addRow("Poll Interval:", self.api_interval)
+        url_form.addRow("Poll Interval:", self.api_interval)
+        api_layout.addLayout(url_form)
+
+        # Test connection button
+        test_row = QHBoxLayout()
+        self.test_btn = QPushButton("Test Connection")
+        self.test_btn.clicked.connect(self._test_api_connection)
+        test_row.addWidget(self.test_btn)
+
+        self.test_status = QLabel("")
+        self.test_status.setStyleSheet(f"color: {COLORS['text_secondary']};")
+        test_row.addWidget(self.test_status)
+        test_row.addStretch()
+        api_layout.addLayout(test_row)
+
+        # Discovered channels
+        self.channels_label = QLabel("")
+        self.channels_label.setStyleSheet(f"""
+            color: {COLORS['text_secondary']};
+            font-size: 12px;
+            padding: 8px;
+            background-color: {COLORS['surface_secondary']};
+            border-radius: 4px;
+        """)
+        self.channels_label.setWordWrap(True)
+        self.channels_label.hide()
+        api_layout.addWidget(self.channels_label)
+
+        # Help text
+        api_help = QLabel(
+            "REST APIs should return JSON with numeric values. "
+            "Supports flat JSON objects, arrays, and GeoJSON formats."
+        )
+        api_help.setStyleSheet(f"color: {COLORS['text_tertiary']}; font-size: 11px;")
+        api_help.setWordWrap(True)
+        api_layout.addWidget(api_help)
 
         self.api_group.hide()
         self.content_layout.addWidget(self.api_group)
@@ -184,6 +237,61 @@ class DataSourceStep(WizardStep):
         self.mqtt_group.setVisible("MQTT" in type_text)
         self.opcua_group.setVisible("OPC" in type_text)
         self.completed.emit(self.is_valid())
+
+    def _on_sample_selected(self, sample_name: str):
+        """Handle sample API selection"""
+        url = self.SAMPLE_APIS.get(sample_name, "")
+        if url:
+            self.api_url.setText(url)
+
+    def _test_api_connection(self):
+        """Test API connection and discover channels"""
+        url = self.api_url.text().strip()
+        if not url:
+            self.test_status.setText("Enter a URL first")
+            self.test_status.setStyleSheet(f"color: {COLORS['warning']};")
+            return
+
+        self.test_status.setText("Testing...")
+        self.test_status.setStyleSheet(f"color: {COLORS['text_secondary']};")
+        self.test_btn.setEnabled(False)
+
+        # Force UI update
+        from PyQt6.QtWidgets import QApplication
+        QApplication.processEvents()
+
+        try:
+            from ..core import APIDataSource
+            source = APIDataSource("test", url)
+            success, channels, message = source.test_connection()
+
+            if success and channels:
+                self._discovered_channels = channels
+                self.test_status.setText(f"Connected - {len(channels)} channels found")
+                self.test_status.setStyleSheet(f"color: {COLORS['success']};")
+                self.channels_label.setText(f"Channels: {', '.join(channels[:10])}" +
+                    (f" (+{len(channels)-10} more)" if len(channels) > 10 else ""))
+                self.channels_label.show()
+            elif success:
+                self.test_status.setText("Connected but no numeric data found")
+                self.test_status.setStyleSheet(f"color: {COLORS['warning']};")
+                self.channels_label.hide()
+            else:
+                self.test_status.setText(f"Failed: {message[:50]}")
+                self.test_status.setStyleSheet(f"color: {COLORS['danger']};")
+                self.channels_label.hide()
+
+        except Exception as e:
+            self.test_status.setText(f"Error: {str(e)[:50]}")
+            self.test_status.setStyleSheet(f"color: {COLORS['danger']};")
+            self.channels_label.hide()
+
+        self.test_btn.setEnabled(True)
+        self.completed.emit(self.is_valid())
+
+    def get_discovered_channels(self) -> list:
+        """Return channels discovered from API test"""
+        return self._discovered_channels
 
     def _browse_file(self):
         file_path, _ = QFileDialog.getOpenFileName(
@@ -887,28 +995,32 @@ class SetupWizard(QDialog):
     def _populate_channels(self):
         """Populate channel list from data source"""
         data_source = self._config.get('data_source', {})
-        file_path = data_source.get('file_path')
+        source_type = data_source.get('source_type', '')
+        channels = []
 
-        if file_path:
-            try:
-                import csv
-                with open(file_path, 'r') as f:
-                    reader = csv.reader(f)
-                    headers = next(reader)
-                    # Filter out timestamp column
-                    ts_col = data_source.get('timestamp_column', '')
-                    channels = [h for h in headers if h != ts_col]
-                    self.channel_step.set_channels(channels)
-            except Exception:
-                # Default channels for demo
-                self.channel_step.set_channels([
-                    "Channel 1", "Channel 2", "Channel 3", "Channel 4"
-                ])
-        else:
-            # Default channels for non-CSV sources
-            self.channel_step.set_channels([
-                "Channel 1", "Channel 2", "Channel 3", "Channel 4"
-            ])
+        # Try to get channels from CSV file
+        if 'CSV' in source_type:
+            file_path = data_source.get('file_path')
+            if file_path:
+                try:
+                    import csv
+                    with open(file_path, 'r') as f:
+                        reader = csv.reader(f)
+                        headers = next(reader)
+                        ts_col = data_source.get('timestamp_column', '')
+                        channels = [h for h in headers if h != ts_col]
+                except Exception:
+                    pass
+
+        # Try to get channels from API test
+        elif 'REST' in source_type:
+            channels = self.data_step.get_discovered_channels()
+
+        # Fallback to defaults if no channels found
+        if not channels:
+            channels = ["Channel 1", "Channel 2", "Channel 3", "Channel 4"]
+
+        self.channel_step.set_channels(channels)
 
     def get_configuration(self) -> dict:
         """Get the complete configuration"""
