@@ -9,10 +9,10 @@ import numpy as np
 import pyqtgraph as pg
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QFrame,
-    QScrollArea, QSizePolicy, QSplitter
+    QScrollArea, QSizePolicy, QSplitter, QPushButton
 )
-from PyQt6.QtCore import Qt, QTimer, pyqtSignal
-from PyQt6.QtGui import QFont, QColor
+from PyQt6.QtCore import Qt, QTimer, pyqtSignal, pyqtSlot
+from PyQt6.QtGui import QFont, QColor, QCursor
 
 from ..styles import COLORS, get_chart_colors, get_match_color
 
@@ -76,17 +76,22 @@ class ChannelStrip(QFrame):
         layout.addWidget(y_panel)
 
         # Center - Plot
-        self.plot_widget = pg.PlotWidget()
+        self.plot_widget = pg.PlotWidget(axisItems={'bottom': pg.DateAxisItem(orientation='bottom')})
         self.plot_widget.setBackground('#1A1A1C')
         self.plot_widget.setMouseEnabled(x=True, y=False)
         self.plot_widget.hideAxis('left')
-        self.plot_widget.hideAxis('bottom')
+        self.plot_widget.showAxis('bottom')
         self.plot_widget.setMenuEnabled(False)
         self.plot_widget.getViewBox().setDefaultPadding(0)
 
+        # Add infinite line for hover
+        self.v_line = pg.InfiniteLine(angle=90, movable=False)
+        self.v_line.setPen(pg.mkPen('#FFFFFF', width=1, style=Qt.PenStyle.DashLine))
+        self.plot_widget.addItem(self.v_line, ignoreBounds=True)
+
         # Create plot curve
         pen = pg.mkPen(color=self.color, width=1.5)
-        self.curve = self.plot_widget.plot([], [], pen=pen)
+        self.curve = self.plot_widget.plot([], [], pen=pen, symbol='o', symbolSize=3, symbolBrush=self.color, symbolPen=None)
 
         layout.addWidget(self.plot_widget, stretch=1)
 
@@ -108,6 +113,67 @@ class ChannelStrip(QFrame):
         self.value_label.setStyleSheet("color: #AAA; font-size: 14px; font-family: monospace;")
         self.value_label.setAlignment(Qt.AlignmentFlag.AlignRight)
         info_layout.addWidget(self.value_label)
+        
+        # Minimize button
+        self.min_btn = QPushButton("−")
+        self.min_btn.setFixedSize(20, 20)
+        self.min_btn.setCheckable(True)
+        self.min_btn.setStyleSheet("""
+            QPushButton {
+                background: transparent;
+                color: #666;
+                border: 1px solid #333;
+                border-radius: 2px;
+            }
+            QPushButton:hover {
+                background: #333;
+                color: #FFF;
+            }
+            QPushButton:checked {
+                background: #333;
+                color: #FFF;
+                content: "+";
+            }
+        """)
+        self.min_btn.clicked.connect(self._toggle_minimize)
+        
+        # Reset View button
+        self.reset_btn = QPushButton("⟲")
+        self.reset_btn.setFixedSize(20, 20)
+        self.reset_btn.setToolTip("Reset View")
+        self.reset_btn.setStyleSheet("""
+            QPushButton {
+                background: transparent;
+                color: #666;
+                border: 1px solid #333;
+                border-radius: 2px;
+            }
+            QPushButton:hover {
+                background: #333;
+                color: #FFF;
+            }
+        """)
+        self.reset_btn.clicked.connect(lambda: self.plot_widget.autoRange())
+
+        
+        # Add to header row in info panel
+        btn_layout = QHBoxLayout()
+        btn_layout.addStretch()
+        btn_layout.addWidget(self.reset_btn)
+        btn_layout.addWidget(self.min_btn)
+        info_layout.addLayout(btn_layout)
+
+    def _toggle_minimize(self, checked):
+        if checked:
+            self.plot_widget.hide()
+            self.min_btn.setText("+")
+            self.setMaximumHeight(50)
+            self.setMinimumHeight(40)
+        else:
+            self.plot_widget.show()
+            self.min_btn.setText("−")
+            self.setMaximumHeight(120)
+            self.setMinimumHeight(100)
 
         layout.addWidget(info_panel)
 
@@ -138,6 +204,11 @@ class ChannelStrip(QFrame):
         self.color = color
         self.name_label.setStyleSheet(f"color: {color}; font-size: 12px; font-weight: 500;")
         self.curve.setPen(pg.mkPen(color=color, width=1.5))
+        self.curve.setSymbolBrush(color)
+
+    def set_hover_line(self, x_val):
+        """Update hover line position"""
+        self.v_line.setPos(x_val)
 
 
 class MatchStrengthBar(QFrame):
@@ -313,10 +384,22 @@ class DashboardPage(QWidget):
         colors = get_chart_colors()
 
         # Create channel strips
+        first_strip = None
         for i, name in enumerate(channel_names):
             color = colors[i % len(colors)]
             strip = ChannelStrip(name, color)
             self._channel_strips[name] = strip
+            
+            # Link X-axis to first strip
+            if first_strip is None:
+                first_strip = strip
+            else:
+                strip.plot_widget.setXLink(first_strip.plot_widget)
+            
+            # Connect mouse move for hover sync
+            # Note: pyqtgraph signals are a bit tricky, using a proxy
+            strip.plot_widget.scene().sigMouseMoved.connect(self._on_mouse_move)
+
             # Insert before the stretch
             self.strips_layout.insertWidget(self.strips_layout.count() - 1, strip)
 
@@ -356,3 +439,30 @@ class DashboardPage(QWidget):
             self._match_bar = None
 
         self.placeholder.show()
+
+    def _on_mouse_move(self, pos):
+        """Handle mouse move to update hover lines"""
+        # Find which plot triggered this
+        sender = self.sender() # The scene
+        
+        # Convert scene pos to view pos
+        # We iterate to find the view box that contains the point is hard from scene
+        # simplified: iterate all strips, mapping pos to view coordinates to find X
+        
+        # Better approach: since axes are linked, getting x from ANY viewbox is fine
+        # provided the mouse is over valid range
+        
+        if not self._channel_strips:
+            return
+            
+        # Get first strip to translate coordinate
+        first_strip = list(self._channel_strips.values())[0]
+        # Map scene point to view point
+        if first_strip.plot_widget.sceneBoundingRect().contains(pos):
+             mouse_point = first_strip.plot_widget.getPlotItem().vb.mapSceneToView(pos)
+             x_val = mouse_point.x()
+             
+             # Update all strips
+             for strip in self._channel_strips.values():
+                 strip.set_hover_line(x_val)
+
