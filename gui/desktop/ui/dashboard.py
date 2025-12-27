@@ -91,7 +91,6 @@ class ChannelGroupWidget(QFrame):
             self.setFixedHeight(40)
 
 
-
 class ChannelStrip(QFrame):
     """
     Individual channel display strip.
@@ -189,30 +188,7 @@ class ChannelStrip(QFrame):
         self.value_label.setStyleSheet("color: #AAA; font-size: 14px; font-family: monospace;")
         self.value_label.setAlignment(Qt.AlignmentFlag.AlignRight)
         info_layout.addWidget(self.value_label)
-
-        # Button row
-        btn_layout = QHBoxLayout()
-        btn_layout.addStretch()
-
-        # Reset View button
-        self.reset_btn = QPushButton("⟲")
-        self.reset_btn.setFixedSize(20, 20)
-        self.reset_btn.setToolTip("Reset View")
-        self.reset_btn.setStyleSheet("""
-            QPushButton {
-                background: transparent;
-                color: #666;
-                border: 1px solid #333;
-                border-radius: 2px;
-            }
-            QPushButton:hover {
-                background: #333;
-                color: #FFF;
-            }
-        """)
-        self.reset_btn.clicked.connect(lambda: self.plot_widget.autoRange())
-        btn_layout.addWidget(self.reset_btn)
-
+        
         # Minimize button
         self.min_btn = QPushButton("−")
         self.min_btn.setFixedSize(20, 20)
@@ -231,11 +207,35 @@ class ChannelStrip(QFrame):
             QPushButton:checked {
                 background: #333;
                 color: #FFF;
+                content: "+";
             }
         """)
         self.min_btn.clicked.connect(self._toggle_minimize)
-        btn_layout.addWidget(self.min_btn)
+        
+        # Reset View button
+        self.reset_btn = QPushButton("⟲")
+        self.reset_btn.setFixedSize(20, 20)
+        self.reset_btn.setToolTip("Reset View")
+        self.reset_btn.setStyleSheet("""
+            QPushButton {
+                background: transparent;
+                color: #666;
+                border: 1px solid #333;
+                border-radius: 2px;
+            }
+            QPushButton:hover {
+                background: #333;
+                color: #FFF;
+            }
+        """)
+        self.reset_btn.clicked.connect(lambda: self.plot_widget.autoRange())
 
+        
+        # Add to header row in info panel
+        btn_layout = QHBoxLayout()
+        btn_layout.addStretch()
+        btn_layout.addWidget(self.reset_btn)
+        btn_layout.addWidget(self.min_btn)
         info_layout.addLayout(btn_layout)
 
         # Add info panel to main layout
@@ -351,7 +351,7 @@ class MatchStrengthBar(QFrame):
         # Score line
         pen = pg.mkPen(color=COLORS['success'], width=2)
         self.curve = self.plot_widget.plot([], [], pen=pen, fillLevel=0,
-                                           brush=pg.mkBrush(color=(52, 199, 89, 50)))
+                                         brush=pg.mkBrush(color=(52, 199, 89, 50)))
 
         layout.addWidget(self.plot_widget, stretch=1)
 

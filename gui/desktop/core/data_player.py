@@ -314,10 +314,11 @@ class APIDataSource(DataSource):
     Supports flat JSON, GeoJSON, and nested structures.
     """
 
-    def __init__(self, name: str, url: str = None, poll_interval: float = 5.0):
+    def __init__(self, name: str, url: str = None, poll_interval: float = 5.0, use_wall_clock: bool = False):
         super().__init__(name)
         self.url = url
         self.poll_interval = poll_interval
+        self.use_wall_clock = use_wall_clock
         self.headers: Dict[str, str] = {'User-Agent': 'MachineIQ/1.0'}
         self.auth_token: Optional[str] = None
         self._connected = False
@@ -403,7 +404,7 @@ class APIDataSource(DataSource):
             props = feature.get('properties', {})
 
             # Try to get timestamp
-            if 'time' in props:
+            if not self.use_wall_clock and 'time' in props:
                 try:
                     # USGS uses milliseconds since epoch
                     ts_val = props['time']
@@ -433,7 +434,7 @@ class APIDataSource(DataSource):
 
         # Handle flat dict or array
         if isinstance(data, dict):
-            if 'timestamp' in data:
+            if not self.use_wall_clock and 'timestamp' in data:
                 try:
                     timestamp = datetime.fromisoformat(str(data['timestamp']))
                 except (ValueError, TypeError):
