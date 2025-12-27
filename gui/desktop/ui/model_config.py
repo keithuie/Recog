@@ -43,39 +43,55 @@ class ChannelGroupWidget(QFrame):
                 border-radius: 8px;
             }}
         """)
+        self.setMinimumHeight(160)
 
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(12, 12, 12, 12)
-        layout.setSpacing(8)
+        layout.setContentsMargins(14, 14, 14, 14)
+        layout.setSpacing(10)
 
         # Header
         header = QHBoxLayout()
 
         self.color_btn = QPushButton()
-        self.color_btn.setFixedSize(20, 20)
+        self.color_btn.setFixedSize(24, 24)
+        self.color_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         self.color_btn.setStyleSheet(f"""
             QPushButton {{
                 background-color: {self.color};
-                border: none;
-                border-radius: 4px;
+                border: 2px solid white;
+                border-radius: 12px;
+            }}
+            QPushButton:hover {{
+                border-color: {COLORS['text_secondary']};
             }}
         """)
         self.color_btn.clicked.connect(self._pick_color)
         header.addWidget(self.color_btn)
 
         self.name_label = QLabel(self.group_name)
-        self.name_label.setStyleSheet("font-weight: 600;")
+        self.name_label.setStyleSheet(f"font-weight: 600; font-size: 14px; color: {COLORS['text_primary']};")
         header.addWidget(self.name_label)
 
         header.addStretch()
 
         self.enabled_cb = QCheckBox("Enabled")
         self.enabled_cb.setChecked(True)
+        self.enabled_cb.setStyleSheet(f"""
+            QCheckBox {{
+                color: {COLORS['text_secondary']};
+                font-size: 12px;
+            }}
+            QCheckBox::indicator {{
+                width: 16px;
+                height: 16px;
+            }}
+        """)
         self.enabled_cb.stateChanged.connect(lambda: self.group_changed.emit())
         header.addWidget(self.enabled_cb)
 
         delete_btn = QPushButton("Delete")
         delete_btn.setFixedWidth(60)
+        delete_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         delete_btn.setStyleSheet(f"""
             QPushButton {{
                 background-color: transparent;
@@ -94,15 +110,23 @@ class ChannelGroupWidget(QFrame):
 
         # Channel list
         self.channel_list = QListWidget()
+        self.channel_list.setMinimumHeight(80)
         self.channel_list.setMaximumHeight(120)
         self.channel_list.setStyleSheet(f"""
             QListWidget {{
                 background-color: {COLORS['surface_secondary']};
                 border: 1px solid {COLORS['border_light']};
-                border-radius: 4px;
+                border-radius: 6px;
+                padding: 4px;
+                font-size: 13px;
+                color: {COLORS['text_primary']};
             }}
             QListWidget::item {{
-                padding: 4px 8px;
+                padding: 5px 10px;
+                border-radius: 4px;
+            }}
+            QListWidget::item:hover {{
+                background-color: {COLORS['border_light']};
             }}
         """)
         layout.addWidget(self.channel_list)
@@ -170,6 +194,8 @@ class ModelConfigPage(QWidget):
 
         # Left column - Model parameters
         left_col = QWidget()
+        left_col.setMinimumWidth(350)
+        left_col.setMaximumWidth(450)
         left_layout = QVBoxLayout(left_col)
         left_layout.setContentsMargins(0, 0, 0, 0)
 
@@ -177,12 +203,35 @@ class ModelConfigPage(QWidget):
         params_group = QGroupBox("Model Parameters")
         params_layout = QFormLayout(params_group)
         params_layout.setSpacing(16)
+        params_layout.setFieldGrowthPolicy(QFormLayout.FieldGrowthPolicy.ExpandingFieldsGrow)
 
         # Kernel type
         self.kernel_combo = QComboBox()
+        self.kernel_combo.setMinimumWidth(180)
+        self.kernel_combo.setMinimumHeight(32)
         self.kernel_combo.addItems(["Triangular", "Parabolic"])
         self.kernel_combo.setCurrentText("Parabolic")
         self.kernel_combo.currentTextChanged.connect(self._on_config_changed)
+        self.kernel_combo.setStyleSheet(f"""
+            QComboBox {{
+                padding: 6px 12px;
+                font-size: 13px;
+                background-color: {COLORS['surface']};
+                border: 1px solid {COLORS['border']};
+                border-radius: 6px;
+                color: {COLORS['text_primary']};
+            }}
+            QComboBox::drop-down {{
+                border: none;
+                width: 24px;
+            }}
+            QComboBox QAbstractItemView {{
+                background-color: {COLORS['surface']};
+                border: 1px solid {COLORS['border']};
+                selection-background-color: {COLORS['primary']};
+                color: {COLORS['text_primary']};
+            }}
+        """)
         params_layout.addRow("Kernel Type:", self.kernel_combo)
 
         # Help text
@@ -195,7 +244,19 @@ class ModelConfigPage(QWidget):
         self.bins_spin = QSpinBox()
         self.bins_spin.setRange(8, 256)
         self.bins_spin.setValue(64)
+        self.bins_spin.setMinimumWidth(120)
+        self.bins_spin.setMinimumHeight(32)
         self.bins_spin.valueChanged.connect(self._on_config_changed)
+        self.bins_spin.setStyleSheet(f"""
+            QSpinBox {{
+                padding: 6px 12px;
+                font-size: 13px;
+                background-color: {COLORS['surface']};
+                border: 1px solid {COLORS['border']};
+                border-radius: 6px;
+                color: {COLORS['text_primary']};
+            }}
+        """)
         params_layout.addRow("Bins per Channel:", self.bins_spin)
 
         bins_help = QLabel("More bins = finer granularity, but requires more training data")
@@ -208,7 +269,19 @@ class ModelConfigPage(QWidget):
         self.width_spin.setRange(0.1, 1.0)
         self.width_spin.setValue(0.5)
         self.width_spin.setSingleStep(0.1)
+        self.width_spin.setMinimumWidth(120)
+        self.width_spin.setMinimumHeight(32)
         self.width_spin.valueChanged.connect(self._on_config_changed)
+        self.width_spin.setStyleSheet(f"""
+            QDoubleSpinBox {{
+                padding: 6px 12px;
+                font-size: 13px;
+                background-color: {COLORS['surface']};
+                border: 1px solid {COLORS['border']};
+                border-radius: 6px;
+                color: {COLORS['text_primary']};
+            }}
+        """)
         params_layout.addRow("Kernel Width:", self.width_spin)
 
         width_help = QLabel("Controls how strictly the model matches (lower = stricter)")
@@ -272,15 +345,32 @@ class ModelConfigPage(QWidget):
 
         # Right column - Channel Groups
         right_col = QWidget()
+        right_col.setMinimumWidth(400)
         right_layout = QVBoxLayout(right_col)
         right_layout.setContentsMargins(0, 0, 0, 0)
 
         # Channel Groups Header
         groups_header = QHBoxLayout()
-        groups_header.addWidget(QLabel("Channel Groups"))
+        header_label = QLabel("Channel Groups")
+        header_label.setStyleSheet(f"font-size: 16px; font-weight: 600; color: {COLORS['text_primary']};")
+        groups_header.addWidget(header_label)
         groups_header.addStretch()
 
-        self.new_group_btn = QPushButton("New Group")
+        self.new_group_btn = QPushButton("+ New Group")
+        self.new_group_btn.setMinimumHeight(32)
+        self.new_group_btn.setStyleSheet(f"""
+            QPushButton {{
+                background-color: {COLORS['primary']};
+                color: white;
+                border: none;
+                border-radius: 6px;
+                padding: 6px 16px;
+                font-weight: 500;
+            }}
+            QPushButton:hover {{
+                background-color: {COLORS['primary_hover']};
+            }}
+        """)
         self.new_group_btn.clicked.connect(self._create_group)
         groups_header.addWidget(self.new_group_btn)
 
@@ -295,22 +385,84 @@ class ModelConfigPage(QWidget):
         groups_help.setWordWrap(True)
         right_layout.addWidget(groups_help)
 
+        right_layout.addSpacing(12)
+
         # Available channels
         avail_group = QGroupBox("Available Channels")
         avail_layout = QVBoxLayout(avail_group)
 
         self.available_list = QListWidget()
         self.available_list.setSelectionMode(QListWidget.SelectionMode.ExtendedSelection)
-        self.available_list.setMaximumHeight(150)
+        self.available_list.setMinimumHeight(120)
+        self.available_list.setMaximumHeight(180)
+        self.available_list.setStyleSheet(f"""
+            QListWidget {{
+                background-color: {COLORS['surface']};
+                border: 1px solid {COLORS['border']};
+                border-radius: 6px;
+                padding: 4px;
+                font-size: 13px;
+                color: {COLORS['text_primary']};
+            }}
+            QListWidget::item {{
+                padding: 6px 10px;
+                border-radius: 4px;
+            }}
+            QListWidget::item:selected {{
+                background-color: {COLORS['primary']};
+                color: white;
+            }}
+            QListWidget::item:hover {{
+                background-color: {COLORS['surface_secondary']};
+            }}
+        """)
         avail_layout.addWidget(self.available_list)
 
         assign_row = QHBoxLayout()
-        assign_row.addWidget(QLabel("Assign to:"))
+        assign_label = QLabel("Assign to:")
+        assign_label.setStyleSheet(f"color: {COLORS['text_primary']}; font-size: 13px;")
+        assign_row.addWidget(assign_label)
+
         self.assign_combo = QComboBox()
-        self.assign_combo.setMinimumWidth(150)
+        self.assign_combo.setMinimumWidth(180)
+        self.assign_combo.setMinimumHeight(32)
+        self.assign_combo.setStyleSheet(f"""
+            QComboBox {{
+                padding: 6px 12px;
+                font-size: 13px;
+                background-color: {COLORS['surface']};
+                border: 1px solid {COLORS['border']};
+                border-radius: 6px;
+                color: {COLORS['text_primary']};
+            }}
+            QComboBox::drop-down {{
+                border: none;
+                width: 24px;
+            }}
+            QComboBox QAbstractItemView {{
+                background-color: {COLORS['surface']};
+                border: 1px solid {COLORS['border']};
+                selection-background-color: {COLORS['primary']};
+                color: {COLORS['text_primary']};
+            }}
+        """)
         assign_row.addWidget(self.assign_combo)
 
         self.assign_btn = QPushButton("Assign")
+        self.assign_btn.setMinimumHeight(32)
+        self.assign_btn.setStyleSheet(f"""
+            QPushButton {{
+                background-color: {COLORS['success']};
+                color: white;
+                border: none;
+                border-radius: 6px;
+                padding: 6px 16px;
+                font-weight: 500;
+            }}
+            QPushButton:hover {{
+                background-color: #2DB84D;
+            }}
+        """)
         self.assign_btn.clicked.connect(self._assign_channels)
         assign_row.addWidget(self.assign_btn)
 
@@ -325,7 +477,7 @@ class ModelConfigPage(QWidget):
         right_layout.addLayout(self.groups_container)
 
         right_layout.addStretch()
-        layout.addWidget(right_col)
+        layout.addWidget(right_col, stretch=1)
 
     def _on_config_changed(self):
         config = self.get_config()
