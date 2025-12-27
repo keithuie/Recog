@@ -14,7 +14,82 @@ from PyQt6.QtWidgets import (
 from PyQt6.QtCore import Qt, QTimer, pyqtSignal, pyqtSlot
 from PyQt6.QtGui import QFont, QColor, QCursor
 
-from ..styles import COLORS, get_chart_colors, get_match_color
+from ..styles import COLORS, get_chart_colors, get_match_color, get_auto_contrast_color
+
+
+class ChannelGroupWidget(QFrame):
+    """
+    Collapsible container for a group of channel strips.
+    """
+    
+    def __init__(self, name: str, parent=None):
+        super().__init__(parent)
+        self.name = name
+        self.is_expanded = True
+        
+        self._setup_ui()
+        
+    def _setup_ui(self):
+        self.setStyleSheet(f"""
+            QFrame#group_container {{
+                background-color: {COLORS['surface_secondary']};
+                border-radius: 6px;
+                margin-bottom: 8px;
+            }}
+            QPushButton {{
+                border: none;
+                text-align: left;
+                font-weight: 600;
+                color: {COLORS['text_primary']};
+                padding: 8px;
+                background-color: transparent;
+            }}
+            QPushButton:hover {{
+                background-color: {COLORS['surface']};
+                border-radius: 4px;
+            }}
+        """)
+        self.setObjectName("group_container")
+        
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(4, 4, 4, 4)
+        layout.setSpacing(0)
+        
+        # Header
+        header_layout = QHBoxLayout()
+        header_layout.setContentsMargins(4, 0, 4, 4)
+        
+        self.toggle_btn = QPushButton(f"▼ {self.name}")
+        self.toggle_btn.clicked.connect(self.toggle)
+        header_layout.addWidget(self.toggle_btn)
+        
+        layout.addLayout(header_layout)
+        
+        # Content container
+        self.content_widget = QWidget()
+        self.content_layout = QVBoxLayout(self.content_widget)
+        self.content_layout.setContentsMargins(0, 0, 0, 0)
+        self.content_layout.setSpacing(1)  # Space between strips
+        
+        layout.addWidget(self.content_widget)
+        
+    def add_strip(self, strip):
+        """Add a channel strip to this group"""
+        self.content_layout.addWidget(strip)
+        
+    def toggle(self):
+        """Toggle collapsed state"""
+        self.is_expanded = not self.is_expanded
+        
+        if self.is_expanded:
+            self.content_widget.show()
+            self.toggle_btn.setText(f"▼ {self.name}")
+            self.setMaximumHeight(16777215) # Restore max height
+        else:
+            self.content_widget.hide()
+            self.toggle_btn.setText(f"▶ {self.name}")
+            self.setFixedHeight(40)
+
 
 
 class ChannelStrip(QFrame):
@@ -329,6 +404,8 @@ class DashboardPage(QWidget):
         super().__init__(parent)
         self._channels = {}
         self._channel_strips = {}
+        self._groups_config = []  # List of {name, channels} dicts
+        self._group_widgets = {}
         self._match_bar = None
         self._timestamps = np.array([])
         self._match_scores = np.array([])
@@ -387,24 +464,71 @@ class DashboardPage(QWidget):
 
         # Get colors
         colors = get_chart_colors()
+        
+        # Identify grouped channels
+        grouped_channels = set()
+        for group in self._groups_config:
+            for ch in group['channels']:
+                if ch in channel_names:
+                    grouped_channels.add(ch)
+        
+        # 1. Create Group Widgets
+        current_color_idx = 0
+        
+        for group in self._groups_config:
+            group_name = group['name']
+            group_chs = [ch for ch in group['channels'] if ch in channel_names]
+            
+            if not group_chs:
+                continue
+                
+            group_widget = ChannelGroupWidget(group_name)
+            self._group_widgets[group_name] = group_widget
+            self.strips_layout.addWidget(group_widget)
+            
+            for ch_name in group_chs:
+                color = colors[current_color_idx % len(colors)]
+                current_color_idx += 1
+                
+                strip = ChannelStrip(ch_name, color)
+                self._channel_strips[ch_name] = strip
+                group_widget.add_strip(strip) # Add to group instead of main layout
+                
+                # Link X-axis
+                if self._first_strip is None:
+                    self._first_strip = strip
+                else:
+                    strip.plot_widget.setXLink(self._first_strip.plot_widget)
+                    
+                strip.plot_widget.scene().sigMouseMoved.connect(self._on_mouse_move)
 
-        # Create channel strips
-        for i, name in enumerate(channel_names):
-            color = colors[i % len(colors)]
-            strip = ChannelStrip(name, color)
-            self._channel_strips[name] = strip
+        # 2. Create Ungrouped Channels
+        ungrouped = [ch for ch in channel_names if ch not in grouped_channels]
+        
+        if ungrouped:
+            # Check if we have groups, if so, put leftovers in "Ungrouped"
+            target_layout = self.strips_layout
+            if self._groups_config:
+                ungrouped_widget = ChannelGroupWidget("Ungrouped Channels")
+                self.strips_layout.addWidget(ungrouped_widget)
+                target_layout = ungrouped_widget.content_layout
+                
+            for ch_name in ungrouped:
+                color = colors[current_color_idx % len(colors)]
+                current_color_idx += 1
+                
+                strip = ChannelStrip(ch_name, color)
+                self._channel_strips[ch_name] = strip
+                target_layout.addWidget(strip)
+                
+                if self._first_strip is None:
+                    self._first_strip = strip
+                else:
+                    strip.plot_widget.setXLink(self._first_strip.plot_widget)
+                    
+                strip.plot_widget.scene().sigMouseMoved.connect(self._on_mouse_move)
 
-            # Link X-axis to first strip for synchronized scrolling
-            if self._first_strip is None:
-                self._first_strip = strip
-            else:
-                strip.plot_widget.setXLink(self._first_strip.plot_widget)
-
-            # Connect mouse move for hover sync
-            strip.plot_widget.scene().sigMouseMoved.connect(self._on_mouse_move)
-
-            # Insert before the stretch
-            self.strips_layout.insertWidget(self.strips_layout.count() - 1, strip)
+        self.strips_layout.addStretch()
 
         # Add match strength bar at the bottom
         if self._match_bar:
@@ -430,6 +554,12 @@ class DashboardPage(QWidget):
         if len(self._match_scores) > 0:
             return self._match_scores[-1]
         return 100.0
+
+    def set_channel_groups(self, groups: list):
+        """Set channel group configuration"""
+        self._groups_config = groups
+        # If we already have strips, we might need to refresh, 
+        # but usually this is called before set_channels or we can rely on next set_channels
 
     def clear(self):
         """Clear all channel strips"""

@@ -178,6 +178,9 @@ class MachineIQApp:
                 group['channels']
             )
 
+        # Pass groups to dashboard
+        self.dashboard.set_channel_groups(channels.get('groups', []))
+
         # Apply alarm config
         alarms = config.get('alarms', {})
         email_config = alarms.get('email', {})

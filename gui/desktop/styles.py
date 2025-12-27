@@ -78,6 +78,27 @@ RADIUS = {
 }
 
 
+def get_auto_contrast_color(hex_color: str) -> str:
+    """
+    Return black or white text color based on background brightness.
+    Calculates perceived brightness using standard formula.
+    """
+    try:
+        h = hex_color.lstrip('#')
+        # Handle 3-digit hex
+        if len(h) == 3:
+            h = ''.join([c*2 for c in h])
+            
+        rgb = tuple(int(h[i:i+2], 16) for i in (0, 2, 4))
+        # Perceived brightness formula
+        brightness = (rgb[0] * 299 + rgb[1] * 587 + rgb[2] * 114) / 1000
+        
+        # Return black for light backgrounds, white for dark
+        return '#000000' if brightness > 128 else '#FFFFFF'
+    except Exception:
+        # Fallback to black if parsing fails
+        return '#000000'
+
 def get_stylesheet():
     """Return the main application stylesheet"""
     return f"""
@@ -146,6 +167,8 @@ def get_stylesheet():
         padding: 10px 20px;
         font-weight: 600;
         font-size: 13px;
+        font-weight: 600;
+        font-size: 13px;
     }}
 
     QPushButton:hover {{
@@ -183,15 +206,26 @@ def get_stylesheet():
     /* Input Fields */
     QLineEdit, QSpinBox, QDoubleSpinBox, QComboBox {{
         background-color: {COLORS['surface']};
+        color: {COLORS['text_primary']};
         border: 1px solid {COLORS['border']};
         border-radius: {RADIUS['md']}px;
-        padding: 10px 12px;
+        padding: 8px 12px;
+        min-height: 32px;
         font-size: 13px;
         selection-background-color: {COLORS['primary']};
+        selection-color: {COLORS['text_inverse']};
     }}
 
     QLineEdit:focus, QSpinBox:focus, QDoubleSpinBox:focus, QComboBox:focus {{
         border-color: {COLORS['primary']};
+        outline: none;
+    }}
+
+    QComboBox QAbstractItemView {{
+        background-color: {COLORS['surface']};
+        color: {COLORS['text_primary']};
+        selection-background-color: {COLORS['primary']};
+        selection-color: {COLORS['text_inverse']};
         outline: none;
     }}
 
