@@ -57,8 +57,7 @@ class Sidebar(QFrame):
         self.buttons = {}
         nav_items = [
             ("dashboard", "Dashboard"),
-            ("data", "Data Manager"),
-            ("connections", "Connections"),
+            ("dataflow", "Dataflow"),
             ("model", "Model Config"),
             ("alarms", "Alarms"),
         ]

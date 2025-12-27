@@ -18,8 +18,7 @@ from .styles import get_stylesheet, COLORS
 from .ui import (
     MainWindow,
     DashboardPage,
-    DataManagerPage,
-    ConnectionCenterPage,
+    DataflowPage,
     ModelConfigPage,
     AlarmCenterPage,
     SetupWizard
@@ -72,8 +71,7 @@ class MachineIQApp:
         # UI components
         self.main_window: Optional[MainWindow] = None
         self.dashboard: Optional[DashboardPage] = None
-        self.data_manager: Optional[DataManagerPage] = None
-        self.connection_center: Optional[ConnectionCenterPage] = None
+        self.dataflow: Optional[DataflowPage] = None
         self.model_config: Optional[ModelConfigPage] = None
         self.alarm_center: Optional[AlarmCenterPage] = None
 
@@ -93,15 +91,13 @@ class MachineIQApp:
 
         # Create pages
         self.dashboard = DashboardPage()
-        self.data_manager = DataManagerPage()
-        self.connection_center = ConnectionCenterPage()
+        self.dataflow = DataflowPage()
         self.model_config = ModelConfigPage()
         self.alarm_center = AlarmCenterPage()
 
         # Add pages to main window
         self.main_window.add_page("dashboard", self.dashboard, "Dashboard")
-        self.main_window.add_page("data", self.data_manager, "Data Manager")
-        self.main_window.add_page("connections", self.connection_center, "Connections")
+        self.main_window.add_page("dataflow", self.dataflow, "Dataflow")
         self.main_window.add_page("model", self.model_config, "Model Configuration")
         self.main_window.add_page("alarms", self.alarm_center, "Alarm Center")
 
@@ -120,9 +116,11 @@ class MachineIQApp:
         header.play_btn.clicked.connect(self._on_play)
         header.pause_btn.clicked.connect(self._on_pause)
 
-        # Data manager signals
-        self.data_manager.playback_started.connect(self._on_playback_started)
-        self.data_manager.playback_stopped.connect(self._on_playback_stopped)
+        # Dataflow signals
+        self.dataflow.source_added.connect(self._on_source_added)
+        self.dataflow.source_connected.connect(self._on_source_connect)
+        self.dataflow.source_disconnected.connect(self._on_source_disconnect)
+        self.dataflow.file_loaded.connect(self._on_csv_file_loaded)
 
         # Model config signals
         self.model_config.training_started.connect(self._on_training_started)
@@ -327,14 +325,69 @@ class MachineIQApp:
                     source.disconnect()
             self.main_window.header.set_status("Paused", connected=True)
 
-    def _on_playback_started(self):
-        """Handle playback started signal"""
-        self.main_window.header.set_status("Monitoring", connected=True, monitoring=True)
-        self.main_window.header.set_playback_enabled(True)
+    def _on_source_added(self, config: dict):
+        """Handle new data source added from Dataflow page"""
+        source_type = config.get('type', '')
+        name = config.get('name', 'Unknown')
 
-    def _on_playback_stopped(self):
-        """Handle playback stopped signal"""
-        self.main_window.header.set_status("Stopped", connected=True)
+        logger.info(f"Data source added: {name} ({source_type})")
+
+        if source_type == 'csv':
+            # CSV sources are auto-connected when added
+            pass
+        elif source_type == 'api':
+            # Store config for later connection
+            url = config.get('url', '')
+            interval = config.get('interval', 5)
+            if url:
+                self._setup_api_source(url, interval)
+                self.dataflow.set_source_status(name, "Monitoring")
+
+    def _on_source_connect(self, name: str):
+        """Handle source connect request from Dataflow page"""
+        logger.info(f"Connecting to source: {name}")
+        config = self.dataflow.get_source_config(name)
+
+        if config.get('type') == 'api':
+            self._setup_api_source(config.get('url', ''), config.get('interval', 5))
+            self.dataflow.set_source_status(name, "Monitoring")
+        elif config.get('type') == 'csv':
+            self._setup_csv_source(config.get('path', ''), config.get('timestamp_column', 'timestamp'))
+            self.dataflow.set_source_status(name, "Connected")
+
+    def _on_source_disconnect(self, name: str):
+        """Handle source disconnect request from Dataflow page"""
+        logger.info(f"Disconnecting from source: {name}")
+
+        if self.data_player:
+            source = self.data_player.active_source
+            if source:
+                source.disconnect()
+            self.dataflow.set_source_status(name, "Disconnected")
+            self.main_window.header.set_status("Disconnected", connected=False)
+
+    def _on_csv_file_loaded(self, filepath: str):
+        """Handle CSV file loaded from Dataflow page"""
+        logger.info(f"CSV file loaded: {filepath}")
+        self._setup_csv_source(filepath, 'timestamp')
+
+        # Update dataflow with file info
+        if self.data_player and self.data_player.active_source:
+            source = self.data_player.active_source
+            if hasattr(source, 'data') and source.data is not None:
+                df = source.data
+                columns = list(df.columns)
+                rows = len(df)
+                start_time = str(df.iloc[0]['timestamp']) if 'timestamp' in df.columns else None
+                end_time = str(df.iloc[-1]['timestamp']) if 'timestamp' in df.columns else None
+
+                self.dataflow.set_file_info(rows, columns, start_time, end_time)
+
+                # Set preview data (first 10 rows)
+                preview_rows = []
+                for i in range(min(10, len(df))):
+                    preview_rows.append([str(df.iloc[i][col]) for col in columns])
+                self.dataflow.set_preview_data(preview_rows)
 
     def _on_training_started(self):
         """Handle training started signal"""
