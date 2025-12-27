@@ -9,10 +9,10 @@ import numpy as np
 import pyqtgraph as pg
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QFrame,
-    QScrollArea, QSizePolicy, QSplitter
+    QScrollArea, QSizePolicy, QSplitter, QPushButton
 )
-from PyQt6.QtCore import Qt, QTimer, pyqtSignal
-from PyQt6.QtGui import QFont, QColor
+from PyQt6.QtCore import Qt, QTimer, pyqtSignal, pyqtSlot
+from PyQt6.QtGui import QFont, QColor, QCursor
 
 from ..styles import COLORS, get_chart_colors, get_match_color
 
@@ -35,6 +35,7 @@ class ChannelStrip(QFrame):
         self._current_value = 0.0
         self._min_value = 0.0
         self._max_value = 100.0
+        self._is_minimized = False
 
         self._setup_ui()
 
@@ -76,17 +77,22 @@ class ChannelStrip(QFrame):
         layout.addWidget(y_panel)
 
         # Center - Plot
-        self.plot_widget = pg.PlotWidget()
+        self.plot_widget = pg.PlotWidget(axisItems={'bottom': pg.DateAxisItem(orientation='bottom')})
         self.plot_widget.setBackground('#1A1A1C')
         self.plot_widget.setMouseEnabled(x=True, y=False)
         self.plot_widget.hideAxis('left')
-        self.plot_widget.hideAxis('bottom')
+        self.plot_widget.showAxis('bottom')
         self.plot_widget.setMenuEnabled(False)
         self.plot_widget.getViewBox().setDefaultPadding(0)
 
+        # Add infinite line for hover
+        self.v_line = pg.InfiniteLine(angle=90, movable=False)
+        self.v_line.setPen(pg.mkPen('#FFFFFF', width=1, style=Qt.PenStyle.DashLine))
+        self.plot_widget.addItem(self.v_line, ignoreBounds=True)
+
         # Create plot curve
         pen = pg.mkPen(color=self.color, width=1.5)
-        self.curve = self.plot_widget.plot([], [], pen=pen)
+        self.curve = self.plot_widget.plot([], [], pen=pen, symbol='o', symbolSize=3, symbolBrush=self.color, symbolPen=None)
 
         layout.addWidget(self.plot_widget, stretch=1)
 
@@ -109,7 +115,70 @@ class ChannelStrip(QFrame):
         self.value_label.setAlignment(Qt.AlignmentFlag.AlignRight)
         info_layout.addWidget(self.value_label)
 
+        # Button row
+        btn_layout = QHBoxLayout()
+        btn_layout.addStretch()
+
+        # Reset View button
+        self.reset_btn = QPushButton("⟲")
+        self.reset_btn.setFixedSize(20, 20)
+        self.reset_btn.setToolTip("Reset View")
+        self.reset_btn.setStyleSheet("""
+            QPushButton {
+                background: transparent;
+                color: #666;
+                border: 1px solid #333;
+                border-radius: 2px;
+            }
+            QPushButton:hover {
+                background: #333;
+                color: #FFF;
+            }
+        """)
+        self.reset_btn.clicked.connect(lambda: self.plot_widget.autoRange())
+        btn_layout.addWidget(self.reset_btn)
+
+        # Minimize button
+        self.min_btn = QPushButton("−")
+        self.min_btn.setFixedSize(20, 20)
+        self.min_btn.setCheckable(True)
+        self.min_btn.setStyleSheet("""
+            QPushButton {
+                background: transparent;
+                color: #666;
+                border: 1px solid #333;
+                border-radius: 2px;
+            }
+            QPushButton:hover {
+                background: #333;
+                color: #FFF;
+            }
+            QPushButton:checked {
+                background: #333;
+                color: #FFF;
+            }
+        """)
+        self.min_btn.clicked.connect(self._toggle_minimize)
+        btn_layout.addWidget(self.min_btn)
+
+        info_layout.addLayout(btn_layout)
+
+        # Add info panel to main layout
         layout.addWidget(info_panel)
+
+    def _toggle_minimize(self, checked):
+        """Toggle between minimized and expanded view"""
+        self._is_minimized = checked
+        if checked:
+            self.plot_widget.hide()
+            self.min_btn.setText("+")
+            self.setMaximumHeight(50)
+            self.setMinimumHeight(40)
+        else:
+            self.plot_widget.show()
+            self.min_btn.setText("−")
+            self.setMaximumHeight(120)
+            self.setMinimumHeight(100)
 
     def update_data(self, timestamps: np.ndarray, values: np.ndarray):
         """Update the plot with new data"""
@@ -138,6 +207,11 @@ class ChannelStrip(QFrame):
         self.color = color
         self.name_label.setStyleSheet(f"color: {color}; font-size: 12px; font-weight: 500;")
         self.curve.setPen(pg.mkPen(color=color, width=1.5))
+        self.curve.setSymbolBrush(color)
+
+    def set_hover_line(self, x_val):
+        """Update hover line position"""
+        self.v_line.setPos(x_val)
 
 
 class MatchStrengthBar(QFrame):
@@ -258,6 +332,7 @@ class DashboardPage(QWidget):
         self._match_bar = None
         self._timestamps = np.array([])
         self._match_scores = np.array([])
+        self._first_strip = None
 
         self._setup_ui()
 
@@ -285,7 +360,7 @@ class DashboardPage(QWidget):
         self.strips_layout.setSpacing(0)
 
         # Placeholder when no channels
-        self.placeholder = QLabel("No data loaded. Use Data Manager or Connection Center to load data.")
+        self.placeholder = QLabel("No data loaded. Use Dataflow to load data.")
         self.placeholder.setStyleSheet(f"""
             color: {COLORS['text_secondary']};
             font-size: 14px;
@@ -305,6 +380,7 @@ class DashboardPage(QWidget):
         for strip in self._channel_strips.values():
             strip.deleteLater()
         self._channel_strips.clear()
+        self._first_strip = None
 
         # Hide placeholder
         self.placeholder.hide()
@@ -317,6 +393,16 @@ class DashboardPage(QWidget):
             color = colors[i % len(colors)]
             strip = ChannelStrip(name, color)
             self._channel_strips[name] = strip
+
+            # Link X-axis to first strip for synchronized scrolling
+            if self._first_strip is None:
+                self._first_strip = strip
+            else:
+                strip.plot_widget.setXLink(self._first_strip.plot_widget)
+
+            # Connect mouse move for hover sync
+            strip.plot_widget.scene().sigMouseMoved.connect(self._on_mouse_move)
+
             # Insert before the stretch
             self.strips_layout.insertWidget(self.strips_layout.count() - 1, strip)
 
@@ -350,9 +436,25 @@ class DashboardPage(QWidget):
         for strip in self._channel_strips.values():
             strip.deleteLater()
         self._channel_strips.clear()
+        self._first_strip = None
 
         if self._match_bar:
             self._match_bar.deleteLater()
             self._match_bar = None
 
         self.placeholder.show()
+
+    def _on_mouse_move(self, pos):
+        """Handle mouse move to update hover lines across all strips"""
+        if not self._channel_strips or not self._first_strip:
+            return
+
+        # Check if position is within the first strip's plot area
+        if self._first_strip.plot_widget.sceneBoundingRect().contains(pos):
+            # Map scene point to view coordinates
+            mouse_point = self._first_strip.plot_widget.getPlotItem().vb.mapSceneToView(pos)
+            x_val = mouse_point.x()
+
+            # Update hover line on all strips
+            for strip in self._channel_strips.values():
+                strip.set_hover_line(x_val)
