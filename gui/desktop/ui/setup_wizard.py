@@ -147,8 +147,14 @@ class DataSourceStep(WizardStep):
         sample_row.addWidget(self.sample_api_combo)
         api_layout.addLayout(sample_row)
 
-        # URL input
+        # Name and URL input
         url_form = QFormLayout()
+
+        self.api_name = QLineEdit()
+        self.api_name.setPlaceholderText("My Data Source")
+        self.api_name.setText("USGS Earthquakes")
+        url_form.addRow("Source Name:", self.api_name)
+
         self.api_url = QLineEdit()
         self.api_url.setPlaceholderText("https://api.example.com/data")
         self.api_url.textChanged.connect(lambda: self.completed.emit(self.is_valid()))
@@ -333,6 +339,7 @@ class DataSourceStep(WizardStep):
             data['file_path'] = self.file_path.text()
             data['timestamp_column'] = self.timestamp_col.currentText()
         elif "REST" in source_type:
+            data['name'] = self.api_name.text().strip() or "REST API"
             data['url'] = self.api_url.text()
             data['interval'] = self.api_interval.value()
         elif "MQTT" in source_type:
@@ -351,180 +358,113 @@ class ModelConfigStep(WizardStep):
     def __init__(self, parent=None):
         super().__init__(
             "Configure Detection Model",
-            "Set up the anomaly detection parameters. The defaults work well for most industrial applications. Adjust if needed for your specific use case.",
+            "Set up the anomaly detection parameters. The defaults work well for most industrial applications.",
             parent
         )
         self._setup_content()
 
-    def _create_setting_row(self, label_text: str, widget, help_text: str):
-        """Create a setting row with label, widget and help text"""
-        container = QWidget()
-        layout = QVBoxLayout(container)
-        layout.setContentsMargins(0, 0, 0, 16)
-        layout.setSpacing(6)
-
-        # Label and widget row
-        row = QHBoxLayout()
-        row.setSpacing(16)
-
-        label = QLabel(label_text)
-        label.setMinimumWidth(120)
-        label.setStyleSheet(f"font-weight: 500; color: {COLORS['text_primary']};")
-        row.addWidget(label)
-
-        widget.setMinimumWidth(160)
-        widget.setMinimumHeight(36)
-        row.addWidget(widget)
-        row.addStretch()
-
-        layout.addLayout(row)
-
-        # Help text
-        help_label = QLabel(help_text)
-        help_label.setStyleSheet(f"""
-            color: {COLORS['text_tertiary']};
-            font-size: 12px;
-            padding-left: 136px;
-        """)
-        help_label.setWordWrap(True)
-        layout.addWidget(help_label)
-
-        return container
-
     def _setup_content(self):
-        # Kernel settings
+        # Use simpler form layouts that render reliably
+
+        # Kernel settings group
         kernel_group = QGroupBox("Detection Kernel")
-        kernel_group.setStyleSheet(f"""
-            QGroupBox {{
-                font-weight: 600;
-                font-size: 14px;
-                color: {COLORS['text_primary']};
-                border: 1px solid {COLORS['border']};
-                border-radius: 10px;
-                margin-top: 16px;
-                padding: 20px;
-                padding-top: 32px;
-            }}
-            QGroupBox::title {{
-                subcontrol-origin: margin;
-                left: 16px;
-                padding: 0 8px;
-            }}
-        """)
-        kernel_layout = QVBoxLayout(kernel_group)
-        kernel_layout.setSpacing(8)
-        kernel_layout.setContentsMargins(16, 16, 16, 16)
+        kernel_form = QFormLayout(kernel_group)
+        kernel_form.setSpacing(16)
+        kernel_form.setContentsMargins(16, 24, 16, 16)
+        kernel_form.setFieldGrowthPolicy(QFormLayout.FieldGrowthPolicy.ExpandingFieldsGrow)
 
         # Kernel type
         self.kernel_type = QComboBox()
         self.kernel_type.addItems(["Triangular", "Parabolic"])
-        kernel_layout.addWidget(self._create_setting_row(
-            "Kernel Type:",
-            self.kernel_type,
-            "Triangular: Faster, good for sharp changes. Parabolic: Smoother, better for gradual variations. Use Parabolic for most industrial applications."
-        ))
+        self.kernel_type.setMinimumHeight(32)
+        self.kernel_type.setMinimumWidth(200)
+        kernel_form.addRow("Kernel Type:", self.kernel_type)
+
+        kernel_help1 = QLabel("Triangular: Fast, sharp changes. Parabolic: Smooth, gradual variations.")
+        kernel_help1.setStyleSheet(f"color: {COLORS['text_tertiary']}; font-size: 11px; margin-bottom: 8px;")
+        kernel_help1.setWordWrap(True)
+        kernel_form.addRow("", kernel_help1)
 
         # Number of bins
         self.num_bins = QSpinBox()
         self.num_bins.setRange(10, 500)
         self.num_bins.setValue(100)
-        kernel_layout.addWidget(self._create_setting_row(
-            "Number of Bins:",
-            self.num_bins,
-            "Divides each channel's value range into bins. More bins = finer detail but needs more training data. 50-100 works well for most cases."
-        ))
+        self.num_bins.setMinimumHeight(32)
+        self.num_bins.setMinimumWidth(120)
+        kernel_form.addRow("Number of Bins:", self.num_bins)
+
+        bins_help = QLabel("More bins = finer detail but needs more training data. 50-100 is typical.")
+        bins_help.setStyleSheet(f"color: {COLORS['text_tertiary']}; font-size: 11px; margin-bottom: 8px;")
+        bins_help.setWordWrap(True)
+        kernel_form.addRow("", bins_help)
 
         # Kernel width
         self.kernel_width = QDoubleSpinBox()
         self.kernel_width.setRange(0.01, 1.0)
         self.kernel_width.setValue(0.1)
         self.kernel_width.setSingleStep(0.01)
-        kernel_layout.addWidget(self._create_setting_row(
-            "Kernel Width:",
-            self.kernel_width,
-            "Controls matching sensitivity. Lower = stricter matching (catches subtle anomalies). Higher = more tolerant (fewer false alarms). Start with 0.1."
-        ))
+        self.kernel_width.setMinimumHeight(32)
+        self.kernel_width.setMinimumWidth(120)
+        kernel_form.addRow("Kernel Width:", self.kernel_width)
+
+        width_help = QLabel("Lower = stricter matching. Higher = more tolerant. Start with 0.1.")
+        width_help.setStyleSheet(f"color: {COLORS['text_tertiary']}; font-size: 11px;")
+        width_help.setWordWrap(True)
+        kernel_form.addRow("", width_help)
 
         self.content_layout.addWidget(kernel_group)
-        self.content_layout.addSpacing(16)
 
-        # Detection settings
+        # Detection settings group
         detection_group = QGroupBox("Detection Settings")
-        detection_group.setStyleSheet(f"""
-            QGroupBox {{
-                font-weight: 600;
-                font-size: 14px;
-                color: {COLORS['text_primary']};
-                border: 1px solid {COLORS['border']};
-                border-radius: 10px;
-                margin-top: 16px;
-                padding: 20px;
-                padding-top: 32px;
-            }}
-            QGroupBox::title {{
-                subcontrol-origin: margin;
-                left: 16px;
-                padding: 0 8px;
-            }}
-        """)
-        detection_layout = QVBoxLayout(detection_group)
-        detection_layout.setSpacing(8)
-        detection_layout.setContentsMargins(16, 16, 16, 16)
+        detection_form = QFormLayout(detection_group)
+        detection_form.setSpacing(16)
+        detection_form.setContentsMargins(16, 24, 16, 16)
+        detection_form.setFieldGrowthPolicy(QFormLayout.FieldGrowthPolicy.ExpandingFieldsGrow)
 
         # Alert threshold
         self.threshold = QDoubleSpinBox()
         self.threshold.setRange(1, 100)
         self.threshold.setValue(30)
         self.threshold.setSuffix(" %")
-        detection_layout.addWidget(self._create_setting_row(
-            "Alert Threshold:",
-            self.threshold,
-            "Triggers alerts when match score falls below this value. Lower = more sensitive (more alerts). Higher = less sensitive (fewer alerts). 30% is a good starting point."
-        ))
+        self.threshold.setMinimumHeight(32)
+        self.threshold.setMinimumWidth(120)
+        detection_form.addRow("Alert Threshold:", self.threshold)
+
+        threshold_help = QLabel("Alerts trigger when match score falls below this. 30% is a good start.")
+        threshold_help.setStyleSheet(f"color: {COLORS['text_tertiary']}; font-size: 11px; margin-bottom: 8px;")
+        threshold_help.setWordWrap(True)
+        detection_form.addRow("", threshold_help)
 
         # Window size
         self.window_size = QSpinBox()
         self.window_size.setRange(1, 1000)
         self.window_size.setValue(50)
         self.window_size.setSuffix(" samples")
-        detection_layout.addWidget(self._create_setting_row(
-            "Window Size:",
-            self.window_size,
-            "Number of recent data points to analyze together. Larger windows smooth out noise but may miss short anomalies. 50 samples is typical."
-        ))
+        self.window_size.setMinimumHeight(32)
+        self.window_size.setMinimumWidth(120)
+        detection_form.addRow("Window Size:", self.window_size)
+
+        window_help = QLabel("Data points to analyze together. Larger = smoother but slower detection.")
+        window_help.setStyleSheet(f"color: {COLORS['text_tertiary']}; font-size: 11px;")
+        window_help.setWordWrap(True)
+        detection_form.addRow("", window_help)
 
         self.content_layout.addWidget(detection_group)
 
-        # Quick tips section
-        tips_frame = QFrame()
-        tips_frame.setStyleSheet(f"""
-            QFrame {{
-                background-color: {COLORS['surface_secondary']};
-                border: 1px solid {COLORS['border_light']};
-                border-radius: 8px;
-                padding: 16px;
-            }}
+        # Quick tips
+        tips_label = QLabel(
+            "Tip: Start with defaults. Adjust threshold after training if you get too many/few alerts."
+        )
+        tips_label.setStyleSheet(f"""
+            color: {COLORS['text_secondary']};
+            font-size: 12px;
+            padding: 12px;
+            background-color: {COLORS['surface_secondary']};
+            border-radius: 6px;
+            margin-top: 8px;
         """)
-        tips_layout = QVBoxLayout(tips_frame)
-        tips_layout.setSpacing(8)
-
-        tips_title = QLabel("Quick Tips")
-        tips_title.setStyleSheet(f"font-weight: 600; color: {COLORS['text_primary']}; font-size: 13px;")
-        tips_layout.addWidget(tips_title)
-
-        tips = [
-            "Start with defaults - they work well for most industrial monitoring",
-            "Adjust threshold after training if you get too many/few alerts",
-            "Use more bins for high-precision sensors, fewer for noisy data",
-        ]
-        for tip in tips:
-            tip_label = QLabel(f"• {tip}")
-            tip_label.setStyleSheet(f"color: {COLORS['text_secondary']}; font-size: 12px;")
-            tip_label.setWordWrap(True)
-            tips_layout.addWidget(tip_label)
-
-        self.content_layout.addSpacing(16)
-        self.content_layout.addWidget(tips_frame)
+        tips_label.setWordWrap(True)
+        self.content_layout.addWidget(tips_label)
 
     def get_data(self) -> dict:
         return {

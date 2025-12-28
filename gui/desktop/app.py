@@ -179,10 +179,11 @@ class MachineIQApp:
         elif source_type == 'REST API':
             url = data_source.get('url')
             interval = data_source.get('interval', 5)
+            api_name = data_source.get('name', 'REST API')
             if url:
-                self._setup_api_source(url, interval)
+                self._setup_api_source(url, interval, api_name)
                 # Add to Dataflow page
-                self._add_to_dataflow('api', url, None, interval)
+                self._add_to_dataflow('api', url, None, interval, api_name)
 
         # Apply model config
         model = config.get('model', {})
@@ -250,19 +251,19 @@ class MachineIQApp:
 
         logger.info("Wizard configuration applied successfully")
 
-    def _add_to_dataflow(self, source_type: str, path_or_url: str, timestamp_col: str = None, interval: int = 5):
+    def _add_to_dataflow(self, source_type: str, path_or_url: str, timestamp_col: str = None, interval: int = 5, custom_name: str = None):
         """Add a data source to the Dataflow page display"""
         from pathlib import Path
 
         if source_type == 'csv':
-            name = Path(path_or_url).name
+            name = custom_name or Path(path_or_url).name
             self.dataflow.add_source_card(name, "CSV File", path_or_url, "Connected")
         elif source_type == 'api':
-            name = "REST API"
+            name = custom_name or "REST API"
             display_url = path_or_url[:50] + "..." if len(path_or_url) > 50 else path_or_url
             self.dataflow.add_source_card(name, "REST API", display_url, "Monitoring")
         elif source_type == 'sample':
-            name = Path(path_or_url).name
+            name = custom_name or Path(path_or_url).name
             self.dataflow.add_source_card(name, "Sample Data", path_or_url, "Connected")
 
     def _setup_csv_source(self, filepath: str, timestamp_col: str = 'timestamp', source_name: str = None):
@@ -311,23 +312,24 @@ class MachineIQApp:
             self.main_window.header.set_status("Load failed", connected=False)
             return None
 
-    def _setup_api_source(self, url: str, interval: int = 5):
+    def _setup_api_source(self, url: str, interval: int = 5, source_name: str = None):
         """Set up REST API data source"""
         from .core import APIDataSource, DataPlayer
 
-        logger.info(f"Setting up API source: {url}")
+        name = source_name or "REST API"
+        logger.info(f"Setting up API source '{name}': {url}")
 
         # Create data player if needed
         if not self.data_player:
             self.data_player = DataPlayer()
             self.data_player.add_data_callback(self._on_data_received)
 
-        # Create API source
-        source = APIDataSource("REST API", url, poll_interval=float(interval), use_wall_clock=True)
+        # Create API source with custom name
+        source = APIDataSource(name, url, poll_interval=float(interval), use_wall_clock=True)
         source.set_status_callback(self._on_api_status)
 
         self.data_player.add_source(source)
-        self.data_player.set_active_source("REST API")
+        self.data_player.set_active_source(name)
 
         # Connect (this will test and discover channels)
         if self.data_player.connect():

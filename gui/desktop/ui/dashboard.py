@@ -726,44 +726,53 @@ class DashboardPage(QWidget):
 
     def _setup_ui(self):
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(8, 8, 8, 8)
-        layout.setSpacing(8)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(0)
 
         # Scroll area for groups
-        scroll = QScrollArea()
-        scroll.setWidgetResizable(True)
-        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
-        scroll.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
-        scroll.setStyleSheet(f"""
-            QScrollArea {{
+        self.scroll = QScrollArea()
+        self.scroll.setWidgetResizable(True)
+        self.scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self.scroll.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOn)
+        self.scroll.setFrameShape(QFrame.Shape.NoFrame)
+        self.scroll.setStyleSheet("""
+            QScrollArea {
                 background-color: #0D0D0E;
                 border: none;
-            }}
-            QScrollBar:vertical {{
+            }
+            QScrollBar:vertical {
                 background-color: #1A1A1C;
-                width: 14px;
-                border-radius: 7px;
-            }}
-            QScrollBar::handle:vertical {{
-                background-color: #444;
-                border-radius: 6px;
-                min-height: 30px;
-                margin: 2px;
-            }}
-            QScrollBar::handle:vertical:hover {{
+                width: 16px;
+                margin: 0;
+            }
+            QScrollBar::handle:vertical {
                 background-color: #555;
-            }}
-            QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {{
+                border-radius: 6px;
+                min-height: 40px;
+                margin: 3px;
+            }
+            QScrollBar::handle:vertical:hover {
+                background-color: #777;
+            }
+            QScrollBar::handle:vertical:pressed {
+                background-color: #888;
+            }
+            QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
                 height: 0;
-            }}
+                background: none;
+            }
+            QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {
+                background: #1A1A1C;
+            }
         """)
 
         # Container for groups
         self.groups_container = QWidget()
         self.groups_container.setStyleSheet("background-color: #0D0D0E;")
         self.groups_layout = QVBoxLayout(self.groups_container)
-        self.groups_layout.setContentsMargins(0, 0, 0, 0)
-        self.groups_layout.setSpacing(8)
+        self.groups_layout.setContentsMargins(8, 8, 8, 8)
+        self.groups_layout.setSpacing(12)
+        self.groups_layout.setAlignment(Qt.AlignmentFlag.AlignTop)
 
         # Placeholder
         self.placeholder = QLabel("No data loaded.\n\nUse Dataflow to connect a data source,\nthen create channel groups in Model Config.")
@@ -775,10 +784,8 @@ class DashboardPage(QWidget):
         self.placeholder.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.groups_layout.addWidget(self.placeholder)
 
-        self.groups_layout.addStretch()
-
-        scroll.setWidget(self.groups_container)
-        layout.addWidget(scroll)
+        self.scroll.setWidget(self.groups_container)
+        layout.addWidget(self.scroll)
 
     def set_groups(self, groups: list):
         """
@@ -806,14 +813,27 @@ class DashboardPage(QWidget):
 
             if channels:  # Only create section if has channels
                 section = ChannelGroupSection(name, channels, color)
+                # Use default arguments to capture current values (avoid closure issue)
                 section.training_requested.connect(
-                    lambda n, d: self.training_started.emit(n, d)
+                    lambda n, d, s=section: self._on_training_requested(s.group_name, d)
                 )
                 section.stop_training_requested.connect(
-                    lambda n: self.training_stopped.emit(n)
+                    lambda n, s=section: self._on_stop_training(s.group_name)
                 )
                 self._groups[name] = section
                 self.groups_layout.insertWidget(self.groups_layout.count() - 1, section)
+
+    def _on_training_requested(self, group_name: str, duration: int):
+        """Forward training request signal"""
+        self.training_started.emit(group_name, duration)
+
+    def _on_stop_training(self, group_name: str):
+        """Forward stop training signal"""
+        self.training_stopped.emit(group_name)
+
+    def set_channel_groups(self, groups: list):
+        """Alias for set_groups for compatibility"""
+        self.set_groups(groups)
 
     def set_ungrouped_channels(self, channels: list):
         """Set channels that aren't in any group"""
@@ -821,15 +841,20 @@ class DashboardPage(QWidget):
 
         if self._ungrouped_section:
             self._ungrouped_section.deleteLater()
+            self._ungrouped_section = None
 
         if channels:
+            self.placeholder.hide()
             self._ungrouped_section = ChannelGroupSection(
                 "Ungrouped Channels", channels, "#888888"
             )
             self._ungrouped_section.training_requested.connect(
-                lambda n, d: self.training_started.emit(n, d)
+                lambda n, d: self._on_training_requested("Ungrouped Channels", d)
             )
-            self.groups_layout.insertWidget(self.groups_layout.count() - 1, self._ungrouped_section)
+            self._ungrouped_section.stop_training_requested.connect(
+                lambda n: self._on_stop_training("Ungrouped Channels")
+            )
+            self.groups_layout.addWidget(self._ungrouped_section)
 
     def update_channel_data(self, channel_name: str, timestamps: np.ndarray, values: np.ndarray):
         """Update data for a specific channel"""
