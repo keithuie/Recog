@@ -26,8 +26,10 @@ from .ui import (
 from .core import (
     ChannelGroupManager,
     DataPlayer,
-    AlarmManager
+    AlarmManager,
+    AlarmCondition
 )
+from .core.alarm_manager import AlarmConditionType, AlarmSeverity
 
 # Import detector from miq core
 import sys
@@ -202,6 +204,9 @@ class MachineIQApp:
                 group['channels']
             )
 
+        # Pass groups to dashboard
+        self.dashboard.set_channel_groups(channels.get('groups', []))
+
         # Apply alarm config
         alarms = config.get('alarms', {})
         email_config = alarms.get('email', {})
@@ -217,12 +222,20 @@ class MachineIQApp:
                 self.alarm_manager.add_recipient(recipient)
 
         for condition in alarms.get('conditions', []):
-            self.alarm_manager.add_condition(
-                name=f"{condition['severity']} Alert",
-                condition_type=condition['type'],
-                threshold=condition['threshold'],
-                severity=condition['severity']
-            )
+            # Convert strings to enums
+            try:
+                cond_type = AlarmConditionType[condition['type']]
+                severity = AlarmSeverity[condition['severity']]
+                
+                new_condition = AlarmCondition(
+                    name=f"{condition['severity']} Alert",
+                    condition_type=cond_type,
+                    threshold=condition['threshold'],
+                    severity=severity
+                )
+                self.alarm_manager.add_condition(new_condition)
+            except KeyError as e:
+                logger.error(f"Invalid alarm configuration: {e}")
 
         # Update status
         self.main_window.header.set_status("Configured", connected=True)
@@ -279,7 +292,7 @@ class MachineIQApp:
             self.data_player.add_data_callback(self._on_data_received)
 
         # Create API source
-        source = APIDataSource("REST API", url, poll_interval=float(interval))
+        source = APIDataSource("REST API", url, poll_interval=float(interval), use_wall_clock=True)
         source.set_status_callback(self._on_api_status)
 
         self.data_player.add_source(source)

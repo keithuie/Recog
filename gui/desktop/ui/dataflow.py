@@ -19,7 +19,7 @@ from PyQt6.QtWidgets import (
 )
 from PyQt6.QtCore import Qt, pyqtSignal
 
-from ..styles import COLORS
+from ..styles import COLORS, get_auto_contrast_color
 
 
 # Sample APIs available for quick setup
@@ -596,6 +596,7 @@ class DataflowPage(QWidget):
         upload_btn.setStyleSheet(f"""
             QPushButton {{
                 background-color: {COLORS['surface']};
+                color: {get_auto_contrast_color(COLORS['surface'])};
                 border: 1px solid {COLORS['border']};
                 border-radius: 8px;
                 font-weight: 500;
@@ -614,6 +615,7 @@ class DataflowPage(QWidget):
         sample_btn.setStyleSheet(f"""
             QPushButton {{
                 background-color: {COLORS['surface']};
+                color: {get_auto_contrast_color(COLORS['surface'])};
                 border: 1px solid {COLORS['border']};
                 border-radius: 8px;
                 font-weight: 500;
@@ -632,6 +634,7 @@ class DataflowPage(QWidget):
         template_btn.setStyleSheet(f"""
             QPushButton {{
                 background-color: {COLORS['surface']};
+                color: {get_auto_contrast_color(COLORS['surface'])};
                 border: 1px solid {COLORS['border']};
                 border-radius: 8px;
                 font-weight: 500;

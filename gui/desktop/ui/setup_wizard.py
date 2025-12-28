@@ -14,7 +14,7 @@ from PyQt6.QtWidgets import (
 )
 from PyQt6.QtCore import Qt, pyqtSignal, QTimer
 
-from ..styles import COLORS
+from ..styles import COLORS, get_auto_contrast_color
 
 
 class WizardStep(QFrame):
@@ -368,11 +368,13 @@ class ModelConfigStep(WizardStep):
 
         self.num_bins = QSpinBox()
         self.num_bins.setRange(10, 500)
+        self.num_bins.setMinimumWidth(120)
         self.num_bins.setValue(100)
         kernel_layout.addRow("Number of Bins:", self.num_bins)
 
         self.kernel_width = QDoubleSpinBox()
         self.kernel_width.setRange(0.01, 1.0)
+        self.kernel_width.setMinimumWidth(120)
         self.kernel_width.setValue(0.1)
         self.kernel_width.setSingleStep(0.01)
         kernel_layout.addRow("Kernel Width:", self.kernel_width)
@@ -386,12 +388,14 @@ class ModelConfigStep(WizardStep):
 
         self.threshold = QDoubleSpinBox()
         self.threshold.setRange(1, 100)
+        self.threshold.setMinimumWidth(120)
         self.threshold.setValue(30)
         self.threshold.setSuffix(" %")
         detection_layout.addRow("Alert Threshold:", self.threshold)
 
         self.window_size = QSpinBox()
         self.window_size.setRange(1, 1000)
+        self.window_size.setMinimumWidth(120)
         self.window_size.setValue(50)
         self.window_size.setSuffix(" samples")
         detection_layout.addRow("Window Size:", self.window_size)
@@ -442,7 +446,7 @@ class ChannelGroupStep(WizardStep):
 
         self.channels_list = QListWidget()
         self.channels_list.setSelectionMode(QListWidget.SelectionMode.MultiSelection)
-        self.channels_list.setMaximumHeight(150)
+        self.channels_list.setMinimumHeight(300)
         channels_layout.addWidget(self.channels_list)
 
         self.content_layout.addWidget(channels_group)
@@ -469,7 +473,8 @@ class ChannelGroupStep(WizardStep):
         groups_layout = QVBoxLayout(groups_group)
 
         self.groups_list = QListWidget()
-        self.groups_list.setMaximumHeight(120)
+        self.groups_list = QListWidget()
+        self.groups_list.setMinimumHeight(150)
         groups_layout.addWidget(self.groups_list)
 
         remove_btn = QPushButton("Remove Selected Group")
@@ -582,12 +587,16 @@ class AlarmConfigStep(WizardStep):
 
         self.content_layout.addWidget(email_group)
 
+        email_layout.setContentsMargins(12, 20, 12, 12)
+        email_layout.setVerticalSpacing(16)
+
         # Recipients
         recipients_group = QGroupBox("Notification Recipients")
         recipients_layout = QVBoxLayout(recipients_group)
 
         self.recipients_list = QListWidget()
-        self.recipients_list.setMaximumHeight(100)
+        self.recipients_list = QListWidget()
+        self.recipients_list.setMinimumHeight(120)
         recipients_layout.addWidget(self.recipients_list)
 
         add_row = QHBoxLayout()
@@ -747,18 +756,31 @@ class SetupWizard(QDialog):
                 padding: 0 8px;
             }}
             QLineEdit, QComboBox, QSpinBox, QDoubleSpinBox {{
-                padding: 8px 12px;
+                padding: 6px 8px;
                 border: 1px solid {COLORS['border']};
                 border-radius: 6px;
                 background-color: {COLORS['surface']};
+                color: {get_auto_contrast_color(COLORS['surface'])};
+                min-height: 20px;
             }}
             QLineEdit:focus, QComboBox:focus {{
                 border-color: {COLORS['primary']};
             }}
             QPushButton {{
-                padding: 10px 20px;
+                padding: 8px 16px;
                 border-radius: 6px;
-                font-weight: 500;
+                font-weight: 600;
+                background-color: {COLORS['primary']};
+                color: {COLORS['text_inverse']};
+                border: none;
+            }}
+            QPushButton:hover {{
+                background-color: {COLORS['primary_hover']};
+            }}
+            QPushButton.secondary {{
+                background-color: transparent;
+                color: {COLORS['text_secondary']};
+                border: 1px solid {COLORS['border']};
             }}
         """)
 
