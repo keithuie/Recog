@@ -147,8 +147,14 @@ class DataSourceStep(WizardStep):
         sample_row.addWidget(self.sample_api_combo)
         api_layout.addLayout(sample_row)
 
-        # URL input
+        # Name and URL input
         url_form = QFormLayout()
+
+        self.api_name = QLineEdit()
+        self.api_name.setPlaceholderText("My Data Source")
+        self.api_name.setText("USGS Earthquakes")
+        url_form.addRow("Source Name:", self.api_name)
+
         self.api_url = QLineEdit()
         self.api_url.setPlaceholderText("https://api.example.com/data")
         self.api_url.textChanged.connect(lambda: self.completed.emit(self.is_valid()))
@@ -333,6 +339,7 @@ class DataSourceStep(WizardStep):
             data['file_path'] = self.file_path.text()
             data['timestamp_column'] = self.timestamp_col.currentText()
         elif "REST" in source_type:
+            data['name'] = self.api_name.text().strip() or "REST API"
             data['url'] = self.api_url.text()
             data['interval'] = self.api_interval.value()
         elif "MQTT" in source_type:
@@ -351,71 +358,113 @@ class ModelConfigStep(WizardStep):
     def __init__(self, parent=None):
         super().__init__(
             "Configure Detection Model",
-            "Set up the anomaly detection parameters. The defaults work well for most industrial applications. Adjust if needed for your specific use case.",
+            "Set up the anomaly detection parameters. The defaults work well for most industrial applications.",
             parent
         )
         self._setup_content()
 
     def _setup_content(self):
-        # Kernel settings
-        kernel_group = QGroupBox("Detection Kernel")
-        kernel_layout = QFormLayout(kernel_group)
-        kernel_layout.setSpacing(12)
+        # Use simpler form layouts that render reliably
 
+        # Kernel settings group
+        kernel_group = QGroupBox("Detection Kernel")
+        kernel_form = QFormLayout(kernel_group)
+        kernel_form.setSpacing(16)
+        kernel_form.setContentsMargins(16, 24, 16, 16)
+        kernel_form.setFieldGrowthPolicy(QFormLayout.FieldGrowthPolicy.ExpandingFieldsGrow)
+
+        # Kernel type
         self.kernel_type = QComboBox()
         self.kernel_type.addItems(["Triangular", "Parabolic"])
-        kernel_layout.addRow("Kernel Type:", self.kernel_type)
+        self.kernel_type.setMinimumHeight(32)
+        self.kernel_type.setMinimumWidth(200)
+        kernel_form.addRow("Kernel Type:", self.kernel_type)
 
+        kernel_help1 = QLabel("Triangular: Fast, sharp changes. Parabolic: Smooth, gradual variations.")
+        kernel_help1.setStyleSheet(f"color: {COLORS['text_tertiary']}; font-size: 11px; margin-bottom: 8px;")
+        kernel_help1.setWordWrap(True)
+        kernel_form.addRow("", kernel_help1)
+
+        # Number of bins
         self.num_bins = QSpinBox()
         self.num_bins.setRange(10, 500)
-        self.num_bins.setMinimumWidth(120)
         self.num_bins.setValue(100)
-        kernel_layout.addRow("Number of Bins:", self.num_bins)
+        self.num_bins.setMinimumHeight(32)
+        self.num_bins.setMinimumWidth(120)
+        kernel_form.addRow("Number of Bins:", self.num_bins)
 
+        bins_help = QLabel("More bins = finer detail but needs more training data. 50-100 is typical.")
+        bins_help.setStyleSheet(f"color: {COLORS['text_tertiary']}; font-size: 11px; margin-bottom: 8px;")
+        bins_help.setWordWrap(True)
+        kernel_form.addRow("", bins_help)
+
+        # Kernel width
         self.kernel_width = QDoubleSpinBox()
         self.kernel_width.setRange(0.01, 1.0)
-        self.kernel_width.setMinimumWidth(120)
         self.kernel_width.setValue(0.1)
         self.kernel_width.setSingleStep(0.01)
-        kernel_layout.addRow("Kernel Width:", self.kernel_width)
+        self.kernel_width.setMinimumHeight(32)
+        self.kernel_width.setMinimumWidth(120)
+        kernel_form.addRow("Kernel Width:", self.kernel_width)
+
+        width_help = QLabel("Lower = stricter matching. Higher = more tolerant. Start with 0.1.")
+        width_help.setStyleSheet(f"color: {COLORS['text_tertiary']}; font-size: 11px;")
+        width_help.setWordWrap(True)
+        kernel_form.addRow("", width_help)
 
         self.content_layout.addWidget(kernel_group)
 
-        # Detection settings
+        # Detection settings group
         detection_group = QGroupBox("Detection Settings")
-        detection_layout = QFormLayout(detection_group)
-        detection_layout.setSpacing(12)
+        detection_form = QFormLayout(detection_group)
+        detection_form.setSpacing(16)
+        detection_form.setContentsMargins(16, 24, 16, 16)
+        detection_form.setFieldGrowthPolicy(QFormLayout.FieldGrowthPolicy.ExpandingFieldsGrow)
 
+        # Alert threshold
         self.threshold = QDoubleSpinBox()
         self.threshold.setRange(1, 100)
-        self.threshold.setMinimumWidth(120)
         self.threshold.setValue(30)
         self.threshold.setSuffix(" %")
-        detection_layout.addRow("Alert Threshold:", self.threshold)
+        self.threshold.setMinimumHeight(32)
+        self.threshold.setMinimumWidth(120)
+        detection_form.addRow("Alert Threshold:", self.threshold)
 
+        threshold_help = QLabel("Alerts trigger when match score falls below this. 30% is a good start.")
+        threshold_help.setStyleSheet(f"color: {COLORS['text_tertiary']}; font-size: 11px; margin-bottom: 8px;")
+        threshold_help.setWordWrap(True)
+        detection_form.addRow("", threshold_help)
+
+        # Window size
         self.window_size = QSpinBox()
         self.window_size.setRange(1, 1000)
-        self.window_size.setMinimumWidth(120)
         self.window_size.setValue(50)
         self.window_size.setSuffix(" samples")
-        detection_layout.addRow("Window Size:", self.window_size)
+        self.window_size.setMinimumHeight(32)
+        self.window_size.setMinimumWidth(120)
+        detection_form.addRow("Window Size:", self.window_size)
+
+        window_help = QLabel("Data points to analyze together. Larger = smoother but slower detection.")
+        window_help.setStyleSheet(f"color: {COLORS['text_tertiary']}; font-size: 11px;")
+        window_help.setWordWrap(True)
+        detection_form.addRow("", window_help)
 
         self.content_layout.addWidget(detection_group)
 
-        # Help text
-        help_label = QLabel(
-            "Tip: Lower thresholds are more sensitive but may produce more false alarms. "
-            "Start with the default of 30% and adjust based on your results."
+        # Quick tips
+        tips_label = QLabel(
+            "Tip: Start with defaults. Adjust threshold after training if you get too many/few alerts."
         )
-        help_label.setStyleSheet(f"""
-            color: {COLORS['text_tertiary']};
+        tips_label.setStyleSheet(f"""
+            color: {COLORS['text_secondary']};
             font-size: 12px;
             padding: 12px;
             background-color: {COLORS['surface_secondary']};
             border-radius: 6px;
+            margin-top: 8px;
         """)
-        help_label.setWordWrap(True)
-        self.content_layout.addWidget(help_label)
+        tips_label.setWordWrap(True)
+        self.content_layout.addWidget(tips_label)
 
     def get_data(self) -> dict:
         return {
@@ -427,102 +476,343 @@ class ModelConfigStep(WizardStep):
         }
 
 
+class ChannelGroupCard(QFrame):
+    """Visual card for a channel group"""
+
+    delete_requested = pyqtSignal(str)
+
+    def __init__(self, name: str, channels: list, color: str, parent=None):
+        super().__init__(parent)
+        self.group_name = name
+        self._channels = channels
+        self._color = color
+        self._setup_ui()
+
+    def _setup_ui(self):
+        self.setStyleSheet(f"""
+            QFrame {{
+                background-color: {COLORS['surface']};
+                border: 2px solid {self._color};
+                border-radius: 10px;
+                padding: 12px;
+            }}
+        """)
+        self.setMinimumHeight(80)
+
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(12, 12, 12, 12)
+        layout.setSpacing(8)
+
+        # Header with name and delete
+        header = QHBoxLayout()
+
+        color_dot = QLabel()
+        color_dot.setFixedSize(12, 12)
+        color_dot.setStyleSheet(f"""
+            background-color: {self._color};
+            border-radius: 6px;
+        """)
+        header.addWidget(color_dot)
+
+        name_label = QLabel(self.group_name)
+        name_label.setStyleSheet(f"font-weight: 600; font-size: 14px; color: {COLORS['text_primary']};")
+        header.addWidget(name_label)
+        header.addStretch()
+
+        delete_btn = QPushButton("×")
+        delete_btn.setFixedSize(24, 24)
+        delete_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        delete_btn.setStyleSheet(f"""
+            QPushButton {{
+                background-color: transparent;
+                color: {COLORS['text_tertiary']};
+                border: none;
+                font-size: 18px;
+                font-weight: bold;
+            }}
+            QPushButton:hover {{
+                color: {COLORS['danger']};
+            }}
+        """)
+        delete_btn.clicked.connect(lambda: self.delete_requested.emit(self.group_name))
+        header.addWidget(delete_btn)
+
+        layout.addLayout(header)
+
+        # Channel chips
+        channels_flow = QHBoxLayout()
+        channels_flow.setSpacing(6)
+
+        for ch in self._channels[:5]:  # Show first 5
+            chip = QLabel(ch)
+            chip.setStyleSheet(f"""
+                background-color: {COLORS['surface_secondary']};
+                color: {COLORS['text_secondary']};
+                padding: 4px 10px;
+                border-radius: 12px;
+                font-size: 11px;
+            """)
+            channels_flow.addWidget(chip)
+
+        if len(self._channels) > 5:
+            more = QLabel(f"+{len(self._channels) - 5} more")
+            more.setStyleSheet(f"color: {COLORS['text_tertiary']}; font-size: 11px;")
+            channels_flow.addWidget(more)
+
+        channels_flow.addStretch()
+        layout.addLayout(channels_flow)
+
+
 class ChannelGroupStep(WizardStep):
     """Step 3: Configure channel groups"""
+
+    GROUP_COLORS = ["#007AFF", "#34C759", "#FF9500", "#AF52DE", "#FF3B30", "#5AC8FA"]
 
     def __init__(self, parent=None):
         super().__init__(
             "Group Your Channels",
-            "Organize channels into groups for multivariate analysis. Channels in the same group will be analyzed together to detect correlated anomalies.",
+            "Organize related channels into groups. Channels in the same group are analyzed together to detect correlated anomalies across multiple signals.",
             parent
         )
         self._groups = []
+        self._all_channels = []
+        self._group_cards = {}
         self._setup_content()
 
     def _setup_content(self):
-        # Available channels (will be populated from data source)
-        channels_group = QGroupBox("Available Channels")
-        channels_layout = QVBoxLayout(channels_group)
+        # Main horizontal layout
+        main_layout = QHBoxLayout()
+        main_layout.setSpacing(24)
+
+        # Left side: Available channels
+        left_panel = QWidget()
+        left_layout = QVBoxLayout(left_panel)
+        left_layout.setContentsMargins(0, 0, 0, 0)
+
+        avail_header = QLabel("Available Channels")
+        avail_header.setStyleSheet(f"font-weight: 600; font-size: 14px; color: {COLORS['text_primary']};")
+        left_layout.addWidget(avail_header)
+
+        avail_help = QLabel("Select channels to add to a group")
+        avail_help.setStyleSheet(f"color: {COLORS['text_tertiary']}; font-size: 12px;")
+        left_layout.addWidget(avail_help)
+
+        left_layout.addSpacing(8)
 
         self.channels_list = QListWidget()
-        self.channels_list.setSelectionMode(QListWidget.SelectionMode.MultiSelection)
-        self.channels_list.setMinimumHeight(300)
-        channels_layout.addWidget(self.channels_list)
+        self.channels_list.setSelectionMode(QListWidget.SelectionMode.ExtendedSelection)
+        self.channels_list.setMinimumHeight(200)
+        self.channels_list.setStyleSheet(f"""
+            QListWidget {{
+                background-color: {COLORS['surface']};
+                border: 1px solid {COLORS['border']};
+                border-radius: 8px;
+                padding: 8px;
+            }}
+            QListWidget::item {{
+                padding: 10px 12px;
+                border-radius: 6px;
+                margin: 2px 0;
+            }}
+            QListWidget::item:selected {{
+                background-color: {COLORS['primary']};
+                color: white;
+            }}
+            QListWidget::item:hover:!selected {{
+                background-color: {COLORS['surface_secondary']};
+            }}
+        """)
+        left_layout.addWidget(self.channels_list)
 
-        self.content_layout.addWidget(channels_group)
+        # Group creation section
+        create_frame = QFrame()
+        create_frame.setStyleSheet(f"""
+            QFrame {{
+                background-color: {COLORS['surface_secondary']};
+                border-radius: 8px;
+                padding: 16px;
+            }}
+        """)
+        create_layout = QVBoxLayout(create_frame)
+        create_layout.setSpacing(12)
 
-        # Group creation
-        create_group = QGroupBox("Create Channel Group")
-        create_layout = QVBoxLayout(create_group)
+        create_title = QLabel("Create New Group")
+        create_title.setStyleSheet(f"font-weight: 600; color: {COLORS['text_primary']};")
+        create_layout.addWidget(create_title)
 
         name_row = QHBoxLayout()
-        name_row.addWidget(QLabel("Group Name:"))
         self.group_name = QLineEdit()
-        self.group_name.setPlaceholderText("e.g., Motor Bearings")
+        self.group_name.setPlaceholderText("Enter group name (e.g., Motor Bearings)")
+        self.group_name.setStyleSheet(f"""
+            QLineEdit {{
+                padding: 10px 12px;
+                border: 1px solid {COLORS['border']};
+                border-radius: 6px;
+                background-color: {COLORS['surface']};
+                font-size: 13px;
+            }}
+            QLineEdit:focus {{
+                border-color: {COLORS['primary']};
+            }}
+        """)
+        self.group_name.returnPressed.connect(self._create_group)
         name_row.addWidget(self.group_name)
         create_layout.addLayout(name_row)
 
-        create_btn = QPushButton("Create Group from Selected")
+        create_btn = QPushButton("Add Selected to Group")
+        create_btn.setMinimumHeight(40)
+        create_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        create_btn.setStyleSheet(f"""
+            QPushButton {{
+                background-color: {COLORS['primary']};
+                color: white;
+                border: none;
+                border-radius: 8px;
+                font-weight: 600;
+                font-size: 13px;
+            }}
+            QPushButton:hover {{
+                background-color: {COLORS['primary_hover']};
+            }}
+        """)
         create_btn.clicked.connect(self._create_group)
         create_layout.addWidget(create_btn)
 
-        self.content_layout.addWidget(create_group)
+        left_layout.addSpacing(12)
+        left_layout.addWidget(create_frame)
 
-        # Created groups
-        groups_group = QGroupBox("Channel Groups")
-        groups_layout = QVBoxLayout(groups_group)
+        main_layout.addWidget(left_panel, stretch=1)
 
-        self.groups_list = QListWidget()
-        self.groups_list = QListWidget()
-        self.groups_list.setMinimumHeight(150)
-        groups_layout.addWidget(self.groups_list)
+        # Right side: Created groups
+        right_panel = QWidget()
+        right_layout = QVBoxLayout(right_panel)
+        right_layout.setContentsMargins(0, 0, 0, 0)
 
-        remove_btn = QPushButton("Remove Selected Group")
-        remove_btn.setStyleSheet(f"""
-            QPushButton {{
-                background-color: transparent;
-                color: {COLORS['text_secondary']};
-                border: 1px solid {COLORS['border']};
-            }}
+        groups_header = QLabel("Channel Groups")
+        groups_header.setStyleSheet(f"font-weight: 600; font-size: 14px; color: {COLORS['text_primary']};")
+        right_layout.addWidget(groups_header)
+
+        groups_help = QLabel("Groups you've created")
+        groups_help.setStyleSheet(f"color: {COLORS['text_tertiary']}; font-size: 12px;")
+        right_layout.addWidget(groups_help)
+
+        right_layout.addSpacing(8)
+
+        # Groups container with scroll
+        self.groups_container = QVBoxLayout()
+        self.groups_container.setSpacing(12)
+
+        # Placeholder for no groups
+        self.no_groups_label = QLabel("No groups created yet.\n\nSelect channels from the left and create a group to get started.")
+        self.no_groups_label.setStyleSheet(f"""
+            color: {COLORS['text_tertiary']};
+            font-size: 13px;
+            padding: 40px;
+            background-color: {COLORS['surface']};
+            border: 2px dashed {COLORS['border']};
+            border-radius: 10px;
         """)
-        remove_btn.clicked.connect(self._remove_group)
-        groups_layout.addWidget(remove_btn)
+        self.no_groups_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.no_groups_label.setWordWrap(True)
+        self.groups_container.addWidget(self.no_groups_label)
 
-        self.content_layout.addWidget(groups_group)
+        right_layout.addLayout(self.groups_container)
+        right_layout.addStretch()
+
+        main_layout.addWidget(right_panel, stretch=1)
+
+        self.content_layout.addLayout(main_layout)
+
+        # Tips at bottom
+        tips_label = QLabel(
+            "Tip: Group channels that are physically related (same motor, same process) "
+            "for better anomaly detection. You can create multiple groups."
+        )
+        tips_label.setStyleSheet(f"""
+            color: {COLORS['text_tertiary']};
+            font-size: 12px;
+            padding: 12px 16px;
+            background-color: {COLORS['surface_secondary']};
+            border-radius: 6px;
+        """)
+        tips_label.setWordWrap(True)
+        self.content_layout.addSpacing(16)
+        self.content_layout.addWidget(tips_label)
 
     def set_channels(self, channels: list):
         """Set available channels from data source"""
+        self._all_channels = channels
+        self._refresh_available_list()
+
+    def _refresh_available_list(self):
+        """Refresh the available channels list"""
+        # Get all channels already in groups
+        grouped_channels = set()
+        for group in self._groups:
+            grouped_channels.update(group['channels'])
+
+        # Show only ungrouped channels
         self.channels_list.clear()
-        for channel in channels:
-            item = QListWidgetItem(channel)
-            item.setFlags(item.flags() | Qt.ItemFlag.ItemIsUserCheckable)
-            self.channels_list.addItem(item)
+        for channel in self._all_channels:
+            if channel not in grouped_channels:
+                item = QListWidgetItem(channel)
+                self.channels_list.addItem(item)
 
     def _create_group(self):
         name = self.group_name.text().strip()
         if not name:
-            return
+            # Auto-generate name
+            name = f"Group {len(self._groups) + 1}"
 
         selected = [item.text() for item in self.channels_list.selectedItems()]
         if not selected:
             return
 
+        # Check for duplicate name
+        if any(g['name'] == name for g in self._groups):
+            name = f"{name} ({len(self._groups) + 1})"
+
+        color = self.GROUP_COLORS[len(self._groups) % len(self.GROUP_COLORS)]
+
         self._groups.append({
             'name': name,
-            'channels': selected
+            'channels': selected,
+            'color': color
         })
 
-        self.groups_list.addItem(f"{name}: {', '.join(selected)}")
+        # Hide placeholder
+        self.no_groups_label.hide()
+
+        # Create card
+        card = ChannelGroupCard(name, selected, color)
+        card.delete_requested.connect(self._remove_group)
+        self._group_cards[name] = card
+        self.groups_container.addWidget(card)
+
+        # Clear and refresh
         self.group_name.clear()
-        self.channels_list.clearSelection()
+        self._refresh_available_list()
         self.completed.emit(self.is_valid())
 
-    def _remove_group(self):
-        current = self.groups_list.currentRow()
-        if current >= 0:
-            self.groups_list.takeItem(current)
-            del self._groups[current]
-            self.completed.emit(self.is_valid())
+    def _remove_group(self, name: str):
+        # Find and remove the group
+        for i, group in enumerate(self._groups):
+            if group['name'] == name:
+                del self._groups[i]
+                break
+
+        # Remove card
+        if name in self._group_cards:
+            card = self._group_cards[name]
+            card.deleteLater()
+            del self._group_cards[name]
+
+        # Show placeholder if no groups
+        if not self._groups:
+            self.no_groups_label.show()
+
+        self._refresh_available_list()
+        self.completed.emit(self.is_valid())
 
     def is_valid(self) -> bool:
         return len(self._groups) > 0

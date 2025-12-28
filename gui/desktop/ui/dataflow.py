@@ -844,12 +844,27 @@ class DataflowPage(QWidget):
         temp_path = os.path.join(temp_dir, f'machineiq_sample_{datetime.now().strftime("%Y%m%d_%H%M%S")}.csv')
         df.to_csv(temp_path, index=False)
 
-        # Add as source
-        self._add_source({
-            'type': 'csv',
+        # Create unique name for this sample
+        sample_name = f"Sample Data ({datetime.now().strftime('%H:%M')})"
+
+        # Hide placeholder
+        self.sources_placeholder.hide()
+
+        # Create card directly (don't use _add_source which emits file_loaded)
+        card = DataSourceCard(sample_name, "Sample Data", "Connected", f"{num_channels} channels, {duration_minutes} min")
+        card.connect_clicked.connect(lambda n: self.source_connected.emit(n))
+        card.disconnect_clicked.connect(lambda n: self.source_disconnected.emit(n))
+        card.delete_clicked.connect(self._remove_source)
+
+        config = {
+            'type': 'sample',
             'path': temp_path,
             'timestamp_column': 'timestamp',
-        })
+            'name': sample_name,
+        }
+
+        self._sources[sample_name] = {'card': card, 'config': config}
+        self.sources_container.insertWidget(self.sources_container.count() - 1, card)
 
         QMessageBox.information(
             self,
@@ -858,10 +873,12 @@ class DataflowPage(QWidget):
             f"Duration: {duration_minutes} minutes\n"
             f"Sample rate: {sample_rate} Hz\n"
             f"{'Includes simulated anomaly at ' + str(int(anomaly_position * 100)) + '%' if include_anomaly else 'No anomaly included'}\n\n"
-            f"File saved to: {temp_path}"
+            f"Click 'Connect' on the card to start playback."
         )
 
-        self.sample_data_generated.emit(temp_path)
+        # Emit signal with config for the app to pick up
+        config['name'] = sample_name
+        self.source_added.emit(config)
 
     def _download_template(self):
         """Download CSV template file"""
@@ -929,3 +946,40 @@ class DataflowPage(QWidget):
         if name in self._sources:
             return self._sources[name].get('config', {})
         return {}
+
+    def add_source_card(self, name: str, source_type: str, details: str, status: str = "Disconnected"):
+        """Add a source card programmatically (e.g., from wizard or other sources)"""
+        # Check if source already exists
+        if name in self._sources:
+            # Update existing source status
+            self._sources[name]['card'].set_status(status)
+            return
+
+        # Hide placeholder
+        self.sources_placeholder.hide()
+
+        # Create card
+        card = DataSourceCard(name, source_type, status, details)
+        card.connect_clicked.connect(lambda n: self.source_connected.emit(n))
+        card.disconnect_clicked.connect(lambda n: self.source_disconnected.emit(n))
+        card.delete_clicked.connect(self._remove_source)
+
+        # Determine config based on type
+        config = {'name': name}
+        if source_type == "CSV File" or source_type == "Sample Data":
+            config['type'] = 'csv'
+            config['path'] = details
+        elif source_type == "REST API":
+            config['type'] = 'api'
+            config['url'] = details
+
+        self._sources[name] = {'card': card, 'config': config}
+        self.sources_container.insertWidget(self.sources_container.count() - 1, card)
+
+    def get_all_sources(self) -> list:
+        """Get list of all source names"""
+        return list(self._sources.keys())
+
+    def has_source(self, name: str) -> bool:
+        """Check if a source exists"""
+        return name in self._sources
