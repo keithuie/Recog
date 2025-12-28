@@ -14,7 +14,7 @@ import os
 # Add project root to path
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from gui.desktop import main
+from legacy_gui.desktop import main
 
 if __name__ == '__main__':
     main()

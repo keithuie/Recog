@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ title }}</title>
+    
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    
+    <!-- Styles -->
+    <link rel="stylesheet" href="/static/css/styles.css">
+</head>
+<body>
+    <div class="app-container">
+        <!-- Sidebar -->
+        <aside class="sidebar glass">
+            <div class="logo-area">
+                <div class="logo-icon"></div>
+                <h1>Recog</h1>
+            </div>
+            
+            <nav class="nav-menu">
+                <a href="#" class="nav-item active">
+                    <span class="icon">📊</span>
+                    Dashboard
+                </a>
+                <a href="#" class="nav-item">
+                    <span class="icon">🧠</span>
+                    Neural Net
+                </a>
+                <a href="#" class="nav-item">
+                    <span class="icon">📁</span>
+                    Data
+                </a>
+                <a href="#" class="nav-item">
+                    <span class="icon">⚙️</span>
+                    Settings
+                </a>
+            </nav>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <header class="top-bar glass">
+                <div class="breadcrumbs">Home / Dashboard</div>
+                <div class="user-profile">
+                    <div class="avatar"></div>
+                </div>
+            </header>
+
+            <div class="content-area">
+                <section class="hero-section">
+                    <h2>Welcome back</h2>
+                    <p class="subtitle">System is ready for processing.</p>
+                </section>
+
+                <div class="grid-container">
+                    <div class="card glass">
+                        <div class="card-header">
+                            <h3>System Status</h3>
+                            <span class="status-indicator active"></span>
+                        </div>
+                        <div class="card-body">
+                            <div class="metric">
+                                <span class="label">CPU Usage</span>
+                                <div class="progress-bar">
+                                    <div class="fill" style="width: 45%"></div>
+                                </div>
+                            </div>
+                            <div class="metric">
+                                <span class="label">Memory</span>
+                                <div class="progress-bar">
+                                    <div class="fill" style="width: 60%"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="card glass">
+                        <div class="card-header">
+                            <h3>Recent Activity</h3>
+                        </div>
+                        <div class="card-body">
+                            <ul class="activity-list">
+                                <li>System initialization complete</li>
+                                <li>Neural network model loaded</li>
+                                <li>Data stream connected</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+</body>
+</html>
