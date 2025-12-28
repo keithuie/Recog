@@ -19,3 +19,19 @@ venv/
 data/
 logs/
 models/
+# Node modules
+node_modules/
+machineiq-panel/node_modules/
+machineiq-panel/dist/
+# Build artifacts
+build/
+*.o
+*.a
+machineiq_host
+# Python cache
+__pycache__/
+*.pyc
+.pytest_cache/
+# IDE
+.vscode/
+.idea/

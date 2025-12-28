@@ -1,0 +1,24 @@
+{
+  "name": "machineiq-pattern-panel",
+  "version": "1.0.0",
+  "description": "Clean Room Visualization for MachineIQ Edge",
+  "scripts": {
+    "build": "grafana-toolkit plugin:build",
+    "test": "grafana-toolkit plugin:test",
+    "dev": "grafana-toolkit plugin:dev",
+    "watch": "grafana-toolkit plugin:dev --watch"
+  },
+  "author": "MachineIQ Team",
+  "license": "Apache-2.0",
+  "devDependencies": {
+    "@grafana/toolkit": "latest",
+    "@grafana/data": "latest",
+    "@grafana/ui": "latest",
+    "react": "^18.0.0",
+    "react-dom": "^18.0.0",
+    "@types/node": "^14.0.0"
+  },
+  "engines": {
+    "node": ">=14"
+  }
+}
