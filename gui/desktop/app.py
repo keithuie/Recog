@@ -29,6 +29,22 @@ from .core import (
     AlarmManager
 )
 
+# Import detector from miq core
+import sys
+from pathlib import Path
+miq_path = Path(__file__).parent.parent.parent / 'miq'
+if str(miq_path) not in sys.path:
+    sys.path.insert(0, str(miq_path.parent))
+
+try:
+    from miq.core.detector import MIQDetector, DetectorConfig, DetectorState
+    from miq.core.kernels import KernelType
+    HAS_DETECTOR = True
+except ImportError:
+    HAS_DETECTOR = False
+    logger = logging.getLogger(__name__)
+    logger.warning("MIQ detector not available")
+
 # Configure logging
 logging.basicConfig(
     level=logging.INFO,
@@ -75,8 +91,11 @@ class MachineIQApp:
         self.model_config: Optional[ModelConfigPage] = None
         self.alarm_center: Optional[AlarmCenterPage] = None
 
-        # Detector reference
-        self._detector = None
+        # Detector references - one per group
+        self._detectors = {}  # group_name -> MIQDetector
+        self._training_timers = {}  # group_name -> QTimer
+        self._training_start_times = {}  # group_name -> datetime
+        self._training_durations = {}  # group_name -> seconds
 
         # Initialize UI
         self._init_ui()
@@ -125,6 +144,11 @@ class MachineIQApp:
         # Model config signals
         self.model_config.training_started.connect(self._on_training_started)
         self.model_config.training_completed.connect(self._on_training_completed)
+        self.model_config.config_changed.connect(self._on_model_config_changed)
+
+        # Dashboard training signals
+        self.dashboard.training_started.connect(self._on_group_training_started)
+        self.dashboard.training_stopped.connect(self._on_group_training_stopped)
 
         # Alarm manager callback
         self.alarm_manager.alarm_triggered_callback = self._on_alarm_triggered
@@ -285,6 +309,7 @@ class MachineIQApp:
     def _on_data_received(self, data_point):
         """Handle incoming data from data player"""
         import numpy as np
+        from datetime import datetime
 
         # Get recent data from buffer
         buffer = self.data_player.buffer
@@ -297,14 +322,56 @@ class MachineIQApp:
             if len(timestamps) > 0:
                 self.dashboard.update_channel_data(channel, timestamps, values)
 
-        # TODO: Run through detector and update match strength
-        # For now, simulate match strength
-        if len(buffer) > 10:
-            timestamps = np.array([p.unix_timestamp for p in buffer[-100:]])
-            # Simulate high match score (will be replaced with actual detector)
-            scores = np.ones(len(timestamps)) * 95 + np.random.randn(len(timestamps)) * 2
-            scores = np.clip(scores, 0, 100)
-            self.dashboard.update_match_strength(timestamps, scores)
+        # Process through detectors for each group
+        if HAS_DETECTOR:
+            for group_name, detector in self._detectors.items():
+                group = self.channel_manager.get_group(group_name)
+                if not group:
+                    continue
+
+                # Build feature vector from current data point
+                feature_vector = []
+                for channel in group.channels:
+                    value = data_point.values.get(channel, 0.0)
+                    feature_vector.append(value)
+
+                if len(feature_vector) == len(group.channels):
+                    feature_array = np.array(feature_vector, dtype=np.float32)
+
+                    # Process through detector
+                    result = detector.process(feature_array, datetime.now())
+
+                    if result is not None:
+                        # We got a result - detector is in monitoring mode
+                        # Update match strength for this group
+                        timestamps = np.array([p.unix_timestamp for p in buffer[-100:]])
+                        scores = np.ones(len(timestamps)) * (result.match_strength * 100)
+                        self.dashboard.update_group_match_strength(group_name, timestamps, scores)
+
+                        # Check for anomaly
+                        if result.is_anomaly:
+                            self._handle_anomaly(group_name, result)
+        else:
+            # Fallback: simulate match strength
+            if len(buffer) > 10:
+                timestamps = np.array([p.unix_timestamp for p in buffer[-100:]])
+                scores = np.ones(len(timestamps)) * 95 + np.random.randn(len(timestamps)) * 2
+                scores = np.clip(scores, 0, 100)
+                self.dashboard.update_match_strength(timestamps, scores)
+
+    def _handle_anomaly(self, group_name: str, result):
+        """Handle detected anomaly"""
+        # Get top contributors
+        contributors = result.get_top_contributors(3)
+
+        message = f"Anomaly in {group_name}: Match={result.match_strength*100:.1f}%"
+        if contributors:
+            message += f" (Top: {contributors[0][0]})"
+
+        logger.warning(message)
+
+        # Could trigger alarm here
+        # self.alarm_manager.check_condition(result.match_strength * 100)
 
     def _on_play(self):
         """Handle play button click"""
@@ -394,11 +461,164 @@ class MachineIQApp:
         self.main_window.header.set_status("Training model...", connected=True)
 
     def _on_training_completed(self, detector):
-        """Handle training completed signal"""
-        self._detector = detector
+        """Handle training completed signal from Model Config"""
+        self._detectors['default'] = detector
         self.main_window.header.set_status("Model ready", connected=True)
         self.main_window.header.set_playback_enabled(True)
         logger.info("Model training completed")
+
+    def _on_model_config_changed(self, config: dict):
+        """Handle model config changes - sync groups to dashboard"""
+        groups = config.get('groups', [])
+        if groups:
+            # Convert to dashboard format
+            dashboard_groups = []
+            for group in groups:
+                dashboard_groups.append({
+                    'name': group.get('name', ''),
+                    'channels': group.get('channels', []),
+                    'color': group.get('color', '#007AFF'),
+                })
+
+            # Update dashboard with groups
+            self.dashboard.set_groups(dashboard_groups)
+
+            # Update channel manager
+            self.channel_manager.clear()
+            for group in groups:
+                self.channel_manager.create_group(
+                    name=group['name'],
+                    channels=group.get('channels', []),
+                    color=group.get('color', '#007AFF')
+                )
+
+    def _on_group_training_started(self, group_name: str, duration_seconds: int):
+        """Handle training started for a specific group from Dashboard"""
+        from datetime import datetime
+        import numpy as np
+
+        logger.info(f"Starting training for group '{group_name}' for {duration_seconds} seconds")
+
+        if not HAS_DETECTOR:
+            logger.error("MIQ Detector not available - cannot train")
+            return
+
+        # Get group channels
+        group = self.channel_manager.get_group(group_name)
+        if not group:
+            logger.error(f"Group '{group_name}' not found")
+            return
+
+        # Get channel ranges from current data
+        channel_ranges = {}
+        if self.data_player:
+            for channel in group.channels:
+                timestamps, values = self.data_player.get_channel_data(channel, limit=1000)
+                if len(values) > 0:
+                    channel_ranges[channel] = (float(np.min(values)), float(np.max(values)))
+                else:
+                    channel_ranges[channel] = (0.0, 100.0)
+
+        # Create detector for this group
+        config = DetectorConfig(
+            bins_per_channel=self.model_config.bins_spin.value(),
+            kernel_type=KernelType.PARABOLIC if self.model_config.kernel_combo.currentText() == "Parabolic" else KernelType.TRIANGULAR,
+            kernel_width=self.model_config.width_spin.value(),
+        )
+
+        detector = MIQDetector(config)
+
+        # Configure channels
+        channel_configs = []
+        for channel in group.channels:
+            if channel in channel_ranges:
+                min_val, max_val = channel_ranges[channel]
+                # Add margin
+                margin = (max_val - min_val) * 0.1
+                channel_configs.append({
+                    'name': channel,
+                    'min_value': min_val - margin,
+                    'max_value': max_val + margin,
+                })
+
+        if channel_configs:
+            detector.configure_channels(channel_configs)
+            detector.start_learning()
+
+            self._detectors[group_name] = detector
+            self._training_start_times[group_name] = datetime.now()
+            self._training_durations[group_name] = duration_seconds
+
+            # Set up progress timer
+            timer = QTimer()
+            timer.timeout.connect(lambda: self._update_training_progress(group_name))
+            timer.start(1000)  # Update every second
+            self._training_timers[group_name] = timer
+
+            self.main_window.header.set_status(f"Training: {group_name}", connected=True, monitoring=True)
+            logger.info(f"Training started for '{group_name}' with {len(channel_configs)} channels")
+
+    def _update_training_progress(self, group_name: str):
+        """Update training progress for a group"""
+        from datetime import datetime
+
+        if group_name not in self._training_start_times:
+            return
+
+        start_time = self._training_start_times[group_name]
+        duration = self._training_durations[group_name]
+        elapsed = (datetime.now() - start_time).total_seconds()
+
+        progress = min(100, (elapsed / duration) * 100)
+        self.dashboard.set_group_training_progress(group_name, progress)
+
+        if progress >= 100:
+            self._complete_group_training(group_name)
+
+    def _complete_group_training(self, group_name: str):
+        """Complete training for a group"""
+        logger.info(f"Training completed for group '{group_name}'")
+
+        # Stop timer
+        if group_name in self._training_timers:
+            self._training_timers[group_name].stop()
+            del self._training_timers[group_name]
+
+        # Switch detector to monitoring mode
+        if group_name in self._detectors:
+            detector = self._detectors[group_name]
+            detector.stop_learning()
+            logger.info(f"Group '{group_name}' trained with {detector.num_trained_states} states")
+
+        # Clean up
+        if group_name in self._training_start_times:
+            del self._training_start_times[group_name]
+        if group_name in self._training_durations:
+            del self._training_durations[group_name]
+
+        self.main_window.header.set_status("Monitoring", connected=True, monitoring=True)
+
+    def _on_group_training_stopped(self, group_name: str):
+        """Handle training stopped for a group"""
+        logger.info(f"Training stopped for group '{group_name}'")
+
+        # Stop timer
+        if group_name in self._training_timers:
+            self._training_timers[group_name].stop()
+            del self._training_timers[group_name]
+
+        # Switch to monitoring with whatever was learned
+        if group_name in self._detectors:
+            self._detectors[group_name].stop_learning()
+
+        # Clean up
+        if group_name in self._training_start_times:
+            del self._training_start_times[group_name]
+        if group_name in self._training_durations:
+            del self._training_durations[group_name]
+
+        self.dashboard.set_group_training_progress(group_name, 100)
+        self.main_window.header.set_status("Monitoring", connected=True, monitoring=True)
 
     def _on_alarm_triggered(self, alarm):
         """Handle alarm triggered"""
