@@ -173,12 +173,16 @@ class MachineIQApp:
             file_path = data_source.get('file_path')
             if file_path:
                 self._setup_csv_source(file_path, data_source.get('timestamp_column', 'timestamp'))
+                # Add to Dataflow page
+                self._add_to_dataflow('csv', file_path, data_source.get('timestamp_column', 'timestamp'))
 
         elif source_type == 'REST API':
             url = data_source.get('url')
             interval = data_source.get('interval', 5)
             if url:
                 self._setup_api_source(url, interval)
+                # Add to Dataflow page
+                self._add_to_dataflow('api', url, None, interval)
 
         # Apply model config
         model = config.get('model', {})
@@ -246,23 +250,48 @@ class MachineIQApp:
 
         logger.info("Wizard configuration applied successfully")
 
-    def _setup_csv_source(self, filepath: str, timestamp_col: str = 'timestamp'):
+    def _add_to_dataflow(self, source_type: str, path_or_url: str, timestamp_col: str = None, interval: int = 5):
+        """Add a data source to the Dataflow page display"""
+        from pathlib import Path
+
+        if source_type == 'csv':
+            name = Path(path_or_url).name
+            self.dataflow.add_source_card(name, "CSV File", path_or_url, "Connected")
+        elif source_type == 'api':
+            name = "REST API"
+            display_url = path_or_url[:50] + "..." if len(path_or_url) > 50 else path_or_url
+            self.dataflow.add_source_card(name, "REST API", display_url, "Monitoring")
+        elif source_type == 'sample':
+            name = Path(path_or_url).name
+            self.dataflow.add_source_card(name, "Sample Data", path_or_url, "Connected")
+
+    def _setup_csv_source(self, filepath: str, timestamp_col: str = 'timestamp', source_name: str = None):
         """Set up CSV data source"""
         from .core import CSVDataSource, DataPlayer
+        from pathlib import Path
 
         logger.info(f"Setting up CSV source: {filepath}")
+
+        # Generate unique source name
+        if not source_name:
+            source_name = Path(filepath).stem
 
         # Create data player if needed
         if not self.data_player:
             self.data_player = DataPlayer()
             self.data_player.add_data_callback(self._on_data_received)
 
+        # Check if source already exists
+        existing_sources = [s.name for s in self.data_player.sources] if hasattr(self.data_player, 'sources') else []
+        if source_name in existing_sources:
+            source_name = f"{source_name}_{len(existing_sources)}"
+
         # Create CSV source
-        source = CSVDataSource("CSV File", filepath)
+        source = CSVDataSource(source_name, filepath)
         source.set_timestamp_column(timestamp_col)
 
         self.data_player.add_source(source)
-        self.data_player.set_active_source("CSV File")
+        self.data_player.set_active_source(source_name)
 
         if self.data_player.connect():
             channels = self.data_player.channels
@@ -276,9 +305,11 @@ class MachineIQApp:
 
             self.main_window.header.set_status("Data loaded", connected=True)
             self.main_window.header.set_playback_enabled(True)
+            return source_name
         else:
             logger.error("Failed to load CSV file")
             self.main_window.header.set_status("Load failed", connected=False)
+            return None
 
     def _setup_api_source(self, url: str, interval: int = 5):
         """Set up REST API data source"""
@@ -413,8 +444,14 @@ class MachineIQApp:
         logger.info(f"Data source added: {name} ({source_type})")
 
         if source_type == 'csv':
-            # CSV sources are auto-connected when added
+            # CSV sources are auto-connected when added via file_loaded signal
             pass
+        elif source_type == 'sample':
+            # Sample data - set up the CSV source
+            path = config.get('path', '')
+            if path:
+                self._setup_csv_source(path, 'timestamp', name)
+                self.dataflow.set_source_status(name, "Connected")
         elif source_type == 'api':
             # Store config for later connection
             url = config.get('url', '')
@@ -431,8 +468,8 @@ class MachineIQApp:
         if config.get('type') == 'api':
             self._setup_api_source(config.get('url', ''), config.get('interval', 5))
             self.dataflow.set_source_status(name, "Monitoring")
-        elif config.get('type') == 'csv':
-            self._setup_csv_source(config.get('path', ''), config.get('timestamp_column', 'timestamp'))
+        elif config.get('type') in ['csv', 'sample']:
+            self._setup_csv_source(config.get('path', ''), config.get('timestamp_column', 'timestamp'), name)
             self.dataflow.set_source_status(name, "Connected")
 
     def _on_source_disconnect(self, name: str):
@@ -448,12 +485,17 @@ class MachineIQApp:
 
     def _on_csv_file_loaded(self, filepath: str):
         """Handle CSV file loaded from Dataflow page"""
+        from pathlib import Path
         logger.info(f"CSV file loaded: {filepath}")
-        self._setup_csv_source(filepath, 'timestamp')
 
-        # Update dataflow with file info
-        if self.data_player and self.data_player.active_source:
+        source_name = self._setup_csv_source(filepath, 'timestamp')
+
+        # Update dataflow with file info and status
+        if source_name and self.data_player and self.data_player.active_source:
             source = self.data_player.active_source
+            file_name = Path(filepath).name
+            self.dataflow.set_source_status(file_name, "Connected")
+
             if hasattr(source, 'data') and source.data is not None:
                 df = source.data
                 columns = list(df.columns)
