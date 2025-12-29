@@ -1,6 +1,23 @@
 """
 MachineIQ ML Core Service
-Provides REST API and MQTT interface for anomaly detection
+Provides REST API for high-fidelity anomaly detection
+
+DATA INGESTION ARCHITECTURE:
+===========================
+HIGH-FIDELITY DATA (time series, waveforms):
+  - REST API POST /api/analyze (batch processing)
+  - Direct pybind11 calls from C++ host (zero-copy, preferred)
+  - Direct SQL queries with binary BLOB extraction
+  - gRPC streaming (for real-time high-throughput)
+
+  DO NOT USE MQTT for time series data - it adds latency,
+  serialization overhead, and is not designed for high-throughput.
+
+CONTROL PLANE (MQTT is appropriate):
+  - Start/stop training commands
+  - Configuration updates
+  - Status notifications
+  - Anomaly alerts
 """
 import os
 import json
@@ -44,14 +61,23 @@ def get_influx_client():
 
 
 def setup_mqtt():
-    """Setup MQTT client for control messages"""
+    """
+    Setup MQTT client for CONTROL PLANE ONLY.
+
+    IMPORTANT: MQTT is NOT used for time series data ingestion.
+    Data should flow via:
+      - REST API POST /api/analyze (recommended for web clients)
+      - Direct pybind11 from C++ host (zero-copy, highest performance)
+      - SQL/database polling
+    """
     global mqtt_client
 
     def on_connect(client, userdata, flags, rc):
         print(f"[MQTT] Connected with result code {rc}")
-        # Subscribe to control topics
+        # Subscribe to CONTROL topics only - NOT data topics
         client.subscribe("machineiq/control/#")
-        client.subscribe("machineiq/data/#")
+        # NOTE: We do NOT subscribe to machineiq/data/#
+        # Time series data must use REST API or direct calls for high fidelity
 
     def on_message(client, userdata, msg):
         try:
@@ -60,8 +86,7 @@ def setup_mqtt():
 
             if topic.startswith("machineiq/control/"):
                 handle_control_message(topic, payload)
-            elif topic.startswith("machineiq/data/"):
-                handle_data_message(topic, payload)
+            # Data messages are NOT handled via MQTT - use REST API instead
         except Exception as e:
             print(f"[MQTT] Error processing message: {e}")
 
@@ -92,29 +117,8 @@ def handle_control_message(topic, payload):
         configure_detector(payload)
 
 
-def handle_data_message(topic, payload):
-    """Handle incoming data for processing"""
-    group_name = topic.split("/")[-1]
-
-    if group_name in detectors:
-        detector = detectors[group_name]
-        pipeline = pipelines.get(group_name)
-
-        # Extract data array
-        data = np.array(payload.get("values", []))
-
-        if pipeline and len(data) > 0:
-            # Run through preprocessing pipeline
-            features = pipeline.get_feature_vector(data)
-
-            # Process with detector
-            result = detector.process(features)
-
-            if result:
-                # Publish result
-                publish_result(group_name, result)
-                # Store in InfluxDB
-                store_result(group_name, result)
+# NOTE: handle_data_message removed - MQTT is not suitable for high-fidelity time series
+# Use REST API POST /api/analyze or direct pybind11 calls from C++ host instead
 
 
 def publish_result(group_name, result):
@@ -229,7 +233,19 @@ def api_configure():
 
 @app.route('/api/analyze', methods=['POST'])
 def api_analyze():
-    """Analyze data via REST API (for non-MQTT sources)"""
+    """
+    Analyze high-fidelity time series data via REST API.
+
+    This is the PRIMARY endpoint for data ingestion from web clients.
+    For highest performance, use direct pybind11 calls from C++ host.
+
+    Expected JSON payload:
+    {
+        "group": "group_name",
+        "values": [1.23, 4.56, ...],  // Raw waveform samples
+        "sample_rate": 10000          // Optional, for preprocessing selection
+    }
+    """
     data = request.json
     group_name = data.get("group")
     values = np.array(data.get("values", []))
