@@ -606,6 +606,8 @@
         let isRetraining = false;
         let lastDataUpdate = {};
         let updateCount = 0;
+        let wsConnected = false;
+        let fallbackSimulationInterval = null;
 
         // WebSocket connection
         function connectWebSocket() {
@@ -614,7 +616,9 @@
 
             ws.onopen = () => {
                 console.log('WebSocket connected');
+                wsConnected = true;
                 updateConnectionStatus(true);
+                stopFallbackSimulation();
                 // Subscribe to all groups
                 document.querySelectorAll('.grid-panel[data-group]').forEach(panel => {
                     ws.send(JSON.stringify({ type: 'subscribe', group: panel.dataset.group }));
@@ -623,7 +627,9 @@
 
             ws.onclose = () => {
                 console.log('WebSocket disconnected');
+                wsConnected = false;
                 updateConnectionStatus(false);
+                startFallbackSimulation();
                 setTimeout(connectWebSocket, 3000);
             };
 
@@ -965,7 +971,7 @@
             updateCount = 0;
         }
 
-        // Simulate data for demo
+        // Simulate data for demo (fallback when WebSocket disconnected)
         function simulateData() {
             document.querySelectorAll('.grid-panel[data-group]').forEach(panel => {
                 const groupName = panel.dataset.group;
@@ -987,6 +993,21 @@
             });
         }
 
+        function startFallbackSimulation() {
+            if (!fallbackSimulationInterval) {
+                console.log('Starting fallback simulation');
+                fallbackSimulationInterval = setInterval(simulateData, 1000);
+            }
+        }
+
+        function stopFallbackSimulation() {
+            if (fallbackSimulationInterval) {
+                console.log('Stopping fallback simulation');
+                clearInterval(fallbackSimulationInterval);
+                fallbackSimulationInterval = null;
+            }
+        }
+
         // Initialize
         document.addEventListener('DOMContentLoaded', () => {
             loadLayout();
@@ -996,8 +1017,8 @@
             // Update rate display
             setInterval(updateRateDisplay, 5000);
 
-            // Simulate data if no real data (for demo)
-            setInterval(simulateData, 1000);
+            // Start fallback simulation initially (will be stopped when WS connects)
+            startFallbackSimulation();
 
             // Close modals on outside click
             document.querySelectorAll('.modal').forEach(modal => {
