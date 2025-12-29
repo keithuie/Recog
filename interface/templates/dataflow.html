@@ -1,0 +1,369 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dataflow - MachineIQ</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/static/css/styles.css">
+</head>
+<body>
+    <div class="app-container">
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <div class="logo-area">
+                <div class="logo-icon"></div>
+                <h1>MachineIQ</h1>
+            </div>
+
+            <nav class="nav-menu">
+                <a href="/" class="nav-item">
+                    <span class="nav-icon">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <rect x="3" y="3" width="7" height="7"></rect>
+                            <rect x="14" y="3" width="7" height="7"></rect>
+                            <rect x="14" y="14" width="7" height="7"></rect>
+                            <rect x="3" y="14" width="7" height="7"></rect>
+                        </svg>
+                    </span>
+                    Dashboard
+                </a>
+                <a href="/setup" class="nav-item">
+                    <span class="nav-icon">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="12" cy="12" r="3"></circle>
+                            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+                        </svg>
+                    </span>
+                    Setup Wizard
+                </a>
+                <a href="/dataflow" class="nav-item active">
+                    <span class="nav-icon">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>
+                        </svg>
+                    </span>
+                    Dataflow
+                </a>
+                <a href="/model-config" class="nav-item">
+                    <span class="nav-icon">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M12 2L2 7l10 5 10-5-10-5z"></path>
+                            <path d="M2 17l10 5 10-5"></path>
+                            <path d="M2 12l10 5 10-5"></path>
+                        </svg>
+                    </span>
+                    Model Config
+                </a>
+            </nav>
+
+            <div class="sidebar-footer">
+                <div class="connection-status">
+                    <span class="status-dot connected"></span>
+                    <span>Connected</span>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <header class="top-bar">
+                <div class="breadcrumbs">Dataflow / Sources & Channels</div>
+                <div class="header-actions">
+                    <a href="/setup" class="btn btn-primary">+ Add Source</a>
+                </div>
+            </header>
+
+            <div class="content-area">
+                <!-- Data Sources Section -->
+                <section class="data-section">
+                    <div class="section-header">
+                        <h2>Data Sources</h2>
+                        <span class="section-count" id="source-count">{{ sources|length }}</span>
+                    </div>
+
+                    <div class="data-table-container">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Name</th>
+                                    <th>Type</th>
+                                    <th>Endpoint</th>
+                                    <th>Status</th>
+                                    <th>Last Update</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="sources-table">
+                                {% if sources %}
+                                    {% for source in sources %}
+                                    <tr data-source="{{ source.name }}">
+                                        <td class="source-name">{{ source.name }}</td>
+                                        <td><span class="type-badge {{ source.type }}">{{ source.type|upper }}</span></td>
+                                        <td class="endpoint">{{ source.url or source.mqtt_topic or source.sql_connection or 'N/A' }}</td>
+                                        <td>
+                                            <span class="status-badge {{ source.status }}">
+                                                <span class="status-indicator"></span>
+                                                {{ source.status }}
+                                            </span>
+                                        </td>
+                                        <td class="last-update">--</td>
+                                        <td class="actions">
+                                            <button class="btn-icon" onclick="testSource('{{ source.name }}')" title="Test Connection">
+                                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                                    <polyline points="23 4 23 10 17 10"></polyline>
+                                                    <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path>
+                                                </svg>
+                                            </button>
+                                            <button class="btn-icon" onclick="editSource('{{ source.name }}')" title="Edit">
+                                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                                    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                                                    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                                                </svg>
+                                            </button>
+                                            <button class="btn-icon danger" onclick="deleteSource('{{ source.name }}')" title="Delete">
+                                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                                    <polyline points="3 6 5 6 21 6"></polyline>
+                                                    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                                                </svg>
+                                            </button>
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                {% else %}
+                                    <tr class="empty-row">
+                                        <td colspan="6">
+                                            <div class="empty-state">
+                                                <p>No data sources configured</p>
+                                                <a href="/setup" class="btn btn-secondary btn-sm">Add Data Source</a>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                {% endif %}
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+
+                <!-- Channel Groups Section -->
+                <section class="data-section">
+                    <div class="section-header">
+                        <h2>Channel Groups</h2>
+                        <span class="section-count" id="group-count">0</span>
+                    </div>
+
+                    <div class="data-table-container">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Group Name</th>
+                                    <th>Channels</th>
+                                    <th>Source</th>
+                                    <th>Preprocessing</th>
+                                    <th>Status</th>
+                                    <th>Trained States</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="groups-table">
+                                <tr class="empty-row">
+                                    <td colspan="7">
+                                        <div class="empty-state">
+                                            <p>No channel groups configured</p>
+                                            <a href="/setup" class="btn btn-secondary btn-sm">Create Group</a>
+                                        </div>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+
+                <!-- Data Flow Diagram -->
+                <section class="data-section">
+                    <div class="section-header">
+                        <h2>Data Pipeline</h2>
+                    </div>
+
+                    <div class="pipeline-diagram">
+                        <div class="pipeline-stage">
+                            <div class="stage-icon">
+                                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M21 12a9 9 0 0 1-9 9m9-9a9 9 0 0 0-9-9m9 9H3m9 9a9 9 0 0 1-9-9m9 9c1.66 0 3-4.03 3-9s-1.34-9-3-9m0 18c-1.66 0-3-4.03-3-9s1.34-9 3-9m-9 9a9 9 0 0 1 9-9"></path>
+                                </svg>
+                            </div>
+                            <span class="stage-label">Sources</span>
+                            <span class="stage-value" id="pipeline-sources">0</span>
+                        </div>
+                        <div class="pipeline-arrow">
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <line x1="5" y1="12" x2="19" y2="12"></line>
+                                <polyline points="12 5 19 12 12 19"></polyline>
+                            </svg>
+                        </div>
+                        <div class="pipeline-stage">
+                            <div class="stage-icon">
+                                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>
+                                </svg>
+                            </div>
+                            <span class="stage-label">Channels</span>
+                            <span class="stage-value" id="pipeline-channels">0</span>
+                        </div>
+                        <div class="pipeline-arrow">
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <line x1="5" y1="12" x2="19" y2="12"></line>
+                                <polyline points="12 5 19 12 12 19"></polyline>
+                            </svg>
+                        </div>
+                        <div class="pipeline-stage">
+                            <div class="stage-icon">
+                                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <polygon points="12 2 2 7 12 12 22 7 12 2"></polygon>
+                                    <polyline points="2 17 12 22 22 17"></polyline>
+                                    <polyline points="2 12 12 17 22 12"></polyline>
+                                </svg>
+                            </div>
+                            <span class="stage-label">Groups</span>
+                            <span class="stage-value" id="pipeline-groups">0</span>
+                        </div>
+                        <div class="pipeline-arrow">
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <line x1="5" y1="12" x2="19" y2="12"></line>
+                                <polyline points="12 5 19 12 12 19"></polyline>
+                            </svg>
+                        </div>
+                        <div class="pipeline-stage">
+                            <div class="stage-icon active">
+                                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M12 2L2 7l10 5 10-5-10-5z"></path>
+                                    <path d="M2 17l10 5 10-5"></path>
+                                    <path d="M2 12l10 5 10-5"></path>
+                                </svg>
+                            </div>
+                            <span class="stage-label">ML Model</span>
+                            <span class="stage-value status-ready">Ready</span>
+                        </div>
+                    </div>
+                </section>
+            </div>
+        </main>
+    </div>
+
+    <script>
+        // Load data on page init
+        async function loadData() {
+            try {
+                const [sourcesRes, groupsRes] = await Promise.all([
+                    fetch('/api/sources'),
+                    fetch('/api/groups')
+                ]);
+
+                const sources = await sourcesRes.json();
+                const groups = await groupsRes.json();
+
+                updatePipelineCounts(sources, groups);
+                updateGroupsTable(groups);
+            } catch (error) {
+                console.error('Failed to load data:', error);
+            }
+        }
+
+        function updatePipelineCounts(sources, groups) {
+            document.getElementById('source-count').textContent = sources.length;
+            document.getElementById('group-count').textContent = groups.length;
+            document.getElementById('pipeline-sources').textContent = sources.length;
+            document.getElementById('pipeline-groups').textContent = groups.length;
+
+            // Count total channels
+            let totalChannels = 0;
+            groups.forEach(g => totalChannels += (g.channels || []).length);
+            document.getElementById('pipeline-channels').textContent = totalChannels;
+        }
+
+        function updateGroupsTable(groups) {
+            const tbody = document.getElementById('groups-table');
+
+            if (groups.length === 0) {
+                tbody.innerHTML = `
+                    <tr class="empty-row">
+                        <td colspan="7">
+                            <div class="empty-state">
+                                <p>No channel groups configured</p>
+                                <a href="/setup" class="btn btn-secondary btn-sm">Create Group</a>
+                            </div>
+                        </td>
+                    </tr>
+                `;
+                return;
+            }
+
+            tbody.innerHTML = groups.map(group => `
+                <tr data-group="${group.name}">
+                    <td>
+                        <span class="group-color-dot" style="background: ${group.color};"></span>
+                        ${group.name}
+                    </td>
+                    <td>${(group.channels || []).join(', ')}</td>
+                    <td>--</td>
+                    <td><span class="badge">${group.preprocessing || 'basic'}</span></td>
+                    <td>
+                        <span class="status-badge ${group.status}">
+                            <span class="status-indicator"></span>
+                            ${group.status}
+                        </span>
+                    </td>
+                    <td>${group.trained_states || 0}</td>
+                    <td class="actions">
+                        <button class="btn-icon" onclick="editGroup('${group.name}')" title="Edit">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                            </svg>
+                        </button>
+                        <button class="btn-icon danger" onclick="deleteGroup('${group.name}')" title="Delete">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <polyline points="3 6 5 6 21 6"></polyline>
+                                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                            </svg>
+                        </button>
+                    </td>
+                </tr>
+            `).join('');
+        }
+
+        function testSource(name) {
+            console.log('Testing source:', name);
+            // Implement source test
+        }
+
+        function editSource(name) {
+            console.log('Edit source:', name);
+            // Implement source edit
+        }
+
+        function deleteSource(name) {
+            if (confirm(`Delete data source "${name}"?`)) {
+                fetch(`/api/sources/${encodeURIComponent(name)}`, { method: 'DELETE' })
+                    .then(() => location.reload());
+            }
+        }
+
+        function editGroup(name) {
+            console.log('Edit group:', name);
+            // Implement group edit
+        }
+
+        function deleteGroup(name) {
+            if (confirm(`Delete channel group "${name}"?`)) {
+                fetch(`/api/groups/${encodeURIComponent(name)}`, { method: 'DELETE' })
+                    .then(() => location.reload());
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', loadData);
+    </script>
+</body>
+</html>

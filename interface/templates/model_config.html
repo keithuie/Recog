@@ -1,0 +1,387 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Model Configuration - MachineIQ</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/static/css/styles.css">
+</head>
+<body>
+    <div class="app-container">
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <div class="logo-area">
+                <div class="logo-icon"></div>
+                <h1>MachineIQ</h1>
+            </div>
+
+            <nav class="nav-menu">
+                <a href="/" class="nav-item">
+                    <span class="nav-icon">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <rect x="3" y="3" width="7" height="7"></rect>
+                            <rect x="14" y="3" width="7" height="7"></rect>
+                            <rect x="14" y="14" width="7" height="7"></rect>
+                            <rect x="3" y="14" width="7" height="7"></rect>
+                        </svg>
+                    </span>
+                    Dashboard
+                </a>
+                <a href="/setup" class="nav-item">
+                    <span class="nav-icon">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="12" cy="12" r="3"></circle>
+                            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+                        </svg>
+                    </span>
+                    Setup Wizard
+                </a>
+                <a href="/dataflow" class="nav-item">
+                    <span class="nav-icon">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>
+                        </svg>
+                    </span>
+                    Dataflow
+                </a>
+                <a href="/model-config" class="nav-item active">
+                    <span class="nav-icon">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M12 2L2 7l10 5 10-5-10-5z"></path>
+                            <path d="M2 17l10 5 10-5"></path>
+                            <path d="M2 12l10 5 10-5"></path>
+                        </svg>
+                    </span>
+                    Model Config
+                </a>
+            </nav>
+
+            <div class="sidebar-footer">
+                <div class="connection-status">
+                    <span class="status-dot connected"></span>
+                    <span>Connected</span>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <header class="top-bar">
+                <div class="breadcrumbs">Model Configuration</div>
+                <div class="header-actions">
+                    <button class="btn btn-secondary" onclick="resetDefaults()">Reset Defaults</button>
+                    <button class="btn btn-primary" onclick="saveConfig()">Save Configuration</button>
+                </div>
+            </header>
+
+            <div class="content-area">
+                <!-- Model Parameters Section -->
+                <section class="data-section">
+                    <div class="section-header">
+                        <h2>Detection Parameters</h2>
+                    </div>
+
+                    <div class="config-grid">
+                        <!-- Kernel Type -->
+                        <div class="config-card">
+                            <div class="config-header">
+                                <h3>Kernel Type</h3>
+                                <span class="config-badge">Core</span>
+                            </div>
+                            <p class="config-desc">Shape of the kernel used for pattern matching</p>
+                            <div class="config-control">
+                                <select id="kernel-type" class="form-select">
+                                    <option value="triangular" selected>Triangular</option>
+                                    <option value="parabolic">Parabolic</option>
+                                </select>
+                            </div>
+                            <div class="config-tip">
+                                <span class="tip-label">Triangular:</span> Sharp response for sudden changes
+                                <br>
+                                <span class="tip-label">Parabolic:</span> Smoother for gradual variations
+                            </div>
+                        </div>
+
+                        <!-- Number of Bins -->
+                        <div class="config-card">
+                            <div class="config-header">
+                                <h3>Number of Bins</h3>
+                                <span class="config-badge">Resolution</span>
+                            </div>
+                            <p class="config-desc">Histogram resolution for each channel</p>
+                            <div class="config-control">
+                                <select id="num-bins" class="form-select">
+                                    <option value="32">32 bins</option>
+                                    <option value="64" selected>64 bins</option>
+                                    <option value="128">128 bins</option>
+                                    <option value="256">256 bins</option>
+                                </select>
+                            </div>
+                            <div class="config-tip">
+                                More bins = higher resolution but needs more training data. 64 is recommended for most applications.
+                            </div>
+                        </div>
+
+                        <!-- Kernel Width -->
+                        <div class="config-card">
+                            <div class="config-header">
+                                <h3>Kernel Width</h3>
+                                <span class="config-badge current-value" id="kw-value">0.5</span>
+                            </div>
+                            <p class="config-desc">Width relative to bin width (sensitivity)</p>
+                            <div class="config-control">
+                                <input type="range" id="kernel-width" class="form-range"
+                                       min="0.1" max="2.0" step="0.1" value="0.5"
+                                       oninput="updateValue('kw-value', this.value)">
+                                <div class="range-labels">
+                                    <span>Sensitive</span>
+                                    <span>Tolerant</span>
+                                </div>
+                            </div>
+                            <div class="config-tip">
+                                Lower (0.3-0.5): More sensitive to exact matches<br>
+                                Higher (0.7-1.0): More tolerant of variation
+                            </div>
+                        </div>
+
+                        <!-- Anomaly Threshold -->
+                        <div class="config-card">
+                            <div class="config-header">
+                                <h3>Anomaly Threshold</h3>
+                                <span class="config-badge current-value" id="threshold-value">0.3</span>
+                            </div>
+                            <p class="config-desc">Match strength below which triggers alert</p>
+                            <div class="config-control">
+                                <input type="range" id="threshold" class="form-range"
+                                       min="0.1" max="0.9" step="0.05" value="0.3"
+                                       oninput="updateValue('threshold-value', this.value)">
+                                <div class="range-labels">
+                                    <span>More Alerts</span>
+                                    <span>Fewer Alerts</span>
+                                </div>
+                            </div>
+                            <div class="config-tip">
+                                Start with 0.3 and adjust based on false positive rate. Lower = more sensitive.
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Preprocessing Section -->
+                <section class="data-section">
+                    <div class="section-header">
+                        <h2>Preprocessing Algorithms</h2>
+                    </div>
+
+                    <div class="preprocessing-cards">
+                        <div class="preprocess-card" data-id="basic">
+                            <div class="preprocess-header">
+                                <h4>Basic Time Domain</h4>
+                                <span class="req-badge">Min: 100 Hz</span>
+                            </div>
+                            <p>RMS, Peak, Crest Factor, Kurtosis</p>
+                            <div class="preprocess-features">
+                                <span class="feature-tag">rms</span>
+                                <span class="feature-tag">peak</span>
+                                <span class="feature-tag">crest_factor</span>
+                                <span class="feature-tag">kurtosis</span>
+                            </div>
+                        </div>
+
+                        <div class="preprocess-card" data-id="vibration">
+                            <div class="preprocess-header">
+                                <h4>Full Vibration Analysis</h4>
+                                <span class="req-badge">Min: 5000 Hz</span>
+                            </div>
+                            <p>Time + Frequency + Envelope + StressWave</p>
+                            <div class="preprocess-features">
+                                <span class="feature-tag">envelope_rms</span>
+                                <span class="feature-tag">stresswave_rms</span>
+                                <span class="feature-tag">peak_frequency</span>
+                                <span class="feature-tag">spectral_energy</span>
+                            </div>
+                        </div>
+
+                        <div class="preprocess-card" data-id="bearing">
+                            <div class="preprocess-header">
+                                <h4>Bearing Fault Detection</h4>
+                                <span class="req-badge high">Min: 10000 Hz</span>
+                            </div>
+                            <p>Optimized for bearing defect detection</p>
+                            <div class="preprocess-features">
+                                <span class="feature-tag">envelope_kurtosis</span>
+                                <span class="feature-tag">stresswave_peak</span>
+                                <span class="feature-tag">crest_factor</span>
+                            </div>
+                        </div>
+
+                        <div class="preprocess-card" data-id="frequency">
+                            <div class="preprocess-header">
+                                <h4>Frequency Analysis</h4>
+                                <span class="req-badge">Min: 1000 Hz</span>
+                            </div>
+                            <p>FFT-based spectral analysis</p>
+                            <div class="preprocess-features">
+                                <span class="feature-tag">spectral_centroid</span>
+                                <span class="feature-tag">spectral_spread</span>
+                                <span class="feature-tag">spectral_entropy</span>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Training Section -->
+                <section class="data-section">
+                    <div class="section-header">
+                        <h2>Training Settings</h2>
+                    </div>
+
+                    <div class="training-config">
+                        <div class="config-card wide">
+                            <div class="config-header">
+                                <h3>Training Duration</h3>
+                            </div>
+                            <p class="config-desc">Duration for learning normal patterns</p>
+                            <div class="duration-options">
+                                <button class="duration-btn" data-value="30">30s</button>
+                                <button class="duration-btn active" data-value="60">1 min</button>
+                                <button class="duration-btn" data-value="120">2 min</button>
+                                <button class="duration-btn" data-value="300">5 min</button>
+                                <button class="duration-btn" data-value="600">10 min</button>
+                            </div>
+                            <div class="config-tip">
+                                Training should capture at least one complete operating cycle. For rotating machinery, this means one full rotation at the slowest operating speed.
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Advanced Settings -->
+                <section class="data-section collapsible">
+                    <div class="section-header clickable" onclick="toggleSection(this)">
+                        <h2>Advanced Settings</h2>
+                        <span class="collapse-icon">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <polyline points="6 9 12 15 18 9"></polyline>
+                            </svg>
+                        </span>
+                    </div>
+
+                    <div class="section-content collapsed">
+                        <div class="config-grid">
+                            <div class="config-card">
+                                <div class="config-header">
+                                    <h3>Auto-Scale Input</h3>
+                                </div>
+                                <p class="config-desc">Automatically normalize input ranges</p>
+                                <div class="config-control">
+                                    <label class="toggle-switch">
+                                        <input type="checkbox" id="auto-scale" checked>
+                                        <span class="toggle-slider"></span>
+                                    </label>
+                                </div>
+                            </div>
+
+                            <div class="config-card">
+                                <div class="config-header">
+                                    <h3>Outlier Rejection</h3>
+                                </div>
+                                <p class="config-desc">Ignore extreme values during training</p>
+                                <div class="config-control">
+                                    <label class="toggle-switch">
+                                        <input type="checkbox" id="outlier-rejection" checked>
+                                        <span class="toggle-slider"></span>
+                                    </label>
+                                </div>
+                            </div>
+
+                            <div class="config-card">
+                                <div class="config-header">
+                                    <h3>Smoothing Window</h3>
+                                    <span class="config-badge current-value" id="smooth-value">5</span>
+                                </div>
+                                <p class="config-desc">Rolling average for match score</p>
+                                <div class="config-control">
+                                    <input type="range" id="smoothing" class="form-range"
+                                           min="1" max="20" step="1" value="5"
+                                           oninput="updateValue('smooth-value', this.value)">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+            </div>
+        </main>
+    </div>
+
+    <script>
+        let selectedDuration = 60;
+
+        function updateValue(elementId, value) {
+            document.getElementById(elementId).textContent = value;
+        }
+
+        function toggleSection(header) {
+            const content = header.nextElementSibling;
+            const icon = header.querySelector('.collapse-icon');
+            content.classList.toggle('collapsed');
+            icon.classList.toggle('rotated');
+        }
+
+        // Duration buttons
+        document.querySelectorAll('.duration-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                document.querySelectorAll('.duration-btn').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                selectedDuration = parseInt(btn.dataset.value);
+            });
+        });
+
+        function resetDefaults() {
+            document.getElementById('kernel-type').value = 'triangular';
+            document.getElementById('num-bins').value = '64';
+            document.getElementById('kernel-width').value = '0.5';
+            document.getElementById('threshold').value = '0.3';
+            document.getElementById('auto-scale').checked = true;
+            document.getElementById('outlier-rejection').checked = true;
+            document.getElementById('smoothing').value = '5';
+
+            updateValue('kw-value', '0.5');
+            updateValue('threshold-value', '0.3');
+            updateValue('smooth-value', '5');
+
+            document.querySelectorAll('.duration-btn').forEach(b => b.classList.remove('active'));
+            document.querySelector('.duration-btn[data-value="60"]').classList.add('active');
+            selectedDuration = 60;
+        }
+
+        function saveConfig() {
+            const config = {
+                kernel_type: document.getElementById('kernel-type').value,
+                num_bins: parseInt(document.getElementById('num-bins').value),
+                kernel_width: parseFloat(document.getElementById('kernel-width').value),
+                threshold: parseFloat(document.getElementById('threshold').value),
+                training_duration: selectedDuration,
+                auto_scale: document.getElementById('auto-scale').checked,
+                outlier_rejection: document.getElementById('outlier-rejection').checked,
+                smoothing_window: parseInt(document.getElementById('smoothing').value)
+            };
+
+            // Save to backend (implement endpoint)
+            console.log('Saving config:', config);
+
+            // Show success feedback
+            const btn = document.querySelector('.btn-primary');
+            btn.textContent = 'Saved!';
+            btn.classList.add('btn-success');
+            setTimeout(() => {
+                btn.textContent = 'Save Configuration';
+                btn.classList.remove('btn-success');
+            }, 2000);
+        }
+    </script>
+</body>
+</html>
