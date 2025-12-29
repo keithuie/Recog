@@ -1,7 +1,7 @@
 version: '3.8'
 
 services:
-  # 1. Verification Database
+  # 1. Time Series Database
   influxdb:
     image: influxdb:1.8
     container_name: machineiq_influx
@@ -11,42 +11,92 @@ services:
       - INFLUXDB_DB=machineiq_data
       - INFLUXDB_ADMIN_USER=admin
       - INFLUXDB_ADMIN_PASSWORD=machineiq_secure_pass
-    networks:
-      - machineiq-net
-
-  # 2. Visualization Dashboard
-  grafana:
-    image: grafana/grafana-oss:latest
-    container_name: machineiq_grafana
-    ports:
-      - "3000:3000"
-    environment:
-      - GF_SECURITY_ADMIN_PASSWORD=admin
-      # Allow unsigned plugins (Crucial for local development)
-      - GF_PLUGINS_ALLOW_LOADING_UNSIGNED_PLUGINS=machineiq-pattern-panel
-    depends_on:
-      - influxdb
     volumes:
-      # Mount your local build folder to the container
-      - ./machineiq-panel/dist:/var/lib/grafana/plugins/machineiq-pattern-panel
-      # Persist Grafana storage
-      - grafana_storage:/var/lib/grafana
+      - influxdb_data:/var/lib/influxdb
     networks:
       - machineiq-net
+    restart: unless-stopped
 
-  # 3. MQTT Broker (Control Plane)
+  # 2. MQTT Broker (Control Plane)
   mosquitto:
-    image: eclipse-mosquitto:latest
+    image: eclipse-mosquitto:2
     container_name: machineiq_mqtt
     ports:
       - "1883:1883"
       - "9001:9001"
+    volumes:
+      - ./config/mosquitto.conf:/mosquitto/config/mosquitto.conf
+      - mosquitto_data:/mosquitto/data
     networks:
       - machineiq-net
+    restart: unless-stopped
+
+  # 3. Telegraf - Data Collection Agent
+  telegraf:
+    image: telegraf:latest
+    container_name: machineiq_telegraf
+    volumes:
+      - ./telegraf.conf:/etc/telegraf/telegraf.conf:ro
+    depends_on:
+      - influxdb
+      - mosquitto
+    networks:
+      - machineiq-net
+    restart: unless-stopped
+
+  # 4. Python ML Core Service
+  ml_core:
+    build:
+      context: .
+      dockerfile: Dockerfile.ml
+    container_name: machineiq_ml
+    environment:
+      - INFLUXDB_HOST=influxdb
+      - INFLUXDB_PORT=8086
+      - INFLUXDB_DB=machineiq_data
+      - MQTT_HOST=mosquitto
+      - MQTT_PORT=1883
+    depends_on:
+      - influxdb
+      - mosquitto
+    volumes:
+      - ./miq:/app/miq:ro
+      - ./machine_iq_core.py:/app/machine_iq_core.py:ro
+      - ml_models:/app/models
+    networks:
+      - machineiq-net
+    restart: unless-stopped
+
+  # 5. Web Interface (Custom Dashboard - replaces Grafana)
+  web_interface:
+    build:
+      context: .
+      dockerfile: Dockerfile.web
+    container_name: machineiq_web
+    ports:
+      - "8000:8000"
+    environment:
+      - INFLUXDB_HOST=influxdb
+      - INFLUXDB_PORT=8086
+      - MQTT_HOST=mosquitto
+      - MQTT_PORT=1883
+      - ML_CORE_HOST=ml_core
+      - ML_CORE_PORT=5000
+    depends_on:
+      - influxdb
+      - mosquitto
+      - ml_core
+    volumes:
+      - ./interface:/app/interface:ro
+    networks:
+      - machineiq-net
+    restart: unless-stopped
 
 networks:
   machineiq-net:
     driver: bridge
 
 volumes:
-  grafana_storage:
+  influxdb_data:
+  mosquitto_data:
+  ml_models:

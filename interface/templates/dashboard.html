@@ -1,0 +1,416 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ title }} - MachineIQ</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/static/css/styles.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+    <div class="app-container">
+        <!-- Sidebar -->
+        <aside class="sidebar glass">
+            <div class="logo-area">
+                <div class="logo-icon"></div>
+                <h1>MachineIQ</h1>
+            </div>
+
+            <nav class="nav-menu">
+                <a href="/" class="nav-item active">
+                    <span class="icon">&#128200;</span>
+                    Dashboard
+                </a>
+                <a href="/setup" class="nav-item">
+                    <span class="icon">&#9881;</span>
+                    Setup Wizard
+                </a>
+                <a href="/dataflow" class="nav-item">
+                    <span class="icon">&#128260;</span>
+                    Dataflow
+                </a>
+                <a href="/model-config" class="nav-item">
+                    <span class="icon">&#129302;</span>
+                    Model Config
+                </a>
+            </nav>
+
+            <div class="sidebar-footer">
+                <div class="connection-status">
+                    <span class="status-dot connected"></span>
+                    <span>Connected</span>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <header class="top-bar glass">
+                <div class="breadcrumbs">Dashboard / Monitoring</div>
+                <div class="header-actions">
+                    <button class="btn btn-secondary" onclick="downloadCSVTemplate()">
+                        Download CSV Template
+                    </button>
+                    <a href="/setup" class="btn btn-primary">
+                        + Add Data Source
+                    </a>
+                </div>
+            </header>
+
+            <div class="content-area">
+                <!-- System Overview -->
+                <section class="hero-section">
+                    <h2>System Overview</h2>
+                    <p class="subtitle">Real-time monitoring and anomaly detection</p>
+                </section>
+
+                <!-- Stats Cards -->
+                <div class="stats-grid">
+                    <div class="stat-card glass">
+                        <div class="stat-icon" style="background: linear-gradient(135deg, #10b981, #059669);">
+                            &#128260;
+                        </div>
+                        <div class="stat-content">
+                            <span class="stat-value" id="source-count">{{ sources|length }}</span>
+                            <span class="stat-label">Data Sources</span>
+                        </div>
+                    </div>
+                    <div class="stat-card glass">
+                        <div class="stat-icon" style="background: linear-gradient(135deg, #6366f1, #4f46e5);">
+                            &#128202;
+                        </div>
+                        <div class="stat-content">
+                            <span class="stat-value" id="group-count">{{ groups|length }}</span>
+                            <span class="stat-label">Channel Groups</span>
+                        </div>
+                    </div>
+                    <div class="stat-card glass">
+                        <div class="stat-icon" style="background: linear-gradient(135deg, #f59e0b, #d97706);">
+                            &#128680;
+                        </div>
+                        <div class="stat-content">
+                            <span class="stat-value" id="alert-count">0</span>
+                            <span class="stat-label">Active Alerts</span>
+                        </div>
+                    </div>
+                    <div class="stat-card glass">
+                        <div class="stat-icon" style="background: linear-gradient(135deg, #ec4899, #db2777);">
+                            &#128337;
+                        </div>
+                        <div class="stat-content">
+                            <span class="stat-value" id="uptime">0h</span>
+                            <span class="stat-label">Uptime</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Channel Groups Section -->
+                <section class="section-header">
+                    <h3>Channel Groups</h3>
+                    <div class="help-tip" title="Channel groups combine multiple data channels for multivariate anomaly detection. Each group learns patterns from all its channels together.">
+                        ?
+                    </div>
+                </section>
+
+                <div id="groups-container" class="groups-grid">
+                    {% if groups %}
+                        {% for group in groups %}
+                        <div class="group-card glass" data-group="{{ group.name }}">
+                            <div class="group-header">
+                                <div class="group-title">
+                                    <div class="group-color" style="background: {{ group.color }};"></div>
+                                    <h4>{{ group.name }}</h4>
+                                </div>
+                                <div class="group-status {{ group.status }}">
+                                    {{ group.status }}
+                                </div>
+                            </div>
+                            <div class="group-chart">
+                                <canvas id="chart-{{ group.name }}"></canvas>
+                            </div>
+                            <div class="group-stats">
+                                <div class="stat-row">
+                                    <span>Channels:</span>
+                                    <span>{{ group.channels|length }}</span>
+                                </div>
+                                <div class="stat-row">
+                                    <span>Trained States:</span>
+                                    <span>{{ group.trained_states }}</span>
+                                </div>
+                                <div class="stat-row">
+                                    <span>Match Strength:</span>
+                                    <span class="match-strength">--</span>
+                                </div>
+                            </div>
+                            <div class="group-controls">
+                                {% if group.status == 'idle' or group.status == 'monitoring' %}
+                                <button class="btn btn-primary btn-sm" onclick="startTraining('{{ group.name }}')">
+                                    Start Training
+                                </button>
+                                {% else %}
+                                <button class="btn btn-secondary btn-sm" onclick="stopTraining('{{ group.name }}')">
+                                    Stop Training
+                                </button>
+                                {% endif %}
+                                <button class="btn btn-ghost btn-sm" onclick="toggleGroupDetails('{{ group.name }}')">
+                                    Details
+                                </button>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    {% else %}
+                        <div class="empty-state glass">
+                            <div class="empty-icon">&#128202;</div>
+                            <h4>No Channel Groups</h4>
+                            <p>Create your first channel group to start monitoring</p>
+                            <a href="/setup" class="btn btn-primary">Setup Wizard</a>
+                        </div>
+                    {% endif %}
+                </div>
+
+                <!-- Data Sources Section -->
+                <section class="section-header">
+                    <h3>Data Sources</h3>
+                </section>
+
+                <div id="sources-container" class="sources-list">
+                    {% if sources %}
+                        {% for source in sources %}
+                        <div class="source-item glass" data-source="{{ source.name }}">
+                            <div class="source-icon {{ source.type }}"></div>
+                            <div class="source-info">
+                                <span class="source-name">{{ source.name }}</span>
+                                <span class="source-details">{{ source.type }} | {{ source.url or source.mqtt_topic or 'Configured' }}</span>
+                            </div>
+                            <div class="source-status connected">
+                                <span class="status-dot"></span>
+                                {{ source.status }}
+                            </div>
+                            <button class="btn btn-ghost btn-icon" onclick="removeSource('{{ source.name }}')">
+                                &#10005;
+                            </button>
+                        </div>
+                        {% endfor %}
+                    {% else %}
+                        <div class="empty-state glass small">
+                            <p>No data sources configured</p>
+                            <a href="/setup" class="btn btn-secondary btn-sm">Add Source</a>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Training Modal -->
+    <div id="training-modal" class="modal" style="display: none;">
+        <div class="modal-content glass">
+            <h3>Start Training</h3>
+            <p>Select training duration for learning normal patterns:</p>
+            <div class="form-group">
+                <label>Duration (seconds)</label>
+                <select id="training-duration" class="form-select">
+                    <option value="30">30 seconds</option>
+                    <option value="60" selected>1 minute</option>
+                    <option value="120">2 minutes</option>
+                    <option value="300">5 minutes</option>
+                    <option value="600">10 minutes</option>
+                </select>
+                <div class="form-hint">
+                    Training should capture at least one full operating cycle
+                </div>
+            </div>
+            <div class="modal-actions">
+                <button class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+                <button class="btn btn-primary" onclick="confirmTraining()">Start</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // WebSocket connection
+        let ws;
+        let charts = {};
+        let currentTrainingGroup = null;
+
+        function connectWebSocket() {
+            const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            ws = new WebSocket(`${protocol}//${window.location.host}/ws`);
+
+            ws.onopen = () => {
+                console.log('WebSocket connected');
+                updateConnectionStatus(true);
+            };
+
+            ws.onclose = () => {
+                console.log('WebSocket disconnected');
+                updateConnectionStatus(false);
+                // Reconnect after 3 seconds
+                setTimeout(connectWebSocket, 3000);
+            };
+
+            ws.onmessage = (event) => {
+                const message = JSON.parse(event.data);
+                handleWebSocketMessage(message);
+            };
+        }
+
+        function handleWebSocketMessage(message) {
+            switch (message.type) {
+                case 'data_update':
+                    updateChart(message.data.group, message.data);
+                    break;
+                case 'training_started':
+                    updateGroupStatus(message.data.group, 'training');
+                    break;
+                case 'training_stopped':
+                    updateGroupStatus(message.data.group, 'monitoring');
+                    break;
+                case 'anomaly_detected':
+                    showAnomalyAlert(message.data);
+                    break;
+            }
+        }
+
+        function updateConnectionStatus(connected) {
+            const statusDot = document.querySelector('.status-dot');
+            const statusText = statusDot.nextElementSibling;
+            if (connected) {
+                statusDot.classList.add('connected');
+                statusDot.classList.remove('disconnected');
+                statusText.textContent = 'Connected';
+            } else {
+                statusDot.classList.remove('connected');
+                statusDot.classList.add('disconnected');
+                statusText.textContent = 'Reconnecting...';
+            }
+        }
+
+        function initCharts() {
+            const chartContainers = document.querySelectorAll('.group-chart canvas');
+            chartContainers.forEach(canvas => {
+                const groupName = canvas.id.replace('chart-', '');
+                charts[groupName] = new Chart(canvas.getContext('2d'), {
+                    type: 'line',
+                    data: {
+                        labels: [],
+                        datasets: [{
+                            label: 'Match Strength',
+                            data: [],
+                            borderColor: '#6366f1',
+                            backgroundColor: 'rgba(99, 102, 241, 0.1)',
+                            fill: true,
+                            tension: 0.4
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: { display: false }
+                        },
+                        scales: {
+                            x: { display: false },
+                            y: {
+                                min: 0,
+                                max: 100,
+                                grid: { color: 'rgba(255,255,255,0.1)' },
+                                ticks: { color: 'rgba(255,255,255,0.5)' }
+                            }
+                        }
+                    }
+                });
+            });
+        }
+
+        function updateChart(groupName, data) {
+            const chart = charts[groupName];
+            if (!chart) return;
+
+            const now = new Date().toLocaleTimeString();
+            chart.data.labels.push(now);
+            chart.data.datasets[0].data.push(data.confidence);
+
+            // Keep only last 50 points
+            if (chart.data.labels.length > 50) {
+                chart.data.labels.shift();
+                chart.data.datasets[0].data.shift();
+            }
+
+            chart.update('none');
+
+            // Update match strength display
+            const card = document.querySelector(`[data-group="${groupName}"]`);
+            if (card) {
+                card.querySelector('.match-strength').textContent = `${data.confidence.toFixed(1)}%`;
+            }
+        }
+
+        function startTraining(groupName) {
+            currentTrainingGroup = groupName;
+            document.getElementById('training-modal').style.display = 'flex';
+        }
+
+        function closeModal() {
+            document.getElementById('training-modal').style.display = 'none';
+            currentTrainingGroup = null;
+        }
+
+        function confirmTraining() {
+            const duration = parseInt(document.getElementById('training-duration').value);
+            fetch('/api/training/start', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ group_name: currentTrainingGroup, duration: duration })
+            }).then(response => response.json())
+              .then(data => {
+                  console.log('Training started:', data);
+                  closeModal();
+              });
+        }
+
+        function stopTraining(groupName) {
+            fetch(`/api/training/stop/${groupName}`, { method: 'POST' })
+                .then(response => response.json())
+                .then(data => console.log('Training stopped:', data));
+        }
+
+        function updateGroupStatus(groupName, status) {
+            const card = document.querySelector(`[data-group="${groupName}"]`);
+            if (card) {
+                const statusEl = card.querySelector('.group-status');
+                statusEl.className = `group-status ${status}`;
+                statusEl.textContent = status;
+            }
+        }
+
+        function downloadCSVTemplate() {
+            window.location.href = '/api/csv-template';
+        }
+
+        function removeSource(name) {
+            if (confirm(`Remove data source "${name}"?`)) {
+                fetch(`/api/sources/${encodeURIComponent(name)}`, { method: 'DELETE' })
+                    .then(() => {
+                        const item = document.querySelector(`[data-source="${name}"]`);
+                        if (item) item.remove();
+                    });
+            }
+        }
+
+        function toggleGroupDetails(groupName) {
+            // Toggle details panel
+            console.log('Toggle details for:', groupName);
+        }
+
+        // Initialize on load
+        document.addEventListener('DOMContentLoaded', () => {
+            connectWebSocket();
+            initCharts();
+        });
+    </script>
+</body>
+</html>

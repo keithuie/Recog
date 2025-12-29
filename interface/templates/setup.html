@@ -1,0 +1,497 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Setup Wizard - MachineIQ</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/static/css/styles.css">
+</head>
+<body>
+    <div class="app-container">
+        <!-- Sidebar -->
+        <aside class="sidebar glass">
+            <div class="logo-area">
+                <div class="logo-icon"></div>
+                <h1>MachineIQ</h1>
+            </div>
+
+            <nav class="nav-menu">
+                <a href="/" class="nav-item">
+                    <span class="icon">&#128200;</span>
+                    Dashboard
+                </a>
+                <a href="/setup" class="nav-item active">
+                    <span class="icon">&#9881;</span>
+                    Setup Wizard
+                </a>
+                <a href="/dataflow" class="nav-item">
+                    <span class="icon">&#128260;</span>
+                    Dataflow
+                </a>
+                <a href="/model-config" class="nav-item">
+                    <span class="icon">&#129302;</span>
+                    Model Config
+                </a>
+            </nav>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <header class="top-bar glass">
+                <div class="breadcrumbs">Setup Wizard</div>
+            </header>
+
+            <div class="content-area">
+                <!-- Wizard Progress -->
+                <div class="wizard-progress">
+                    <div class="progress-step active" data-step="1">
+                        <div class="step-number">1</div>
+                        <span>Data Source</span>
+                    </div>
+                    <div class="progress-line"></div>
+                    <div class="progress-step" data-step="2">
+                        <div class="step-number">2</div>
+                        <span>Channels</span>
+                    </div>
+                    <div class="progress-line"></div>
+                    <div class="progress-step" data-step="3">
+                        <div class="step-number">3</div>
+                        <span>Preprocessing</span>
+                    </div>
+                    <div class="progress-line"></div>
+                    <div class="progress-step" data-step="4">
+                        <div class="step-number">4</div>
+                        <span>Model Config</span>
+                    </div>
+                </div>
+
+                <!-- Step 1: Data Source -->
+                <div id="step-1" class="wizard-step active">
+                    <div class="step-content glass">
+                        <h2>Connect Data Source</h2>
+                        <p class="step-description">Choose how to connect your data to MachineIQ</p>
+
+                        <div class="source-options">
+                            <div class="source-option" data-type="api" onclick="selectSourceType('api')">
+                                <div class="option-icon">&#127760;</div>
+                                <h4>REST API</h4>
+                                <p>Poll data from HTTP/HTTPS endpoint</p>
+                            </div>
+                            <div class="source-option" data-type="mqtt" onclick="selectSourceType('mqtt')">
+                                <div class="option-icon">&#128225;</div>
+                                <h4>MQTT</h4>
+                                <p>Subscribe to MQTT broker topic</p>
+                            </div>
+                            <div class="source-option" data-type="sql" onclick="selectSourceType('sql')">
+                                <div class="option-icon">&#128451;</div>
+                                <h4>SQL Database</h4>
+                                <p>Query from SQL database</p>
+                            </div>
+                            <div class="source-option" data-type="csv" onclick="selectSourceType('csv')">
+                                <div class="option-icon">&#128196;</div>
+                                <h4>CSV Upload</h4>
+                                <p>Upload historical data file</p>
+                            </div>
+                        </div>
+
+                        <!-- API Config -->
+                        <div id="config-api" class="source-config" style="display: none;">
+                            <div class="form-group">
+                                <label>Source Name</label>
+                                <input type="text" id="api-name" class="form-input" placeholder="My API Source">
+                                <div class="form-hint">A friendly name to identify this data source</div>
+                            </div>
+                            <div class="form-group">
+                                <label>API URL</label>
+                                <input type="url" id="api-url" class="form-input" placeholder="https://api.example.com/data">
+                                <div class="form-hint">
+                                    <span class="tip-icon">&#128161;</span>
+                                    The endpoint should return JSON with numeric values. Arrays or objects with channel data.
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label>Poll Interval (seconds)</label>
+                                <input type="number" id="api-interval" class="form-input" value="5" min="1" max="3600">
+                                <div class="form-hint">How often to fetch new data (1-3600 seconds)</div>
+                            </div>
+                        </div>
+
+                        <!-- MQTT Config -->
+                        <div id="config-mqtt" class="source-config" style="display: none;">
+                            <div class="form-group">
+                                <label>Source Name</label>
+                                <input type="text" id="mqtt-name" class="form-input" placeholder="My MQTT Source">
+                            </div>
+                            <div class="form-group">
+                                <label>MQTT Topic</label>
+                                <input type="text" id="mqtt-topic" class="form-input" placeholder="sensors/machine1/#">
+                                <div class="form-hint">
+                                    <span class="tip-icon">&#128161;</span>
+                                    Use # for wildcard subscriptions (e.g., sensors/+/temperature)
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- SQL Config -->
+                        <div id="config-sql" class="source-config" style="display: none;">
+                            <div class="form-group">
+                                <label>Source Name</label>
+                                <input type="text" id="sql-name" class="form-input" placeholder="My Database">
+                            </div>
+                            <div class="form-group">
+                                <label>Connection String</label>
+                                <input type="text" id="sql-connection" class="form-input" placeholder="postgresql://user:pass@host:5432/db">
+                                <div class="form-hint">
+                                    <span class="tip-icon">&#128161;</span>
+                                    Supports PostgreSQL, MySQL, SQLite, and ODBC connections
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label>Query</label>
+                                <textarea id="sql-query" class="form-textarea" placeholder="SELECT timestamp, value1, value2 FROM sensor_data ORDER BY timestamp DESC LIMIT 1000"></textarea>
+                            </div>
+                        </div>
+
+                        <!-- CSV Config -->
+                        <div id="config-csv" class="source-config" style="display: none;">
+                            <div class="form-group">
+                                <label>Source Name</label>
+                                <input type="text" id="csv-name" class="form-input" placeholder="Historical Data">
+                            </div>
+                            <div class="form-group">
+                                <label>Upload CSV File</label>
+                                <div class="file-upload">
+                                    <input type="file" id="csv-file" accept=".csv">
+                                    <span>Drag & drop or click to browse</span>
+                                </div>
+                                <div class="form-hint">
+                                    <a href="/api/csv-template" class="link">Download template</a> to see expected format
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Step 2: Channel Configuration -->
+                <div id="step-2" class="wizard-step">
+                    <div class="step-content glass">
+                        <h2>Configure Channels</h2>
+                        <p class="step-description">Select and group the data channels to monitor</p>
+
+                        <div class="form-group">
+                            <label>Group Name</label>
+                            <input type="text" id="group-name" class="form-input" placeholder="Motor Assembly 1">
+                            <div class="form-hint">Name for this collection of channels</div>
+                        </div>
+
+                        <div class="form-group">
+                            <label>Sample Rate (Hz)</label>
+                            <input type="number" id="sample-rate" class="form-input" value="1000" min="1" max="100000">
+                            <div class="form-hint">
+                                <span class="tip-icon">&#128161;</span>
+                                Higher sample rates enable more advanced analysis (envelope, stress wave)
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label>Select Channels</label>
+                            <div id="channel-list" class="channel-list">
+                                <div class="channel-item">
+                                    <input type="checkbox" id="ch-1" checked>
+                                    <label for="ch-1">channel_1</label>
+                                </div>
+                                <div class="channel-item">
+                                    <input type="checkbox" id="ch-2" checked>
+                                    <label for="ch-2">channel_2</label>
+                                </div>
+                                <div class="channel-item">
+                                    <input type="checkbox" id="ch-3">
+                                    <label for="ch-3">channel_3</label>
+                                </div>
+                                <div class="channel-item">
+                                    <input type="checkbox" id="ch-4">
+                                    <label for="ch-4">channel_4</label>
+                                </div>
+                            </div>
+                            <div class="form-hint">
+                                <span class="tip-icon">&#128161;</span>
+                                Group channels that represent related measurements (e.g., X, Y, Z acceleration from same sensor)
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label>Group Color</label>
+                            <div class="color-picker">
+                                <div class="color-option selected" style="background: #007AFF;" data-color="#007AFF"></div>
+                                <div class="color-option" style="background: #10b981;" data-color="#10b981"></div>
+                                <div class="color-option" style="background: #f59e0b;" data-color="#f59e0b"></div>
+                                <div class="color-option" style="background: #ec4899;" data-color="#ec4899"></div>
+                                <div class="color-option" style="background: #8b5cf6;" data-color="#8b5cf6"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Step 3: Preprocessing -->
+                <div id="step-3" class="wizard-step">
+                    <div class="step-content glass">
+                        <h2>Preprocessing Options</h2>
+                        <p class="step-description">Select how to process raw signals before analysis</p>
+
+                        <div id="preprocessing-options" class="preprocessing-grid">
+                            <!-- Populated by JavaScript -->
+                        </div>
+
+                        <div class="info-box">
+                            <div class="info-icon">&#9432;</div>
+                            <div class="info-content">
+                                <strong>What is preprocessing?</strong>
+                                <p>Preprocessing extracts meaningful features from raw signals. For example, converting a vibration waveform into RMS, peak frequency, and kurtosis values that reveal machinery health.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Step 4: Model Configuration -->
+                <div id="step-4" class="wizard-step">
+                    <div class="step-content glass">
+                        <h2>Model Configuration</h2>
+                        <p class="step-description">Configure the anomaly detection parameters</p>
+
+                        <div id="model-params" class="model-config-grid">
+                            <!-- Populated by JavaScript -->
+                        </div>
+
+                        <div class="info-box success">
+                            <div class="info-icon">&#10004;</div>
+                            <div class="info-content">
+                                <strong>Ready to start!</strong>
+                                <p>After setup, you'll train the model on normal operating data. Training typically takes 1-5 minutes depending on your data.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Navigation -->
+                <div class="wizard-navigation">
+                    <button id="btn-prev" class="btn btn-secondary" onclick="prevStep()" style="display: none;">
+                        Previous
+                    </button>
+                    <button id="btn-next" class="btn btn-primary" onclick="nextStep()">
+                        Next
+                    </button>
+                    <button id="btn-finish" class="btn btn-success" onclick="finishSetup()" style="display: none;">
+                        Complete Setup
+                    </button>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script>
+        let currentStep = 1;
+        let selectedSourceType = null;
+        let selectedPreprocessing = 'basic';
+        let selectedColor = '#007AFF';
+        let preprocessingInfo = null;
+        let modelConfigInfo = null;
+
+        // Load preprocessing and model config info
+        async function loadConfigInfo() {
+            const [prepRes, modelRes] = await Promise.all([
+                fetch('/api/preprocessing-info'),
+                fetch('/api/model-config-info')
+            ]);
+            preprocessingInfo = await prepRes.json();
+            modelConfigInfo = await modelRes.json();
+
+            renderPreprocessingOptions();
+            renderModelConfig();
+        }
+
+        function renderPreprocessingOptions() {
+            const container = document.getElementById('preprocessing-options');
+            container.innerHTML = preprocessingInfo.algorithms.map(algo => `
+                <div class="preprocessing-option ${algo.id === selectedPreprocessing ? 'selected' : ''}"
+                     data-id="${algo.id}" onclick="selectPreprocessing('${algo.id}')">
+                    <h4>${algo.name}</h4>
+                    <p>${algo.description}</p>
+                    <div class="option-meta">
+                        <span class="badge">Min ${algo.sample_rate_min} Hz</span>
+                    </div>
+                    <div class="option-tip">
+                        <span class="tip-icon">&#128161;</span>
+                        ${algo.tip}
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function renderModelConfig() {
+            const container = document.getElementById('model-params');
+            container.innerHTML = modelConfigInfo.parameters.map(param => {
+                if (param.options) {
+                    return `
+                        <div class="config-param">
+                            <label>${param.name}</label>
+                            <select id="param-${param.id}" class="form-select">
+                                ${param.options.map(opt =>
+                                    `<option value="${opt}" ${opt === param.default ? 'selected' : ''}>${opt}</option>`
+                                ).join('')}
+                            </select>
+                            <div class="param-tip">
+                                <span class="tip-icon">&#128161;</span>
+                                ${param.tip}
+                            </div>
+                        </div>
+                    `;
+                } else {
+                    return `
+                        <div class="config-param">
+                            <label>${param.name}</label>
+                            <input type="range" id="param-${param.id}" class="form-range"
+                                   min="${param.min}" max="${param.max}" step="0.1" value="${param.default}"
+                                   oninput="updateRangeValue(this)">
+                            <span class="range-value">${param.default}</span>
+                            <div class="param-tip">
+                                <span class="tip-icon">&#128161;</span>
+                                ${param.tip}
+                            </div>
+                        </div>
+                    `;
+                }
+            }).join('');
+        }
+
+        function updateRangeValue(input) {
+            input.nextElementSibling.textContent = input.value;
+        }
+
+        function selectSourceType(type) {
+            selectedSourceType = type;
+            document.querySelectorAll('.source-option').forEach(el => {
+                el.classList.toggle('selected', el.dataset.type === type);
+            });
+            document.querySelectorAll('.source-config').forEach(el => {
+                el.style.display = 'none';
+            });
+            document.getElementById(`config-${type}`).style.display = 'block';
+        }
+
+        function selectPreprocessing(id) {
+            selectedPreprocessing = id;
+            document.querySelectorAll('.preprocessing-option').forEach(el => {
+                el.classList.toggle('selected', el.dataset.id === id);
+            });
+        }
+
+        function updateStep() {
+            document.querySelectorAll('.wizard-step').forEach((el, i) => {
+                el.classList.toggle('active', i + 1 === currentStep);
+            });
+            document.querySelectorAll('.progress-step').forEach((el, i) => {
+                el.classList.toggle('active', i + 1 <= currentStep);
+                el.classList.toggle('completed', i + 1 < currentStep);
+            });
+
+            document.getElementById('btn-prev').style.display = currentStep > 1 ? 'block' : 'none';
+            document.getElementById('btn-next').style.display = currentStep < 4 ? 'block' : 'none';
+            document.getElementById('btn-finish').style.display = currentStep === 4 ? 'block' : 'none';
+        }
+
+        function nextStep() {
+            if (currentStep < 4) {
+                currentStep++;
+                updateStep();
+            }
+        }
+
+        function prevStep() {
+            if (currentStep > 1) {
+                currentStep--;
+                updateStep();
+            }
+        }
+
+        async function finishSetup() {
+            // Collect configuration
+            const sourceConfig = collectSourceConfig();
+            const groupConfig = collectGroupConfig();
+
+            try {
+                // Add data source
+                await fetch('/api/sources', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(sourceConfig)
+                });
+
+                // Add channel group
+                await fetch('/api/groups', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(groupConfig)
+                });
+
+                // Redirect to dashboard
+                window.location.href = '/';
+            } catch (error) {
+                console.error('Setup failed:', error);
+                alert('Setup failed. Please try again.');
+            }
+        }
+
+        function collectSourceConfig() {
+            const config = {
+                name: document.getElementById(`${selectedSourceType}-name`).value || 'Data Source',
+                source_type: selectedSourceType
+            };
+
+            if (selectedSourceType === 'api') {
+                config.url = document.getElementById('api-url').value;
+                config.poll_interval = parseInt(document.getElementById('api-interval').value);
+            } else if (selectedSourceType === 'mqtt') {
+                config.mqtt_topic = document.getElementById('mqtt-topic').value;
+            } else if (selectedSourceType === 'sql') {
+                config.sql_connection = document.getElementById('sql-connection').value;
+                config.sql_query = document.getElementById('sql-query').value;
+            }
+
+            return config;
+        }
+
+        function collectGroupConfig() {
+            const channels = [];
+            document.querySelectorAll('.channel-item input:checked').forEach(cb => {
+                channels.push(cb.nextElementSibling.textContent);
+            });
+
+            return {
+                name: document.getElementById('group-name').value || 'Channel Group',
+                channels: channels,
+                color: selectedColor,
+                sample_rate: parseFloat(document.getElementById('sample-rate').value),
+                preprocessing: selectedPreprocessing
+            };
+        }
+
+        // Color picker
+        document.querySelectorAll('.color-option').forEach(el => {
+            el.addEventListener('click', () => {
+                document.querySelectorAll('.color-option').forEach(opt => opt.classList.remove('selected'));
+                el.classList.add('selected');
+                selectedColor = el.dataset.color;
+            });
+        });
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', () => {
+            loadConfigInfo();
+            updateStep();
+        });
+    </script>
+</body>
+</html>
