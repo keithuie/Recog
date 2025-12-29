@@ -9,6 +9,347 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/static/css/styles.css">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        /* Grafana-like Grid Layout */
+        .dashboard-grid {
+            display: grid;
+            grid-template-columns: repeat(12, 1fr);
+            grid-auto-rows: minmax(80px, auto);
+            gap: 16px;
+            padding: 16px 0;
+        }
+
+        .grid-panel {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-primary);
+            border-radius: var(--radius-md);
+            position: relative;
+            overflow: hidden;
+            transition: box-shadow 0.2s ease;
+        }
+
+        .grid-panel:hover {
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+        }
+
+        .grid-panel.dragging {
+            opacity: 0.8;
+            z-index: 1000;
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+        }
+
+        /* Panel sizes */
+        .panel-1x1 { grid-column: span 3; grid-row: span 2; }
+        .panel-2x1 { grid-column: span 6; grid-row: span 2; }
+        .panel-3x1 { grid-column: span 9; grid-row: span 2; }
+        .panel-4x1 { grid-column: span 12; grid-row: span 2; }
+        .panel-1x2 { grid-column: span 3; grid-row: span 4; }
+        .panel-2x2 { grid-column: span 6; grid-row: span 4; }
+        .panel-3x2 { grid-column: span 9; grid-row: span 4; }
+        .panel-4x2 { grid-column: span 12; grid-row: span 4; }
+
+        .panel-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px 16px;
+            border-bottom: 1px solid var(--border-primary);
+            cursor: move;
+        }
+
+        .panel-title {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 14px;
+            font-weight: 600;
+        }
+
+        .panel-title .color-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+        }
+
+        .panel-actions {
+            display: flex;
+            gap: 4px;
+            opacity: 0;
+            transition: opacity 0.2s ease;
+        }
+
+        .grid-panel:hover .panel-actions {
+            opacity: 1;
+        }
+
+        .panel-action-btn {
+            background: transparent;
+            border: none;
+            color: var(--text-tertiary);
+            cursor: pointer;
+            padding: 4px;
+            border-radius: 4px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .panel-action-btn:hover {
+            background: var(--bg-hover);
+            color: var(--text-primary);
+        }
+
+        .panel-content {
+            padding: 16px;
+            height: calc(100% - 48px);
+            display: flex;
+            flex-direction: column;
+        }
+
+        .panel-chart {
+            flex: 1;
+            min-height: 0;
+            position: relative;
+        }
+
+        .panel-stats {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 12px;
+            margin-top: 12px;
+        }
+
+        .panel-stat {
+            text-align: center;
+            padding: 8px;
+            background: var(--bg-tertiary);
+            border-radius: var(--radius-sm);
+        }
+
+        .panel-stat-value {
+            font-size: 18px;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        .panel-stat-label {
+            font-size: 10px;
+            color: var(--text-tertiary);
+            text-transform: uppercase;
+            margin-top: 2px;
+        }
+
+        /* Match score gauge */
+        .match-gauge {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 12px;
+            background: var(--bg-tertiary);
+            border-radius: var(--radius-sm);
+            margin-top: 12px;
+        }
+
+        .gauge-bar {
+            flex: 1;
+            height: 8px;
+            background: var(--bg-primary);
+            border-radius: 4px;
+            overflow: hidden;
+        }
+
+        .gauge-fill {
+            height: 100%;
+            border-radius: 4px;
+            transition: width 0.3s ease, background 0.3s ease;
+        }
+
+        .gauge-value {
+            font-size: 20px;
+            font-weight: 700;
+            min-width: 60px;
+            text-align: right;
+        }
+
+        /* Channel data display */
+        .channel-data {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            margin-top: 8px;
+            max-height: 120px;
+            overflow-y: auto;
+        }
+
+        .channel-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 6px 8px;
+            background: var(--bg-tertiary);
+            border-radius: var(--radius-sm);
+            font-size: 12px;
+        }
+
+        .channel-name {
+            color: var(--text-secondary);
+        }
+
+        .channel-value {
+            font-family: 'SF Mono', monospace;
+            color: var(--text-primary);
+            font-weight: 500;
+        }
+
+        /* Resize handle */
+        .resize-handle {
+            position: absolute;
+            bottom: 0;
+            right: 0;
+            width: 16px;
+            height: 16px;
+            cursor: se-resize;
+            opacity: 0;
+            transition: opacity 0.2s ease;
+        }
+
+        .grid-panel:hover .resize-handle {
+            opacity: 1;
+        }
+
+        .resize-handle::after {
+            content: '';
+            position: absolute;
+            bottom: 4px;
+            right: 4px;
+            width: 8px;
+            height: 8px;
+            border-right: 2px solid var(--text-tertiary);
+            border-bottom: 2px solid var(--text-tertiary);
+        }
+
+        /* Edit mode */
+        .dashboard-grid.edit-mode .grid-panel {
+            border: 2px dashed var(--border-secondary);
+        }
+
+        .dashboard-grid.edit-mode .panel-header {
+            background: var(--bg-tertiary);
+        }
+
+        /* Panel size selector */
+        .size-selector {
+            position: absolute;
+            top: 100%;
+            right: 0;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-primary);
+            border-radius: var(--radius-md);
+            padding: 8px;
+            z-index: 100;
+            display: none;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+        }
+
+        .size-selector.visible {
+            display: block;
+        }
+
+        .size-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 24px);
+            gap: 4px;
+        }
+
+        .size-cell {
+            width: 24px;
+            height: 24px;
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-secondary);
+            border-radius: 2px;
+            cursor: pointer;
+        }
+
+        .size-cell:hover,
+        .size-cell.selected {
+            background: var(--accent-primary);
+            border-color: var(--accent-primary);
+        }
+
+        /* Toolbar */
+        .dashboard-toolbar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 16px;
+            padding: 12px 16px;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-primary);
+            border-radius: var(--radius-md);
+        }
+
+        .toolbar-left {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .toolbar-title {
+            font-size: 16px;
+            font-weight: 600;
+        }
+
+        .toolbar-status {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 12px;
+            color: var(--text-secondary);
+        }
+
+        .live-indicator {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .live-dot {
+            width: 8px;
+            height: 8px;
+            background: var(--accent-secondary);
+            border-radius: 50%;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .toolbar-actions {
+            display: flex;
+            gap: 8px;
+        }
+
+        /* Data source connection status */
+        .source-status {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 12px;
+            background: var(--bg-tertiary);
+            border-radius: var(--radius-sm);
+            font-size: 12px;
+        }
+
+        .source-status.connected {
+            color: var(--accent-secondary);
+        }
+
+        .source-status.error {
+            color: var(--accent-danger);
+        }
+    </style>
 </head>
 <body>
     <div class="app-container">
@@ -62,8 +403,8 @@
 
             <div class="sidebar-footer">
                 <div class="connection-status">
-                    <span class="status-dot connected"></span>
-                    <span>Connected</span>
+                    <span class="status-dot" id="ws-status"></span>
+                    <span id="ws-status-text">Connecting...</span>
                 </div>
             </div>
         </aside>
@@ -83,132 +424,104 @@
             </header>
 
             <div class="content-area">
-                <!-- System Overview - Collapsible -->
-                <section class="hero-section collapsible" id="system-overview">
-                    <div class="collapse-toggle" onclick="toggleOverview()">
-                        <div>
-                            <h2>System Overview</h2>
-                            <p class="subtitle">Real-time monitoring and anomaly detection</p>
+                <!-- Dashboard Toolbar -->
+                <div class="dashboard-toolbar">
+                    <div class="toolbar-left">
+                        <span class="toolbar-title">Monitoring Dashboard</span>
+                        <div class="toolbar-status">
+                            <div class="live-indicator">
+                                <span class="live-dot"></span>
+                                <span>LIVE</span>
+                            </div>
+                            <span id="update-rate">--</span>
                         </div>
-                        <span class="collapse-icon" id="overview-icon">
-                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <polyline points="18 15 12 9 6 15"></polyline>
+                    </div>
+                    <div class="toolbar-actions">
+                        <button class="btn btn-secondary btn-sm" onclick="toggleEditMode()" id="edit-mode-btn">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
                             </svg>
-                        </span>
+                            Edit Layout
+                        </button>
+                        <button class="btn btn-secondary btn-sm" onclick="resetLayout()">
+                            Reset
+                        </button>
                     </div>
+                </div>
 
-                    <div class="hero-content" id="overview-content">
-                        <!-- Stats Cards -->
-                        <div class="stats-grid" style="margin-top: 16px;">
-                            <div class="stat-card">
-                                <div class="stat-icon" style="background: rgba(0, 200, 83, 0.15); color: #00c853;">
-                                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                        <path d="M21 12a9 9 0 0 1-9 9m9-9a9 9 0 0 0-9-9m9 9H3m9 9a9 9 0 0 1-9-9m9 9c1.66 0 3-4.03 3-9s-1.34-9-3-9m0 18c-1.66 0-3-4.03-3-9s1.34-9 3-9m-9 9a9 9 0 0 1 9-9"></path>
-                                    </svg>
-                                </div>
-                                <div class="stat-content">
-                                    <span class="stat-value" id="source-count">{{ sources|length }}</span>
-                                    <span class="stat-label">Data Sources</span>
-                                </div>
-                            </div>
-                            <div class="stat-card">
-                                <div class="stat-icon" style="background: rgba(123, 97, 255, 0.15); color: #7b61ff;">
-                                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                        <path d="M12 2L2 7l10 5 10-5-10-5z"></path>
-                                        <path d="M2 17l10 5 10-5"></path>
-                                        <path d="M2 12l10 5 10-5"></path>
-                                    </svg>
-                                </div>
-                                <div class="stat-content">
-                                    <span class="stat-value" id="group-count">{{ groups|length }}</span>
-                                    <span class="stat-label">Channel Groups</span>
-                                </div>
-                            </div>
-                            <div class="stat-card">
-                                <div class="stat-icon" style="background: rgba(255, 193, 7, 0.15); color: #ffc107;">
-                                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                        <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
-                                        <line x1="12" y1="9" x2="12" y2="13"></line>
-                                        <line x1="12" y1="17" x2="12.01" y2="17"></line>
-                                    </svg>
-                                </div>
-                                <div class="stat-content">
-                                    <span class="stat-value" id="alert-count">0</span>
-                                    <span class="stat-label">Active Alerts</span>
-                                </div>
-                            </div>
-                            <div class="stat-card">
-                                <div class="stat-icon" style="background: rgba(255, 82, 82, 0.15); color: #ff5252;">
-                                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                        <circle cx="12" cy="12" r="10"></circle>
-                                        <polyline points="12 6 12 12 16 14"></polyline>
-                                    </svg>
-                                </div>
-                                <div class="stat-content">
-                                    <span class="stat-value" id="uptime">0h</span>
-                                    <span class="stat-label">Uptime</span>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </section>
-
-                <!-- Channel Groups Section -->
-                <section class="data-section">
-                    <div class="section-header">
-                        <div style="display: flex; align-items: center; gap: 8px;">
-                            <h2>Channel Groups</h2>
-                            <div class="help-tip" title="Channel groups combine multiple data channels for multivariate anomaly detection.">?</div>
-                        </div>
-                    </div>
-
-                    <div id="groups-container" class="groups-grid">
-                        {% if groups %}
-                            {% for group in groups %}
-                            <div class="group-card" data-group="{{ group.name }}">
-                                <div class="group-header">
-                                    <div class="group-title">
-                                        <div class="group-color" style="background: {{ group.color }};"></div>
-                                        <h4>{{ group.name }}</h4>
-                                    </div>
-                                    <div class="group-status {{ group.status }}">
+                <!-- Dashboard Grid -->
+                <div class="dashboard-grid" id="dashboard-grid">
+                    {% if groups %}
+                        {% for group in groups %}
+                        <div class="grid-panel panel-2x2" data-group="{{ group.name }}" data-size="2x2">
+                            <div class="panel-header">
+                                <div class="panel-title">
+                                    <span class="color-dot" style="background: {{ group.color }};"></span>
+                                    {{ group.name }}
+                                    <span class="status-badge {{ group.status }}" style="font-size: 10px; padding: 2px 6px;">
                                         {{ group.status }}
+                                    </span>
+                                </div>
+                                <div class="panel-actions">
+                                    <button class="panel-action-btn" onclick="resizePanel(this)" title="Resize">
+                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                            <polyline points="15 3 21 3 21 9"></polyline>
+                                            <polyline points="9 21 3 21 3 15"></polyline>
+                                            <line x1="21" y1="3" x2="14" y2="10"></line>
+                                            <line x1="3" y1="21" x2="10" y2="14"></line>
+                                        </svg>
+                                    </button>
+                                    <button class="panel-action-btn" onclick="showGroupDetails('{{ group.name }}')" title="Details">
+                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                            <circle cx="12" cy="12" r="10"></circle>
+                                            <line x1="12" y1="16" x2="12" y2="12"></line>
+                                            <line x1="12" y1="8" x2="12.01" y2="8"></line>
+                                        </svg>
+                                    </button>
+                                    <button class="panel-action-btn" onclick="startTraining('{{ group.name }}', {{ group.trained_states }})" title="Train">
+                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                            <polygon points="5 3 19 12 5 21 5 3"></polygon>
+                                        </svg>
+                                    </button>
+                                </div>
+                                <div class="size-selector" id="size-{{ group.name }}">
+                                    <div class="size-grid">
+                                        <div class="size-cell" onclick="setPanelSize('{{ group.name }}', '1x1')"></div>
+                                        <div class="size-cell" onclick="setPanelSize('{{ group.name }}', '2x1')"></div>
+                                        <div class="size-cell" onclick="setPanelSize('{{ group.name }}', '3x1')"></div>
+                                        <div class="size-cell" onclick="setPanelSize('{{ group.name }}', '4x1')"></div>
+                                        <div class="size-cell" onclick="setPanelSize('{{ group.name }}', '1x2')"></div>
+                                        <div class="size-cell selected" onclick="setPanelSize('{{ group.name }}', '2x2')"></div>
+                                        <div class="size-cell" onclick="setPanelSize('{{ group.name }}', '3x2')"></div>
+                                        <div class="size-cell" onclick="setPanelSize('{{ group.name }}', '4x2')"></div>
                                     </div>
                                 </div>
-                                <div class="group-chart">
+                            </div>
+                            <div class="panel-content">
+                                <div class="panel-chart">
                                     <canvas id="chart-{{ group.name }}"></canvas>
                                 </div>
-                                <div class="group-stats">
-                                    <div class="stat-row">
-                                        <span>Channels:</span>
-                                        <span>{{ group.channels|length }}</span>
+                                <div class="match-gauge">
+                                    <div class="gauge-bar">
+                                        <div class="gauge-fill" id="gauge-{{ group.name }}" style="width: 0%; background: var(--accent-secondary);"></div>
                                     </div>
-                                    <div class="stat-row">
-                                        <span>Trained States:</span>
-                                        <span>{{ group.trained_states }}</span>
-                                    </div>
-                                    <div class="stat-row">
-                                        <span>Match Score:</span>
-                                        <span class="match-strength" style="color: #00c853;">--</span>
-                                    </div>
+                                    <div class="gauge-value" id="score-{{ group.name }}">--</div>
                                 </div>
-                                <div class="group-controls">
-                                    {% if group.status == 'idle' or group.status == 'monitoring' %}
-                                    <button class="btn btn-primary btn-sm" onclick="startTraining('{{ group.name }}', {{ group.trained_states }})">
-                                        {% if group.trained_states > 0 %}Re-Train{% else %}Start Training{% endif %}
-                                    </button>
-                                    {% else %}
-                                    <button class="btn btn-secondary btn-sm" onclick="stopTraining('{{ group.name }}')">
-                                        Stop Training
-                                    </button>
-                                    {% endif %}
-                                    <button class="btn btn-ghost btn-sm" onclick="showGroupDetails('{{ group.name }}')">
-                                        Details
-                                    </button>
+                                <div class="channel-data" id="channels-{{ group.name }}">
+                                    {% for channel in group.channels %}
+                                    <div class="channel-row">
+                                        <span class="channel-name">{{ channel }}</span>
+                                        <span class="channel-value" id="val-{{ group.name }}-{{ loop.index0 }}">--</span>
+                                    </div>
+                                    {% endfor %}
                                 </div>
                             </div>
-                            {% endfor %}
-                        {% else %}
+                            <div class="resize-handle"></div>
+                        </div>
+                        {% endfor %}
+                    {% else %}
+                        <div class="grid-panel panel-4x2" style="display: flex; align-items: center; justify-content: center;">
                             <div class="empty-state">
                                 <div class="empty-icon">
                                     <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" opacity="0.5">
@@ -221,59 +534,28 @@
                                 <p>Create your first channel group to start monitoring</p>
                                 <a href="/setup" class="btn btn-primary">Setup Wizard</a>
                             </div>
-                        {% endif %}
-                    </div>
-                </section>
+                        </div>
+                    {% endif %}
+                </div>
 
-                <!-- Data Sources Section -->
-                <section class="data-section">
+                <!-- Data Sources Status -->
+                <section class="data-section" style="margin-top: 24px;">
                     <div class="section-header">
                         <h2>Data Sources</h2>
                         <span class="section-count">{{ sources|length }}</span>
                     </div>
-
-                    <div id="sources-container">
+                    <div class="sources-status-grid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 12px;">
                         {% if sources %}
-                        <div class="data-table-container">
-                            <table class="data-table">
-                                <thead>
-                                    <tr>
-                                        <th>Name</th>
-                                        <th>Type</th>
-                                        <th>Endpoint</th>
-                                        <th>Status</th>
-                                        <th>Actions</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {% for source in sources %}
-                                    <tr data-source="{{ source.name }}">
-                                        <td>{{ source.name }}</td>
-                                        <td><span class="type-badge {{ source.type }}">{{ source.type|upper }}</span></td>
-                                        <td class="endpoint">{{ source.url or source.mqtt_topic or 'Configured' }}</td>
-                                        <td>
-                                            <span class="status-badge {{ source.status }}">
-                                                <span class="status-indicator"></span>
-                                                {{ source.status }}
-                                            </span>
-                                        </td>
-                                        <td class="actions">
-                                            <button class="btn-icon" onclick="removeSource('{{ source.name }}')" title="Remove">
-                                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                                    <polyline points="3 6 5 6 21 6"></polyline>
-                                                    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
-                                                </svg>
-                                            </button>
-                                        </td>
-                                    </tr>
-                                    {% endfor %}
-                                </tbody>
-                            </table>
-                        </div>
+                            {% for source in sources %}
+                            <div class="source-status connected" data-source="{{ source.name }}">
+                                <span class="status-dot connected"></span>
+                                <span>{{ source.name }}</span>
+                                <span class="type-badge {{ source.type }}" style="margin-left: auto;">{{ source.type|upper }}</span>
+                            </div>
+                            {% endfor %}
                         {% else %}
-                            <div class="empty-state small">
-                                <p>No data sources configured</p>
-                                <a href="/setup" class="btn btn-secondary btn-sm">Add Source</a>
+                            <div class="source-status">
+                                <span>No data sources configured</span>
                             </div>
                         {% endif %}
                     </div>
@@ -296,9 +578,6 @@
                     <option value="300">5 minutes</option>
                     <option value="600">10 minutes</option>
                 </select>
-                <div class="form-hint">
-                    Training should capture at least one full operating cycle
-                </div>
             </div>
             <div class="modal-actions">
                 <button class="btn btn-secondary" onclick="closeModal()">Cancel</button>
@@ -307,13 +586,11 @@
         </div>
     </div>
 
-    <!-- Group Details Modal -->
+    <!-- Details Modal -->
     <div id="details-modal" class="modal" style="display: none;">
         <div class="modal-content" style="max-width: 600px;">
             <h3 id="details-modal-title">Group Details</h3>
-            <div id="details-content">
-                <!-- Populated by JavaScript -->
-            </div>
+            <div id="details-content"></div>
             <div class="modal-actions">
                 <button class="btn btn-secondary" onclick="closeDetailsModal()">Close</button>
             </div>
@@ -324,33 +601,13 @@
         // State
         let ws;
         let charts = {};
+        let editMode = false;
         let currentTrainingGroup = null;
         let isRetraining = false;
-        let overviewCollapsed = localStorage.getItem('overviewCollapsed') === 'true';
-        const startTime = Date.now();
+        let lastDataUpdate = {};
+        let updateCount = 0;
 
-        // Initialize overview state
-        if (overviewCollapsed) {
-            document.getElementById('overview-content').style.display = 'none';
-            document.getElementById('overview-icon').style.transform = 'rotate(180deg)';
-        }
-
-        function toggleOverview() {
-            const content = document.getElementById('overview-content');
-            const icon = document.getElementById('overview-icon');
-            overviewCollapsed = !overviewCollapsed;
-
-            if (overviewCollapsed) {
-                content.style.display = 'none';
-                icon.style.transform = 'rotate(180deg)';
-            } else {
-                content.style.display = 'block';
-                icon.style.transform = 'rotate(0deg)';
-            }
-
-            localStorage.setItem('overviewCollapsed', overviewCollapsed);
-        }
-
+        // WebSocket connection
         function connectWebSocket() {
             const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
             ws = new WebSocket(`${protocol}//${window.location.host}/ws`);
@@ -358,6 +615,10 @@
             ws.onopen = () => {
                 console.log('WebSocket connected');
                 updateConnectionStatus(true);
+                // Subscribe to all groups
+                document.querySelectorAll('.grid-panel[data-group]').forEach(panel => {
+                    ws.send(JSON.stringify({ type: 'subscribe', group: panel.dataset.group }));
+                });
             };
 
             ws.onclose = () => {
@@ -366,48 +627,104 @@
                 setTimeout(connectWebSocket, 3000);
             };
 
+            ws.onerror = (error) => {
+                console.error('WebSocket error:', error);
+            };
+
             ws.onmessage = (event) => {
-                const message = JSON.parse(event.data);
-                handleWebSocketMessage(message);
+                try {
+                    const message = JSON.parse(event.data);
+                    handleWebSocketMessage(message);
+                } catch (e) {
+                    console.error('Error parsing message:', e);
+                }
             };
         }
 
         function handleWebSocketMessage(message) {
             switch (message.type) {
                 case 'data_update':
-                    updateChart(message.data.group, message.data);
+                    updateGroupData(message.data);
                     break;
                 case 'training_started':
                     updateGroupStatus(message.data.group, 'training');
                     break;
                 case 'training_stopped':
+                case 'training_complete':
                     updateGroupStatus(message.data.group, 'monitoring');
                     break;
                 case 'anomaly_detected':
                     showAnomalyAlert(message.data);
                     break;
+                case 'pong':
+                    // Keep-alive response
+                    break;
             }
         }
 
+        function updateGroupData(data) {
+            const group = data.group;
+            const confidence = data.confidence || data.match_score || 0;
+            const channelValues = data.channel_values || data.values || {};
+
+            // Update chart
+            const chart = charts[group];
+            if (chart) {
+                chart.data.labels.push('');
+                chart.data.datasets[0].data.push(confidence);
+
+                if (chart.data.labels.length > 60) {
+                    chart.data.labels.shift();
+                    chart.data.datasets[0].data.shift();
+                }
+                chart.update('none');
+            }
+
+            // Update match score gauge
+            const gauge = document.getElementById(`gauge-${group}`);
+            const score = document.getElementById(`score-${group}`);
+            if (gauge && score) {
+                gauge.style.width = `${confidence}%`;
+                gauge.style.background = confidence > 70 ? 'var(--accent-secondary)' :
+                                        confidence > 40 ? 'var(--accent-warning)' : 'var(--accent-danger)';
+                score.textContent = confidence.toFixed(0) + '%';
+                score.style.color = confidence > 70 ? 'var(--accent-secondary)' :
+                                   confidence > 40 ? 'var(--accent-warning)' : 'var(--accent-danger)';
+            }
+
+            // Update channel values
+            Object.keys(channelValues).forEach((channel, index) => {
+                const valEl = document.getElementById(`val-${group}-${index}`);
+                if (valEl) {
+                    const value = channelValues[channel];
+                    valEl.textContent = typeof value === 'number' ? value.toFixed(4) : value;
+                }
+            });
+
+            // Track update rate
+            lastDataUpdate[group] = Date.now();
+            updateCount++;
+        }
+
         function updateConnectionStatus(connected) {
-            const statusDot = document.querySelector('.status-dot');
-            const statusText = statusDot.nextElementSibling;
+            const statusDot = document.getElementById('ws-status');
+            const statusText = document.getElementById('ws-status-text');
             if (connected) {
                 statusDot.classList.add('connected');
-                statusDot.classList.remove('disconnected');
                 statusText.textContent = 'Connected';
             } else {
                 statusDot.classList.remove('connected');
-                statusDot.classList.add('disconnected');
                 statusText.textContent = 'Reconnecting...';
             }
         }
 
+        // Initialize charts
         function initCharts() {
-            const chartContainers = document.querySelectorAll('.group-chart canvas');
-            chartContainers.forEach(canvas => {
+            document.querySelectorAll('.panel-chart canvas').forEach(canvas => {
                 const groupName = canvas.id.replace('chart-', '');
-                charts[groupName] = new Chart(canvas.getContext('2d'), {
+                const ctx = canvas.getContext('2d');
+
+                charts[groupName] = new Chart(ctx, {
                     type: 'line',
                     data: {
                         labels: [],
@@ -425,69 +742,123 @@
                     options: {
                         responsive: true,
                         maintainAspectRatio: false,
+                        animation: false,
                         plugins: {
                             legend: { display: false }
                         },
                         scales: {
                             x: {
-                                display: false,
-                                grid: { display: false }
+                                display: false
                             },
                             y: {
                                 min: 0,
                                 max: 100,
                                 grid: {
-                                    color: 'rgba(255,255,255,0.05)',
-                                    drawBorder: false
+                                    color: 'rgba(255,255,255,0.05)'
                                 },
                                 ticks: {
                                     color: 'rgba(255,255,255,0.3)',
                                     font: { size: 10 },
-                                    callback: (value) => value + '%'
+                                    callback: (v) => v + '%'
                                 }
                             }
-                        },
-                        interaction: {
-                            intersect: false,
-                            mode: 'index'
                         }
                     }
                 });
 
-                // Add some demo data
+                // Initialize with demo data
                 for (let i = 0; i < 30; i++) {
-                    const value = 70 + Math.random() * 25;
                     charts[groupName].data.labels.push('');
-                    charts[groupName].data.datasets[0].data.push(value);
+                    charts[groupName].data.datasets[0].data.push(70 + Math.random() * 25);
                 }
                 charts[groupName].update('none');
             });
         }
 
-        function updateChart(groupName, data) {
-            const chart = charts[groupName];
-            if (!chart) return;
+        // Panel resizing
+        function resizePanel(btn) {
+            const panel = btn.closest('.grid-panel');
+            const groupName = panel.dataset.group;
+            const selector = document.getElementById(`size-${groupName}`);
+            selector.classList.toggle('visible');
+        }
 
-            chart.data.labels.push('');
-            chart.data.datasets[0].data.push(data.confidence);
+        function setPanelSize(groupName, size) {
+            const panel = document.querySelector(`[data-group="${groupName}"]`);
+            if (panel) {
+                // Remove old size class
+                panel.className = panel.className.replace(/panel-\dx\d/g, '');
+                panel.classList.add(`panel-${size}`);
+                panel.dataset.size = size;
 
-            if (chart.data.labels.length > 50) {
-                chart.data.labels.shift();
-                chart.data.datasets[0].data.shift();
-            }
+                // Hide selector
+                document.getElementById(`size-${groupName}`).classList.remove('visible');
 
-            chart.update('none');
+                // Save layout
+                saveLayout();
 
-            // Update match strength display
-            const card = document.querySelector(`[data-group="${groupName}"]`);
-            if (card) {
-                const strength = card.querySelector('.match-strength');
-                strength.textContent = data.confidence.toFixed(0) + '%';
-                strength.style.color = data.confidence > 70 ? '#00c853' :
-                                       data.confidence > 40 ? '#ffc107' : '#ff5252';
+                // Resize chart
+                setTimeout(() => {
+                    if (charts[groupName]) {
+                        charts[groupName].resize();
+                    }
+                }, 100);
             }
         }
 
+        // Edit mode
+        function toggleEditMode() {
+            editMode = !editMode;
+            const grid = document.getElementById('dashboard-grid');
+            const btn = document.getElementById('edit-mode-btn');
+
+            grid.classList.toggle('edit-mode', editMode);
+            btn.innerHTML = editMode ?
+                '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg> Done' :
+                '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg> Edit Layout';
+
+            if (!editMode) {
+                saveLayout();
+            }
+        }
+
+        // Layout persistence
+        function saveLayout() {
+            const layout = {};
+            document.querySelectorAll('.grid-panel[data-group]').forEach(panel => {
+                layout[panel.dataset.group] = {
+                    size: panel.dataset.size,
+                    order: Array.from(panel.parentElement.children).indexOf(panel)
+                };
+            });
+            localStorage.setItem('dashboardLayout', JSON.stringify(layout));
+        }
+
+        function loadLayout() {
+            const saved = localStorage.getItem('dashboardLayout');
+            if (saved) {
+                try {
+                    const layout = JSON.parse(saved);
+                    Object.keys(layout).forEach(groupName => {
+                        const panel = document.querySelector(`[data-group="${groupName}"]`);
+                        if (panel && layout[groupName].size) {
+                            panel.className = panel.className.replace(/panel-\dx\d/g, '');
+                            panel.classList.add(`panel-${layout[groupName].size}`);
+                            panel.dataset.size = layout[groupName].size;
+                        }
+                    });
+                } catch (e) {
+                    console.error('Error loading layout:', e);
+                }
+            }
+        }
+
+        function resetLayout() {
+            localStorage.removeItem('dashboardLayout');
+            location.reload();
+        }
+
+        // Training
         function startTraining(groupName, trainedStates) {
             currentTrainingGroup = groupName;
             isRetraining = trainedStates > 0;
@@ -498,11 +869,11 @@
 
             if (isRetraining) {
                 title.textContent = 'Re-Train Model?';
-                desc.innerHTML = '<strong style="color: #ffc107;">Warning:</strong> This group has already been trained. Re-training will replace the existing model. Are you sure you want to continue?<br><br>Select training duration:';
+                desc.innerHTML = '<strong style="color: var(--accent-warning);">Warning:</strong> This will replace the existing model.';
                 btn.textContent = 'Re-Train';
             } else {
                 title.textContent = 'Start Training';
-                desc.textContent = 'Select training duration for learning normal patterns:';
+                desc.textContent = 'Select training duration:';
                 btn.textContent = 'Start';
             }
 
@@ -511,8 +882,6 @@
 
         function closeModal() {
             document.getElementById('training-modal').style.display = 'none';
-            currentTrainingGroup = null;
-            isRetraining = false;
         }
 
         function confirmTraining() {
@@ -520,59 +889,30 @@
             fetch('/api/training/start', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ group_name: currentTrainingGroup, duration: duration })
-            }).then(response => response.json())
-              .then(data => {
-                  console.log('Training started:', data);
-                  closeModal();
-                  updateGroupStatus(currentTrainingGroup, 'training');
-              });
-        }
-
-        function stopTraining(groupName) {
-            fetch(`/api/training/stop/${groupName}`, { method: 'POST' })
-                .then(response => response.json())
-                .then(data => {
-                    console.log('Training stopped:', data);
-                    updateGroupStatus(groupName, 'monitoring');
-                });
+                body: JSON.stringify({ group_name: currentTrainingGroup, duration })
+            }).then(() => {
+                closeModal();
+                updateGroupStatus(currentTrainingGroup, 'training');
+            });
         }
 
         function updateGroupStatus(groupName, status) {
-            const card = document.querySelector(`[data-group="${groupName}"]`);
-            if (card) {
-                const statusEl = card.querySelector('.group-status');
-                statusEl.className = `group-status ${status}`;
-                statusEl.textContent = status;
-
-                // Update button
-                const controls = card.querySelector('.group-controls');
-                if (status === 'training') {
-                    controls.innerHTML = `
-                        <button class="btn btn-secondary btn-sm" onclick="stopTraining('${groupName}')">
-                            Stop Training
-                        </button>
-                        <button class="btn btn-ghost btn-sm" onclick="showGroupDetails('${groupName}')">
-                            Details
-                        </button>
-                    `;
-                } else {
-                    controls.innerHTML = `
-                        <button class="btn btn-primary btn-sm" onclick="startTraining('${groupName}', 1)">
-                            Re-Train
-                        </button>
-                        <button class="btn btn-ghost btn-sm" onclick="showGroupDetails('${groupName}')">
-                            Details
-                        </button>
-                    `;
+            const panel = document.querySelector(`[data-group="${groupName}"]`);
+            if (panel) {
+                const badge = panel.querySelector('.status-badge');
+                if (badge) {
+                    badge.className = `status-badge ${status}`;
+                    badge.textContent = status;
+                    badge.style.fontSize = '10px';
+                    badge.style.padding = '2px 6px';
                 }
             }
         }
 
+        // Details
         function showGroupDetails(groupName) {
             document.getElementById('details-modal-title').textContent = groupName + ' - Details';
 
-            // Fetch group details
             fetch('/api/groups')
                 .then(res => res.json())
                 .then(groups => {
@@ -581,34 +921,17 @@
                         document.getElementById('details-content').innerHTML = `
                             <div class="config-grid" style="margin-top: 16px;">
                                 <div class="config-card">
-                                    <div class="config-header">
-                                        <h3>Channels</h3>
-                                    </div>
-                                    <div style="display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px;">
+                                    <h4 style="margin-bottom: 8px;">Channels</h4>
+                                    <div style="display: flex; flex-wrap: wrap; gap: 8px;">
                                         ${(group.channels || []).map(ch => `<span class="badge">${ch}</span>`).join('')}
                                     </div>
                                 </div>
                                 <div class="config-card">
-                                    <div class="config-header">
-                                        <h3>Configuration</h3>
-                                    </div>
-                                    <div class="group-stats" style="margin-top: 8px;">
-                                        <div class="stat-row">
-                                            <span>Status:</span>
-                                            <span>${group.status}</span>
-                                        </div>
-                                        <div class="stat-row">
-                                            <span>Preprocessing:</span>
-                                            <span>${group.preprocessing || 'basic'}</span>
-                                        </div>
-                                        <div class="stat-row">
-                                            <span>Trained States:</span>
-                                            <span>${group.trained_states || 0}</span>
-                                        </div>
-                                        <div class="stat-row">
-                                            <span>Created:</span>
-                                            <span>${group.created_at ? new Date(group.created_at).toLocaleDateString() : '--'}</span>
-                                        </div>
+                                    <h4 style="margin-bottom: 8px;">Status</h4>
+                                    <div class="group-stats">
+                                        <div class="stat-row"><span>Status:</span><span>${group.status}</span></div>
+                                        <div class="stat-row"><span>Preprocessing:</span><span>${group.preprocessing || 'basic'}</span></div>
+                                        <div class="stat-row"><span>Trained States:</span><span>${group.trained_states || 0}</span></div>
                                     </div>
                                 </div>
                             </div>
@@ -623,38 +946,74 @@
             document.getElementById('details-modal').style.display = 'none';
         }
 
+        // Utilities
         function downloadCSVTemplate() {
             window.location.href = '/api/csv-template';
         }
 
-        function removeSource(name) {
-            if (confirm(`Remove data source "${name}"?`)) {
-                fetch(`/api/sources/${encodeURIComponent(name)}`, { method: 'DELETE' })
-                    .then(() => location.reload());
-            }
-        }
-
         function showAnomalyAlert(data) {
-            const alertCount = document.getElementById('alert-count');
-            alertCount.textContent = parseInt(alertCount.textContent) + 1;
-            // Could add toast notification here
+            console.log('Anomaly detected:', data);
+            // Could show toast notification
         }
 
-        function updateUptime() {
-            const elapsed = Math.floor((Date.now() - startTime) / 1000);
-            const hours = Math.floor(elapsed / 3600);
-            const minutes = Math.floor((elapsed % 3600) / 60);
+        // Update rate display
+        function updateRateDisplay() {
+            const rate = document.getElementById('update-rate');
+            if (updateCount > 0) {
+                rate.textContent = `${updateCount} updates/5s`;
+            }
+            updateCount = 0;
+        }
 
-            document.getElementById('uptime').textContent =
-                hours > 0 ? `${hours}h ${minutes}m` : `${minutes}m`;
+        // Simulate data for demo
+        function simulateData() {
+            document.querySelectorAll('.grid-panel[data-group]').forEach(panel => {
+                const groupName = panel.dataset.group;
+                const confidence = 60 + Math.random() * 35;
+
+                // Simulate channel values
+                const channelRows = panel.querySelectorAll('.channel-row');
+                const channelValues = {};
+                channelRows.forEach((row, i) => {
+                    const name = row.querySelector('.channel-name').textContent;
+                    channelValues[name] = (Math.random() * 2 - 1).toFixed(4);
+                });
+
+                updateGroupData({
+                    group: groupName,
+                    confidence: confidence,
+                    channel_values: channelValues
+                });
+            });
         }
 
         // Initialize
         document.addEventListener('DOMContentLoaded', () => {
-            connectWebSocket();
+            loadLayout();
             initCharts();
-            setInterval(updateUptime, 60000);
-            updateUptime();
+            connectWebSocket();
+
+            // Update rate display
+            setInterval(updateRateDisplay, 5000);
+
+            // Simulate data if no real data (for demo)
+            setInterval(simulateData, 1000);
+
+            // Close modals on outside click
+            document.querySelectorAll('.modal').forEach(modal => {
+                modal.addEventListener('click', (e) => {
+                    if (e.target === modal) {
+                        modal.style.display = 'none';
+                    }
+                });
+            });
+
+            // Close size selectors on outside click
+            document.addEventListener('click', (e) => {
+                if (!e.target.closest('.panel-action-btn') && !e.target.closest('.size-selector')) {
+                    document.querySelectorAll('.size-selector').forEach(s => s.classList.remove('visible'));
+                }
+            });
         });
     </script>
 </body>
