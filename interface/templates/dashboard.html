@@ -13,7 +13,7 @@
 <body>
     <div class="app-container">
         <!-- Sidebar -->
-        <aside class="sidebar glass">
+        <aside class="sidebar">
             <div class="logo-area">
                 <div class="logo-icon"></div>
                 <h1>MachineIQ</h1>
@@ -21,19 +21,41 @@
 
             <nav class="nav-menu">
                 <a href="/" class="nav-item active">
-                    <span class="icon">&#128200;</span>
+                    <span class="nav-icon">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <rect x="3" y="3" width="7" height="7"></rect>
+                            <rect x="14" y="3" width="7" height="7"></rect>
+                            <rect x="14" y="14" width="7" height="7"></rect>
+                            <rect x="3" y="14" width="7" height="7"></rect>
+                        </svg>
+                    </span>
                     Dashboard
                 </a>
                 <a href="/setup" class="nav-item">
-                    <span class="icon">&#9881;</span>
+                    <span class="nav-icon">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="12" cy="12" r="3"></circle>
+                            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+                        </svg>
+                    </span>
                     Setup Wizard
                 </a>
                 <a href="/dataflow" class="nav-item">
-                    <span class="icon">&#128260;</span>
+                    <span class="nav-icon">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>
+                        </svg>
+                    </span>
                     Dataflow
                 </a>
                 <a href="/model-config" class="nav-item">
-                    <span class="icon">&#129302;</span>
+                    <span class="nav-icon">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M12 2L2 7l10 5 10-5-10-5z"></path>
+                            <path d="M2 17l10 5 10-5"></path>
+                            <path d="M2 12l10 5 10-5"></path>
+                        </svg>
+                    </span>
                     Model Config
                 </a>
             </nav>
@@ -48,7 +70,7 @@
 
         <!-- Main Content -->
         <main class="main-content">
-            <header class="top-bar glass">
+            <header class="top-bar">
                 <div class="breadcrumbs">Dashboard / Monitoring</div>
                 <div class="header-actions">
                     <button class="btn btn-secondary" onclick="downloadCSVTemplate()">
@@ -61,157 +83,212 @@
             </header>
 
             <div class="content-area">
-                <!-- System Overview -->
-                <section class="hero-section">
-                    <h2>System Overview</h2>
-                    <p class="subtitle">Real-time monitoring and anomaly detection</p>
-                </section>
+                <!-- System Overview - Collapsible -->
+                <section class="hero-section collapsible" id="system-overview">
+                    <div class="collapse-toggle" onclick="toggleOverview()">
+                        <div>
+                            <h2>System Overview</h2>
+                            <p class="subtitle">Real-time monitoring and anomaly detection</p>
+                        </div>
+                        <span class="collapse-icon" id="overview-icon">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <polyline points="18 15 12 9 6 15"></polyline>
+                            </svg>
+                        </span>
+                    </div>
 
-                <!-- Stats Cards -->
-                <div class="stats-grid">
-                    <div class="stat-card glass">
-                        <div class="stat-icon" style="background: linear-gradient(135deg, #10b981, #059669);">
-                            &#128260;
-                        </div>
-                        <div class="stat-content">
-                            <span class="stat-value" id="source-count">{{ sources|length }}</span>
-                            <span class="stat-label">Data Sources</span>
+                    <div class="hero-content" id="overview-content">
+                        <!-- Stats Cards -->
+                        <div class="stats-grid" style="margin-top: 16px;">
+                            <div class="stat-card">
+                                <div class="stat-icon" style="background: rgba(0, 200, 83, 0.15); color: #00c853;">
+                                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <path d="M21 12a9 9 0 0 1-9 9m9-9a9 9 0 0 0-9-9m9 9H3m9 9a9 9 0 0 1-9-9m9 9c1.66 0 3-4.03 3-9s-1.34-9-3-9m0 18c-1.66 0-3-4.03-3-9s1.34-9 3-9m-9 9a9 9 0 0 1 9-9"></path>
+                                    </svg>
+                                </div>
+                                <div class="stat-content">
+                                    <span class="stat-value" id="source-count">{{ sources|length }}</span>
+                                    <span class="stat-label">Data Sources</span>
+                                </div>
+                            </div>
+                            <div class="stat-card">
+                                <div class="stat-icon" style="background: rgba(123, 97, 255, 0.15); color: #7b61ff;">
+                                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <path d="M12 2L2 7l10 5 10-5-10-5z"></path>
+                                        <path d="M2 17l10 5 10-5"></path>
+                                        <path d="M2 12l10 5 10-5"></path>
+                                    </svg>
+                                </div>
+                                <div class="stat-content">
+                                    <span class="stat-value" id="group-count">{{ groups|length }}</span>
+                                    <span class="stat-label">Channel Groups</span>
+                                </div>
+                            </div>
+                            <div class="stat-card">
+                                <div class="stat-icon" style="background: rgba(255, 193, 7, 0.15); color: #ffc107;">
+                                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
+                                        <line x1="12" y1="9" x2="12" y2="13"></line>
+                                        <line x1="12" y1="17" x2="12.01" y2="17"></line>
+                                    </svg>
+                                </div>
+                                <div class="stat-content">
+                                    <span class="stat-value" id="alert-count">0</span>
+                                    <span class="stat-label">Active Alerts</span>
+                                </div>
+                            </div>
+                            <div class="stat-card">
+                                <div class="stat-icon" style="background: rgba(255, 82, 82, 0.15); color: #ff5252;">
+                                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <circle cx="12" cy="12" r="10"></circle>
+                                        <polyline points="12 6 12 12 16 14"></polyline>
+                                    </svg>
+                                </div>
+                                <div class="stat-content">
+                                    <span class="stat-value" id="uptime">0h</span>
+                                    <span class="stat-label">Uptime</span>
+                                </div>
+                            </div>
                         </div>
                     </div>
-                    <div class="stat-card glass">
-                        <div class="stat-icon" style="background: linear-gradient(135deg, #6366f1, #4f46e5);">
-                            &#128202;
-                        </div>
-                        <div class="stat-content">
-                            <span class="stat-value" id="group-count">{{ groups|length }}</span>
-                            <span class="stat-label">Channel Groups</span>
-                        </div>
-                    </div>
-                    <div class="stat-card glass">
-                        <div class="stat-icon" style="background: linear-gradient(135deg, #f59e0b, #d97706);">
-                            &#128680;
-                        </div>
-                        <div class="stat-content">
-                            <span class="stat-value" id="alert-count">0</span>
-                            <span class="stat-label">Active Alerts</span>
-                        </div>
-                    </div>
-                    <div class="stat-card glass">
-                        <div class="stat-icon" style="background: linear-gradient(135deg, #ec4899, #db2777);">
-                            &#128337;
-                        </div>
-                        <div class="stat-content">
-                            <span class="stat-value" id="uptime">0h</span>
-                            <span class="stat-label">Uptime</span>
-                        </div>
-                    </div>
-                </div>
+                </section>
 
                 <!-- Channel Groups Section -->
-                <section class="section-header">
-                    <h3>Channel Groups</h3>
-                    <div class="help-tip" title="Channel groups combine multiple data channels for multivariate anomaly detection. Each group learns patterns from all its channels together.">
-                        ?
+                <section class="data-section">
+                    <div class="section-header">
+                        <div style="display: flex; align-items: center; gap: 8px;">
+                            <h2>Channel Groups</h2>
+                            <div class="help-tip" title="Channel groups combine multiple data channels for multivariate anomaly detection.">?</div>
+                        </div>
+                    </div>
+
+                    <div id="groups-container" class="groups-grid">
+                        {% if groups %}
+                            {% for group in groups %}
+                            <div class="group-card" data-group="{{ group.name }}">
+                                <div class="group-header">
+                                    <div class="group-title">
+                                        <div class="group-color" style="background: {{ group.color }};"></div>
+                                        <h4>{{ group.name }}</h4>
+                                    </div>
+                                    <div class="group-status {{ group.status }}">
+                                        {{ group.status }}
+                                    </div>
+                                </div>
+                                <div class="group-chart">
+                                    <canvas id="chart-{{ group.name }}"></canvas>
+                                </div>
+                                <div class="group-stats">
+                                    <div class="stat-row">
+                                        <span>Channels:</span>
+                                        <span>{{ group.channels|length }}</span>
+                                    </div>
+                                    <div class="stat-row">
+                                        <span>Trained States:</span>
+                                        <span>{{ group.trained_states }}</span>
+                                    </div>
+                                    <div class="stat-row">
+                                        <span>Match Score:</span>
+                                        <span class="match-strength" style="color: #00c853;">--</span>
+                                    </div>
+                                </div>
+                                <div class="group-controls">
+                                    {% if group.status == 'idle' or group.status == 'monitoring' %}
+                                    <button class="btn btn-primary btn-sm" onclick="startTraining('{{ group.name }}', {{ group.trained_states }})">
+                                        {% if group.trained_states > 0 %}Re-Train{% else %}Start Training{% endif %}
+                                    </button>
+                                    {% else %}
+                                    <button class="btn btn-secondary btn-sm" onclick="stopTraining('{{ group.name }}')">
+                                        Stop Training
+                                    </button>
+                                    {% endif %}
+                                    <button class="btn btn-ghost btn-sm" onclick="showGroupDetails('{{ group.name }}')">
+                                        Details
+                                    </button>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        {% else %}
+                            <div class="empty-state">
+                                <div class="empty-icon">
+                                    <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" opacity="0.5">
+                                        <path d="M12 2L2 7l10 5 10-5-10-5z"></path>
+                                        <path d="M2 17l10 5 10-5"></path>
+                                        <path d="M2 12l10 5 10-5"></path>
+                                    </svg>
+                                </div>
+                                <h4>No Channel Groups</h4>
+                                <p>Create your first channel group to start monitoring</p>
+                                <a href="/setup" class="btn btn-primary">Setup Wizard</a>
+                            </div>
+                        {% endif %}
                     </div>
                 </section>
 
-                <div id="groups-container" class="groups-grid">
-                    {% if groups %}
-                        {% for group in groups %}
-                        <div class="group-card glass" data-group="{{ group.name }}">
-                            <div class="group-header">
-                                <div class="group-title">
-                                    <div class="group-color" style="background: {{ group.color }};"></div>
-                                    <h4>{{ group.name }}</h4>
-                                </div>
-                                <div class="group-status {{ group.status }}">
-                                    {{ group.status }}
-                                </div>
-                            </div>
-                            <div class="group-chart">
-                                <canvas id="chart-{{ group.name }}"></canvas>
-                            </div>
-                            <div class="group-stats">
-                                <div class="stat-row">
-                                    <span>Channels:</span>
-                                    <span>{{ group.channels|length }}</span>
-                                </div>
-                                <div class="stat-row">
-                                    <span>Trained States:</span>
-                                    <span>{{ group.trained_states }}</span>
-                                </div>
-                                <div class="stat-row">
-                                    <span>Match Strength:</span>
-                                    <span class="match-strength">--</span>
-                                </div>
-                            </div>
-                            <div class="group-controls">
-                                {% if group.status == 'idle' or group.status == 'monitoring' %}
-                                <button class="btn btn-primary btn-sm" onclick="startTraining('{{ group.name }}')">
-                                    Start Training
-                                </button>
-                                {% else %}
-                                <button class="btn btn-secondary btn-sm" onclick="stopTraining('{{ group.name }}')">
-                                    Stop Training
-                                </button>
-                                {% endif %}
-                                <button class="btn btn-ghost btn-sm" onclick="toggleGroupDetails('{{ group.name }}')">
-                                    Details
-                                </button>
-                            </div>
-                        </div>
-                        {% endfor %}
-                    {% else %}
-                        <div class="empty-state glass">
-                            <div class="empty-icon">&#128202;</div>
-                            <h4>No Channel Groups</h4>
-                            <p>Create your first channel group to start monitoring</p>
-                            <a href="/setup" class="btn btn-primary">Setup Wizard</a>
-                        </div>
-                    {% endif %}
-                </div>
-
                 <!-- Data Sources Section -->
-                <section class="section-header">
-                    <h3>Data Sources</h3>
-                </section>
+                <section class="data-section">
+                    <div class="section-header">
+                        <h2>Data Sources</h2>
+                        <span class="section-count">{{ sources|length }}</span>
+                    </div>
 
-                <div id="sources-container" class="sources-list">
-                    {% if sources %}
-                        {% for source in sources %}
-                        <div class="source-item glass" data-source="{{ source.name }}">
-                            <div class="source-icon {{ source.type }}"></div>
-                            <div class="source-info">
-                                <span class="source-name">{{ source.name }}</span>
-                                <span class="source-details">{{ source.type }} | {{ source.url or source.mqtt_topic or 'Configured' }}</span>
-                            </div>
-                            <div class="source-status connected">
-                                <span class="status-dot"></span>
-                                {{ source.status }}
-                            </div>
-                            <button class="btn btn-ghost btn-icon" onclick="removeSource('{{ source.name }}')">
-                                &#10005;
-                            </button>
+                    <div id="sources-container">
+                        {% if sources %}
+                        <div class="data-table-container">
+                            <table class="data-table">
+                                <thead>
+                                    <tr>
+                                        <th>Name</th>
+                                        <th>Type</th>
+                                        <th>Endpoint</th>
+                                        <th>Status</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for source in sources %}
+                                    <tr data-source="{{ source.name }}">
+                                        <td>{{ source.name }}</td>
+                                        <td><span class="type-badge {{ source.type }}">{{ source.type|upper }}</span></td>
+                                        <td class="endpoint">{{ source.url or source.mqtt_topic or 'Configured' }}</td>
+                                        <td>
+                                            <span class="status-badge {{ source.status }}">
+                                                <span class="status-indicator"></span>
+                                                {{ source.status }}
+                                            </span>
+                                        </td>
+                                        <td class="actions">
+                                            <button class="btn-icon" onclick="removeSource('{{ source.name }}')" title="Remove">
+                                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                                    <polyline points="3 6 5 6 21 6"></polyline>
+                                                    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                                                </svg>
+                                            </button>
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
                         </div>
-                        {% endfor %}
-                    {% else %}
-                        <div class="empty-state glass small">
-                            <p>No data sources configured</p>
-                            <a href="/setup" class="btn btn-secondary btn-sm">Add Source</a>
-                        </div>
-                    {% endif %}
-                </div>
+                        {% else %}
+                            <div class="empty-state small">
+                                <p>No data sources configured</p>
+                                <a href="/setup" class="btn btn-secondary btn-sm">Add Source</a>
+                            </div>
+                        {% endif %}
+                    </div>
+                </section>
             </div>
         </main>
     </div>
 
     <!-- Training Modal -->
     <div id="training-modal" class="modal" style="display: none;">
-        <div class="modal-content glass">
-            <h3>Start Training</h3>
-            <p>Select training duration for learning normal patterns:</p>
+        <div class="modal-content">
+            <h3 id="training-modal-title">Start Training</h3>
+            <p id="training-modal-desc">Select training duration for learning normal patterns:</p>
             <div class="form-group">
-                <label>Duration (seconds)</label>
+                <label>Duration</label>
                 <select id="training-duration" class="form-select">
                     <option value="30">30 seconds</option>
                     <option value="60" selected>1 minute</option>
@@ -225,16 +302,54 @@
             </div>
             <div class="modal-actions">
                 <button class="btn btn-secondary" onclick="closeModal()">Cancel</button>
-                <button class="btn btn-primary" onclick="confirmTraining()">Start</button>
+                <button class="btn btn-primary" id="confirm-training-btn" onclick="confirmTraining()">Start</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Group Details Modal -->
+    <div id="details-modal" class="modal" style="display: none;">
+        <div class="modal-content" style="max-width: 600px;">
+            <h3 id="details-modal-title">Group Details</h3>
+            <div id="details-content">
+                <!-- Populated by JavaScript -->
+            </div>
+            <div class="modal-actions">
+                <button class="btn btn-secondary" onclick="closeDetailsModal()">Close</button>
             </div>
         </div>
     </div>
 
     <script>
-        // WebSocket connection
+        // State
         let ws;
         let charts = {};
         let currentTrainingGroup = null;
+        let isRetraining = false;
+        let overviewCollapsed = localStorage.getItem('overviewCollapsed') === 'true';
+        const startTime = Date.now();
+
+        // Initialize overview state
+        if (overviewCollapsed) {
+            document.getElementById('overview-content').style.display = 'none';
+            document.getElementById('overview-icon').style.transform = 'rotate(180deg)';
+        }
+
+        function toggleOverview() {
+            const content = document.getElementById('overview-content');
+            const icon = document.getElementById('overview-icon');
+            overviewCollapsed = !overviewCollapsed;
+
+            if (overviewCollapsed) {
+                content.style.display = 'none';
+                icon.style.transform = 'rotate(180deg)';
+            } else {
+                content.style.display = 'block';
+                icon.style.transform = 'rotate(0deg)';
+            }
+
+            localStorage.setItem('overviewCollapsed', overviewCollapsed);
+        }
 
         function connectWebSocket() {
             const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
@@ -248,7 +363,6 @@
             ws.onclose = () => {
                 console.log('WebSocket disconnected');
                 updateConnectionStatus(false);
-                // Reconnect after 3 seconds
                 setTimeout(connectWebSocket, 3000);
             };
 
@@ -298,12 +412,14 @@
                     data: {
                         labels: [],
                         datasets: [{
-                            label: 'Match Strength',
+                            label: 'Match Score',
                             data: [],
-                            borderColor: '#6366f1',
-                            backgroundColor: 'rgba(99, 102, 241, 0.1)',
+                            borderColor: '#7b61ff',
+                            backgroundColor: 'rgba(123, 97, 255, 0.1)',
                             fill: true,
-                            tension: 0.4
+                            tension: 0.4,
+                            pointRadius: 0,
+                            borderWidth: 2
                         }]
                     },
                     options: {
@@ -313,16 +429,38 @@
                             legend: { display: false }
                         },
                         scales: {
-                            x: { display: false },
+                            x: {
+                                display: false,
+                                grid: { display: false }
+                            },
                             y: {
                                 min: 0,
                                 max: 100,
-                                grid: { color: 'rgba(255,255,255,0.1)' },
-                                ticks: { color: 'rgba(255,255,255,0.5)' }
+                                grid: {
+                                    color: 'rgba(255,255,255,0.05)',
+                                    drawBorder: false
+                                },
+                                ticks: {
+                                    color: 'rgba(255,255,255,0.3)',
+                                    font: { size: 10 },
+                                    callback: (value) => value + '%'
+                                }
                             }
+                        },
+                        interaction: {
+                            intersect: false,
+                            mode: 'index'
                         }
                     }
                 });
+
+                // Add some demo data
+                for (let i = 0; i < 30; i++) {
+                    const value = 70 + Math.random() * 25;
+                    charts[groupName].data.labels.push('');
+                    charts[groupName].data.datasets[0].data.push(value);
+                }
+                charts[groupName].update('none');
             });
         }
 
@@ -330,11 +468,9 @@
             const chart = charts[groupName];
             if (!chart) return;
 
-            const now = new Date().toLocaleTimeString();
-            chart.data.labels.push(now);
+            chart.data.labels.push('');
             chart.data.datasets[0].data.push(data.confidence);
 
-            // Keep only last 50 points
             if (chart.data.labels.length > 50) {
                 chart.data.labels.shift();
                 chart.data.datasets[0].data.shift();
@@ -345,18 +481,38 @@
             // Update match strength display
             const card = document.querySelector(`[data-group="${groupName}"]`);
             if (card) {
-                card.querySelector('.match-strength').textContent = `${data.confidence.toFixed(1)}%`;
+                const strength = card.querySelector('.match-strength');
+                strength.textContent = data.confidence.toFixed(0) + '%';
+                strength.style.color = data.confidence > 70 ? '#00c853' :
+                                       data.confidence > 40 ? '#ffc107' : '#ff5252';
             }
         }
 
-        function startTraining(groupName) {
+        function startTraining(groupName, trainedStates) {
             currentTrainingGroup = groupName;
+            isRetraining = trainedStates > 0;
+
+            const title = document.getElementById('training-modal-title');
+            const desc = document.getElementById('training-modal-desc');
+            const btn = document.getElementById('confirm-training-btn');
+
+            if (isRetraining) {
+                title.textContent = 'Re-Train Model?';
+                desc.innerHTML = '<strong style="color: #ffc107;">Warning:</strong> This group has already been trained. Re-training will replace the existing model. Are you sure you want to continue?<br><br>Select training duration:';
+                btn.textContent = 'Re-Train';
+            } else {
+                title.textContent = 'Start Training';
+                desc.textContent = 'Select training duration for learning normal patterns:';
+                btn.textContent = 'Start';
+            }
+
             document.getElementById('training-modal').style.display = 'flex';
         }
 
         function closeModal() {
             document.getElementById('training-modal').style.display = 'none';
             currentTrainingGroup = null;
+            isRetraining = false;
         }
 
         function confirmTraining() {
@@ -369,13 +525,17 @@
               .then(data => {
                   console.log('Training started:', data);
                   closeModal();
+                  updateGroupStatus(currentTrainingGroup, 'training');
               });
         }
 
         function stopTraining(groupName) {
             fetch(`/api/training/stop/${groupName}`, { method: 'POST' })
                 .then(response => response.json())
-                .then(data => console.log('Training stopped:', data));
+                .then(data => {
+                    console.log('Training stopped:', data);
+                    updateGroupStatus(groupName, 'monitoring');
+                });
         }
 
         function updateGroupStatus(groupName, status) {
@@ -384,7 +544,83 @@
                 const statusEl = card.querySelector('.group-status');
                 statusEl.className = `group-status ${status}`;
                 statusEl.textContent = status;
+
+                // Update button
+                const controls = card.querySelector('.group-controls');
+                if (status === 'training') {
+                    controls.innerHTML = `
+                        <button class="btn btn-secondary btn-sm" onclick="stopTraining('${groupName}')">
+                            Stop Training
+                        </button>
+                        <button class="btn btn-ghost btn-sm" onclick="showGroupDetails('${groupName}')">
+                            Details
+                        </button>
+                    `;
+                } else {
+                    controls.innerHTML = `
+                        <button class="btn btn-primary btn-sm" onclick="startTraining('${groupName}', 1)">
+                            Re-Train
+                        </button>
+                        <button class="btn btn-ghost btn-sm" onclick="showGroupDetails('${groupName}')">
+                            Details
+                        </button>
+                    `;
+                }
             }
+        }
+
+        function showGroupDetails(groupName) {
+            document.getElementById('details-modal-title').textContent = groupName + ' - Details';
+
+            // Fetch group details
+            fetch('/api/groups')
+                .then(res => res.json())
+                .then(groups => {
+                    const group = groups.find(g => g.name === groupName);
+                    if (group) {
+                        document.getElementById('details-content').innerHTML = `
+                            <div class="config-grid" style="margin-top: 16px;">
+                                <div class="config-card">
+                                    <div class="config-header">
+                                        <h3>Channels</h3>
+                                    </div>
+                                    <div style="display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px;">
+                                        ${(group.channels || []).map(ch => `<span class="badge">${ch}</span>`).join('')}
+                                    </div>
+                                </div>
+                                <div class="config-card">
+                                    <div class="config-header">
+                                        <h3>Configuration</h3>
+                                    </div>
+                                    <div class="group-stats" style="margin-top: 8px;">
+                                        <div class="stat-row">
+                                            <span>Status:</span>
+                                            <span>${group.status}</span>
+                                        </div>
+                                        <div class="stat-row">
+                                            <span>Preprocessing:</span>
+                                            <span>${group.preprocessing || 'basic'}</span>
+                                        </div>
+                                        <div class="stat-row">
+                                            <span>Trained States:</span>
+                                            <span>${group.trained_states || 0}</span>
+                                        </div>
+                                        <div class="stat-row">
+                                            <span>Created:</span>
+                                            <span>${group.created_at ? new Date(group.created_at).toLocaleDateString() : '--'}</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        `;
+                    }
+                });
+
+            document.getElementById('details-modal').style.display = 'flex';
+        }
+
+        function closeDetailsModal() {
+            document.getElementById('details-modal').style.display = 'none';
         }
 
         function downloadCSVTemplate() {
@@ -394,22 +630,31 @@
         function removeSource(name) {
             if (confirm(`Remove data source "${name}"?`)) {
                 fetch(`/api/sources/${encodeURIComponent(name)}`, { method: 'DELETE' })
-                    .then(() => {
-                        const item = document.querySelector(`[data-source="${name}"]`);
-                        if (item) item.remove();
-                    });
+                    .then(() => location.reload());
             }
         }
 
-        function toggleGroupDetails(groupName) {
-            // Toggle details panel
-            console.log('Toggle details for:', groupName);
+        function showAnomalyAlert(data) {
+            const alertCount = document.getElementById('alert-count');
+            alertCount.textContent = parseInt(alertCount.textContent) + 1;
+            // Could add toast notification here
         }
 
-        // Initialize on load
+        function updateUptime() {
+            const elapsed = Math.floor((Date.now() - startTime) / 1000);
+            const hours = Math.floor(elapsed / 3600);
+            const minutes = Math.floor((elapsed % 3600) / 60);
+
+            document.getElementById('uptime').textContent =
+                hours > 0 ? `${hours}h ${minutes}m` : `${minutes}m`;
+        }
+
+        // Initialize
         document.addEventListener('DOMContentLoaded', () => {
             connectWebSocket();
             initCharts();
+            setInterval(updateUptime, 60000);
+            updateUptime();
         });
     </script>
 </body>

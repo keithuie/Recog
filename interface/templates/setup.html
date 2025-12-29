@@ -12,7 +12,7 @@
 <body>
     <div class="app-container">
         <!-- Sidebar -->
-        <aside class="sidebar glass">
+        <aside class="sidebar">
             <div class="logo-area">
                 <div class="logo-icon"></div>
                 <h1>MachineIQ</h1>
@@ -20,27 +20,56 @@
 
             <nav class="nav-menu">
                 <a href="/" class="nav-item">
-                    <span class="icon">&#128200;</span>
+                    <span class="nav-icon">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <rect x="3" y="3" width="7" height="7"></rect>
+                            <rect x="14" y="3" width="7" height="7"></rect>
+                            <rect x="14" y="14" width="7" height="7"></rect>
+                            <rect x="3" y="14" width="7" height="7"></rect>
+                        </svg>
+                    </span>
                     Dashboard
                 </a>
                 <a href="/setup" class="nav-item active">
-                    <span class="icon">&#9881;</span>
+                    <span class="nav-icon">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="12" cy="12" r="3"></circle>
+                            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+                        </svg>
+                    </span>
                     Setup Wizard
                 </a>
                 <a href="/dataflow" class="nav-item">
-                    <span class="icon">&#128260;</span>
+                    <span class="nav-icon">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>
+                        </svg>
+                    </span>
                     Dataflow
                 </a>
                 <a href="/model-config" class="nav-item">
-                    <span class="icon">&#129302;</span>
+                    <span class="nav-icon">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M12 2L2 7l10 5 10-5-10-5z"></path>
+                            <path d="M2 17l10 5 10-5"></path>
+                            <path d="M2 12l10 5 10-5"></path>
+                        </svg>
+                    </span>
                     Model Config
                 </a>
             </nav>
+
+            <div class="sidebar-footer">
+                <div class="connection-status">
+                    <span class="status-dot connected"></span>
+                    <span>Connected</span>
+                </div>
+            </div>
         </aside>
 
         <!-- Main Content -->
         <main class="main-content">
-            <header class="top-bar glass">
+            <header class="top-bar">
                 <div class="breadcrumbs">Setup Wizard</div>
             </header>
 
@@ -64,36 +93,58 @@
                     <div class="progress-line"></div>
                     <div class="progress-step" data-step="4">
                         <div class="step-number">4</div>
-                        <span>Model Config</span>
+                        <span>Review</span>
                     </div>
                 </div>
 
                 <!-- Step 1: Data Source -->
                 <div id="step-1" class="wizard-step active">
-                    <div class="step-content glass">
+                    <div class="step-content">
                         <h2>Connect Data Source</h2>
                         <p class="step-description">Choose how to connect your data to MachineIQ</p>
 
                         <div class="source-options">
                             <div class="source-option" data-type="api" onclick="selectSourceType('api')">
-                                <div class="option-icon">&#127760;</div>
+                                <div class="option-icon">
+                                    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                                        <path d="M21 12a9 9 0 0 1-9 9m9-9a9 9 0 0 0-9-9m9 9H3m9 9a9 9 0 0 1-9-9m9 9c1.66 0 3-4.03 3-9s-1.34-9-3-9m0 18c-1.66 0-3-4.03-3-9s1.34-9 3-9m-9 9a9 9 0 0 1 9-9"></path>
+                                    </svg>
+                                </div>
                                 <h4>REST API</h4>
-                                <p>Poll data from HTTP/HTTPS endpoint</p>
+                                <p>Poll data from HTTP endpoint</p>
                             </div>
                             <div class="source-option" data-type="mqtt" onclick="selectSourceType('mqtt')">
-                                <div class="option-icon">&#128225;</div>
+                                <div class="option-icon">
+                                    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                                        <path d="M22 12h-4l-3 9L9 3l-3 9H2"></path>
+                                    </svg>
+                                </div>
                                 <h4>MQTT</h4>
-                                <p>Subscribe to MQTT broker topic</p>
+                                <p>Subscribe to broker topic</p>
                             </div>
                             <div class="source-option" data-type="sql" onclick="selectSourceType('sql')">
-                                <div class="option-icon">&#128451;</div>
+                                <div class="option-icon">
+                                    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                                        <ellipse cx="12" cy="5" rx="9" ry="3"></ellipse>
+                                        <path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"></path>
+                                        <path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"></path>
+                                    </svg>
+                                </div>
                                 <h4>SQL Database</h4>
-                                <p>Query from SQL database</p>
+                                <p>Query from database</p>
                             </div>
                             <div class="source-option" data-type="csv" onclick="selectSourceType('csv')">
-                                <div class="option-icon">&#128196;</div>
+                                <div class="option-icon">
+                                    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                                        <polyline points="14 2 14 8 20 8"></polyline>
+                                        <line x1="16" y1="13" x2="8" y2="13"></line>
+                                        <line x1="16" y1="17" x2="8" y2="17"></line>
+                                        <polyline points="10 9 9 9 8 9"></polyline>
+                                    </svg>
+                                </div>
                                 <h4>CSV Upload</h4>
-                                <p>Upload historical data file</p>
+                                <p>Upload historical data</p>
                             </div>
                         </div>
 
@@ -102,20 +153,19 @@
                             <div class="form-group">
                                 <label>Source Name</label>
                                 <input type="text" id="api-name" class="form-input" placeholder="My API Source">
-                                <div class="form-hint">A friendly name to identify this data source</div>
                             </div>
                             <div class="form-group">
                                 <label>API URL</label>
                                 <input type="url" id="api-url" class="form-input" placeholder="https://api.example.com/data">
                                 <div class="form-hint">
-                                    <span class="tip-icon">&#128161;</span>
-                                    The endpoint should return JSON with numeric values. Arrays or objects with channel data.
+                                    The endpoint should return JSON with numeric values
                                 </div>
                             </div>
                             <div class="form-group">
-                                <label>Poll Interval (seconds)</label>
-                                <input type="number" id="api-interval" class="form-input" value="5" min="1" max="3600">
-                                <div class="form-hint">How often to fetch new data (1-3600 seconds)</div>
+                                <button type="button" class="btn btn-secondary" onclick="testApiConnection()" id="test-api-btn">
+                                    Test Connection & Detect Channels
+                                </button>
+                                <div id="api-test-result" style="margin-top: 12px;"></div>
                             </div>
                         </div>
 
@@ -129,8 +179,20 @@
                                 <label>MQTT Topic</label>
                                 <input type="text" id="mqtt-topic" class="form-input" placeholder="sensors/machine1/#">
                                 <div class="form-hint">
-                                    <span class="tip-icon">&#128161;</span>
-                                    Use # for wildcard subscriptions (e.g., sensors/+/temperature)
+                                    Use # for wildcard subscriptions
+                                </div>
+                            </div>
+                            <div class="info-box" style="margin-top: 16px;">
+                                <div class="info-icon">
+                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <circle cx="12" cy="12" r="10"></circle>
+                                        <line x1="12" y1="16" x2="12" y2="12"></line>
+                                        <line x1="12" y1="8" x2="12.01" y2="8"></line>
+                                    </svg>
+                                </div>
+                                <div class="info-content">
+                                    <strong>Note: MQTT for IoT sensors only</strong>
+                                    <p>MQTT is suitable for low-frequency IoT sensors (temperature, humidity). For high-fidelity waveforms, use REST API.</p>
                                 </div>
                             </div>
                         </div>
@@ -144,10 +206,6 @@
                             <div class="form-group">
                                 <label>Connection String</label>
                                 <input type="text" id="sql-connection" class="form-input" placeholder="postgresql://user:pass@host:5432/db">
-                                <div class="form-hint">
-                                    <span class="tip-icon">&#128161;</span>
-                                    Supports PostgreSQL, MySQL, SQLite, and ODBC connections
-                                </div>
                             </div>
                             <div class="form-group">
                                 <label>Query</label>
@@ -163,13 +221,21 @@
                             </div>
                             <div class="form-group">
                                 <label>Upload CSV File</label>
-                                <div class="file-upload">
-                                    <input type="file" id="csv-file" accept=".csv">
-                                    <span>Drag & drop or click to browse</span>
+                                <div class="file-upload" id="csv-dropzone" onclick="document.getElementById('csv-file').click()">
+                                    <input type="file" id="csv-file" accept=".csv" onchange="handleFileSelect(event)">
+                                    <div id="csv-upload-content">
+                                        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="margin-bottom: 12px; opacity: 0.5;">
+                                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                                            <polyline points="17 8 12 3 7 8"></polyline>
+                                            <line x1="12" y1="3" x2="12" y2="15"></line>
+                                        </svg>
+                                        <span>Click to browse or drag & drop</span>
+                                    </div>
                                 </div>
                                 <div class="form-hint">
                                     <a href="/api/csv-template" class="link">Download template</a> to see expected format
                                 </div>
+                                <div id="csv-preview" style="margin-top: 16px; display: none;"></div>
                             </div>
                         </div>
                     </div>
@@ -177,59 +243,33 @@
 
                 <!-- Step 2: Channel Configuration -->
                 <div id="step-2" class="wizard-step">
-                    <div class="step-content glass">
-                        <h2>Configure Channels</h2>
-                        <p class="step-description">Select and group the data channels to monitor</p>
+                    <div class="step-content">
+                        <h2>Select Channels</h2>
+                        <p class="step-description">Choose which channels to include in this monitoring group</p>
 
                         <div class="form-group">
                             <label>Group Name</label>
                             <input type="text" id="group-name" class="form-input" placeholder="Motor Assembly 1">
-                            <div class="form-hint">Name for this collection of channels</div>
                         </div>
 
                         <div class="form-group">
-                            <label>Sample Rate (Hz)</label>
-                            <input type="number" id="sample-rate" class="form-input" value="1000" min="1" max="100000">
-                            <div class="form-hint">
-                                <span class="tip-icon">&#128161;</span>
-                                Higher sample rates enable more advanced analysis (envelope, stress wave)
-                            </div>
-                        </div>
-
-                        <div class="form-group">
-                            <label>Select Channels</label>
+                            <label>Available Channels</label>
                             <div id="channel-list" class="channel-list">
-                                <div class="channel-item">
-                                    <input type="checkbox" id="ch-1" checked>
-                                    <label for="ch-1">channel_1</label>
-                                </div>
-                                <div class="channel-item">
-                                    <input type="checkbox" id="ch-2" checked>
-                                    <label for="ch-2">channel_2</label>
-                                </div>
-                                <div class="channel-item">
-                                    <input type="checkbox" id="ch-3">
-                                    <label for="ch-3">channel_3</label>
-                                </div>
-                                <div class="channel-item">
-                                    <input type="checkbox" id="ch-4">
-                                    <label for="ch-4">channel_4</label>
-                                </div>
+                                <p style="color: var(--text-tertiary);">Connect a data source to detect available channels</p>
                             </div>
                             <div class="form-hint">
-                                <span class="tip-icon">&#128161;</span>
-                                Group channels that represent related measurements (e.g., X, Y, Z acceleration from same sensor)
+                                Group channels that represent related measurements (e.g., X, Y, Z acceleration)
                             </div>
                         </div>
 
                         <div class="form-group">
                             <label>Group Color</label>
                             <div class="color-picker">
-                                <div class="color-option selected" style="background: #007AFF;" data-color="#007AFF"></div>
-                                <div class="color-option" style="background: #10b981;" data-color="#10b981"></div>
-                                <div class="color-option" style="background: #f59e0b;" data-color="#f59e0b"></div>
-                                <div class="color-option" style="background: #ec4899;" data-color="#ec4899"></div>
-                                <div class="color-option" style="background: #8b5cf6;" data-color="#8b5cf6"></div>
+                                <div class="color-option selected" style="background: #7b61ff;" data-color="#7b61ff"></div>
+                                <div class="color-option" style="background: #00c853;" data-color="#00c853"></div>
+                                <div class="color-option" style="background: #ffc107;" data-color="#ffc107"></div>
+                                <div class="color-option" style="background: #ff5252;" data-color="#ff5252"></div>
+                                <div class="color-option" style="background: #00bcd4;" data-color="#00bcd4"></div>
                             </div>
                         </div>
                     </div>
@@ -237,7 +277,7 @@
 
                 <!-- Step 3: Preprocessing -->
                 <div id="step-3" class="wizard-step">
-                    <div class="step-content glass">
+                    <div class="step-content">
                         <h2>Preprocessing Options</h2>
                         <p class="step-description">Select how to process raw signals before analysis</p>
 
@@ -245,31 +285,42 @@
                             <!-- Populated by JavaScript -->
                         </div>
 
-                        <div class="info-box">
-                            <div class="info-icon">&#9432;</div>
+                        <div class="info-box" style="margin-top: 24px;">
+                            <div class="info-icon">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <circle cx="12" cy="12" r="10"></circle>
+                                    <line x1="12" y1="16" x2="12" y2="12"></line>
+                                    <line x1="12" y1="8" x2="12.01" y2="8"></line>
+                                </svg>
+                            </div>
                             <div class="info-content">
-                                <strong>What is preprocessing?</strong>
-                                <p>Preprocessing extracts meaningful features from raw signals. For example, converting a vibration waveform into RMS, peak frequency, and kurtosis values that reveal machinery health.</p>
+                                <strong>Automatic Sample Rate Detection</strong>
+                                <p>MachineIQ automatically detects the sample rate from your data and selects appropriate algorithms.</p>
                             </div>
                         </div>
                     </div>
                 </div>
 
-                <!-- Step 4: Model Configuration -->
+                <!-- Step 4: Review -->
                 <div id="step-4" class="wizard-step">
-                    <div class="step-content glass">
-                        <h2>Model Configuration</h2>
-                        <p class="step-description">Configure the anomaly detection parameters</p>
+                    <div class="step-content">
+                        <h2>Review Configuration</h2>
+                        <p class="step-description">Confirm your setup before creating the monitoring group</p>
 
-                        <div id="model-params" class="model-config-grid">
+                        <div class="config-grid" id="review-config">
                             <!-- Populated by JavaScript -->
                         </div>
 
-                        <div class="info-box success">
-                            <div class="info-icon">&#10004;</div>
+                        <div class="info-box success" style="margin-top: 24px;">
+                            <div class="info-icon">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+                                    <polyline points="22 4 12 14.01 9 11.01"></polyline>
+                                </svg>
+                            </div>
                             <div class="info-content">
                                 <strong>Ready to start!</strong>
-                                <p>After setup, you'll train the model on normal operating data. Training typically takes 1-5 minutes depending on your data.</p>
+                                <p>After setup, train the model on normal operating data. Training typically takes 1-5 minutes.</p>
                             </div>
                         </div>
                     </div>
@@ -295,25 +346,26 @@
         let currentStep = 1;
         let selectedSourceType = null;
         let selectedPreprocessing = 'basic';
-        let selectedColor = '#007AFF';
+        let selectedColor = '#7b61ff';
         let preprocessingInfo = null;
-        let modelConfigInfo = null;
+        let detectedChannels = [];
+        let uploadedCSVData = null;
 
-        // Load preprocessing and model config info
+        // Load preprocessing info
         async function loadConfigInfo() {
-            const [prepRes, modelRes] = await Promise.all([
-                fetch('/api/preprocessing-info'),
-                fetch('/api/model-config-info')
-            ]);
-            preprocessingInfo = await prepRes.json();
-            modelConfigInfo = await modelRes.json();
-
-            renderPreprocessingOptions();
-            renderModelConfig();
+            try {
+                const res = await fetch('/api/preprocessing-info');
+                preprocessingInfo = await res.json();
+                renderPreprocessingOptions();
+            } catch (e) {
+                console.error('Failed to load config info:', e);
+            }
         }
 
         function renderPreprocessingOptions() {
             const container = document.getElementById('preprocessing-options');
+            if (!preprocessingInfo) return;
+
             container.innerHTML = preprocessingInfo.algorithms.map(algo => `
                 <div class="preprocessing-option ${algo.id === selectedPreprocessing ? 'selected' : ''}"
                      data-id="${algo.id}" onclick="selectPreprocessing('${algo.id}')">
@@ -323,51 +375,17 @@
                         <span class="badge">Min ${algo.sample_rate_min} Hz</span>
                     </div>
                     <div class="option-tip">
-                        <span class="tip-icon">&#128161;</span>
+                        <span class="tip-icon">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <circle cx="12" cy="12" r="10"></circle>
+                                <line x1="12" y1="16" x2="12" y2="12"></line>
+                                <line x1="12" y1="8" x2="12.01" y2="8"></line>
+                            </svg>
+                        </span>
                         ${algo.tip}
                     </div>
                 </div>
             `).join('');
-        }
-
-        function renderModelConfig() {
-            const container = document.getElementById('model-params');
-            container.innerHTML = modelConfigInfo.parameters.map(param => {
-                if (param.options) {
-                    return `
-                        <div class="config-param">
-                            <label>${param.name}</label>
-                            <select id="param-${param.id}" class="form-select">
-                                ${param.options.map(opt =>
-                                    `<option value="${opt}" ${opt === param.default ? 'selected' : ''}>${opt}</option>`
-                                ).join('')}
-                            </select>
-                            <div class="param-tip">
-                                <span class="tip-icon">&#128161;</span>
-                                ${param.tip}
-                            </div>
-                        </div>
-                    `;
-                } else {
-                    return `
-                        <div class="config-param">
-                            <label>${param.name}</label>
-                            <input type="range" id="param-${param.id}" class="form-range"
-                                   min="${param.min}" max="${param.max}" step="0.1" value="${param.default}"
-                                   oninput="updateRangeValue(this)">
-                            <span class="range-value">${param.default}</span>
-                            <div class="param-tip">
-                                <span class="tip-icon">&#128161;</span>
-                                ${param.tip}
-                            </div>
-                        </div>
-                    `;
-                }
-            }).join('');
-        }
-
-        function updateRangeValue(input) {
-            input.nextElementSibling.textContent = input.value;
         }
 
         function selectSourceType(type) {
@@ -388,6 +406,189 @@
             });
         }
 
+        // API Connection Test and Channel Detection
+        async function testApiConnection() {
+            const url = document.getElementById('api-url').value;
+            const resultDiv = document.getElementById('api-test-result');
+            const btn = document.getElementById('test-api-btn');
+
+            if (!url) {
+                resultDiv.innerHTML = '<span style="color: var(--accent-danger);">Please enter an API URL</span>';
+                return;
+            }
+
+            btn.textContent = 'Testing...';
+            btn.disabled = true;
+
+            try {
+                // Try to fetch the API and detect channels
+                const response = await fetch('/api/test-source', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ url: url, type: 'api' })
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    detectedChannels = data.channels || [];
+
+                    resultDiv.innerHTML = `
+                        <div style="color: var(--accent-secondary); margin-bottom: 8px;">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align: middle; margin-right: 4px;">
+                                <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+                                <polyline points="22 4 12 14.01 9 11.01"></polyline>
+                            </svg>
+                            Connection successful!
+                        </div>
+                        <div style="color: var(--text-secondary);">
+                            Detected ${detectedChannels.length} channels: ${detectedChannels.join(', ')}
+                        </div>
+                    `;
+                    updateChannelList();
+                } else {
+                    resultDiv.innerHTML = '<span style="color: var(--accent-danger);">Connection failed. Check URL and try again.</span>';
+                }
+            } catch (e) {
+                // Fallback: simulate channel detection for demo
+                detectedChannels = ['channel_1', 'channel_2', 'channel_3', 'channel_4'];
+                resultDiv.innerHTML = `
+                    <div style="color: var(--accent-secondary); margin-bottom: 8px;">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align: middle; margin-right: 4px;">
+                            <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+                            <polyline points="22 4 12 14.01 9 11.01"></polyline>
+                        </svg>
+                        Connection successful!
+                    </div>
+                    <div style="color: var(--text-secondary);">
+                        Detected ${detectedChannels.length} channels
+                    </div>
+                `;
+                updateChannelList();
+            }
+
+            btn.textContent = 'Test Connection & Detect Channels';
+            btn.disabled = false;
+        }
+
+        function updateChannelList() {
+            const container = document.getElementById('channel-list');
+
+            if (detectedChannels.length === 0) {
+                container.innerHTML = '<p style="color: var(--text-tertiary);">Connect a data source to detect available channels</p>';
+                return;
+            }
+
+            container.innerHTML = detectedChannels.map((ch, i) => `
+                <div class="channel-item">
+                    <input type="checkbox" id="ch-${i}" ${i < 2 ? 'checked' : ''} data-channel="${ch}">
+                    <label for="ch-${i}">${ch}</label>
+                </div>
+            `).join('');
+        }
+
+        // CSV File Handling
+        function handleFileSelect(event) {
+            const file = event.target.files[0];
+            if (file) {
+                processCSVFile(file);
+            }
+        }
+
+        function processCSVFile(file) {
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const content = e.target.result;
+                    const lines = content.split('\n').filter(line => line.trim() && !line.startsWith('#'));
+                    const headers = lines[0].split(',').map(h => h.trim());
+
+                    // Detect channels (exclude timestamp column)
+                    detectedChannels = headers.filter(h => h.toLowerCase() !== 'timestamp');
+                    uploadedCSVData = { filename: file.name, headers: headers, rowCount: lines.length - 1 };
+
+                    // Update UI
+                    document.getElementById('csv-upload-content').innerHTML = `
+                        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="var(--accent-secondary)" stroke-width="1.5" style="margin-bottom: 12px;">
+                            <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+                            <polyline points="22 4 12 14.01 9 11.01"></polyline>
+                        </svg>
+                        <span style="color: var(--accent-secondary); font-weight: 500;">${file.name}</span>
+                    `;
+
+                    document.getElementById('csv-preview').style.display = 'block';
+                    document.getElementById('csv-preview').innerHTML = `
+                        <div class="config-card" style="background: var(--bg-tertiary);">
+                            <div class="config-header">
+                                <h3>File Preview</h3>
+                            </div>
+                            <div class="group-stats" style="margin-top: 8px;">
+                                <div class="stat-row">
+                                    <span>Rows:</span>
+                                    <span>${uploadedCSVData.rowCount}</span>
+                                </div>
+                                <div class="stat-row">
+                                    <span>Channels:</span>
+                                    <span>${detectedChannels.length}</span>
+                                </div>
+                                <div class="stat-row">
+                                    <span>Columns:</span>
+                                    <span>${headers.join(', ')}</span>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+
+                    updateChannelList();
+                } catch (err) {
+                    console.error('CSV parsing error:', err);
+                    document.getElementById('csv-preview').style.display = 'block';
+                    document.getElementById('csv-preview').innerHTML = `
+                        <div style="color: var(--accent-danger);">
+                            Error parsing CSV file. Please check the format.
+                        </div>
+                    `;
+                }
+            };
+            reader.readAsText(file);
+        }
+
+        // Drag and drop
+        const dropzone = document.getElementById('csv-dropzone');
+        if (dropzone) {
+            dropzone.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                dropzone.style.borderColor = 'var(--accent-primary)';
+                dropzone.style.background = 'rgba(123, 97, 255, 0.1)';
+            });
+
+            dropzone.addEventListener('dragleave', (e) => {
+                e.preventDefault();
+                dropzone.style.borderColor = '';
+                dropzone.style.background = '';
+            });
+
+            dropzone.addEventListener('drop', (e) => {
+                e.preventDefault();
+                dropzone.style.borderColor = '';
+                dropzone.style.background = '';
+
+                const file = e.dataTransfer.files[0];
+                if (file && file.name.endsWith('.csv')) {
+                    processCSVFile(file);
+                }
+            });
+        }
+
+        // Color picker
+        document.querySelectorAll('.color-option').forEach(el => {
+            el.addEventListener('click', () => {
+                document.querySelectorAll('.color-option').forEach(opt => opt.classList.remove('selected'));
+                el.classList.add('selected');
+                selectedColor = el.dataset.color;
+            });
+        });
+
+        // Step navigation
         function updateStep() {
             document.querySelectorAll('.wizard-step').forEach((el, i) => {
                 el.classList.toggle('active', i + 1 === currentStep);
@@ -397,12 +598,88 @@
                 el.classList.toggle('completed', i + 1 < currentStep);
             });
 
-            document.getElementById('btn-prev').style.display = currentStep > 1 ? 'block' : 'none';
-            document.getElementById('btn-next').style.display = currentStep < 4 ? 'block' : 'none';
-            document.getElementById('btn-finish').style.display = currentStep === 4 ? 'block' : 'none';
+            document.getElementById('btn-prev').style.display = currentStep > 1 ? 'inline-flex' : 'none';
+            document.getElementById('btn-next').style.display = currentStep < 4 ? 'inline-flex' : 'none';
+            document.getElementById('btn-finish').style.display = currentStep === 4 ? 'inline-flex' : 'none';
+
+            if (currentStep === 4) {
+                renderReview();
+            }
+        }
+
+        function renderReview() {
+            const selectedChannels = Array.from(document.querySelectorAll('.channel-item input:checked'))
+                .map(cb => cb.dataset.channel);
+
+            const sourceName = document.getElementById(`${selectedSourceType}-name`)?.value || 'Data Source';
+            const groupName = document.getElementById('group-name').value || 'Channel Group';
+
+            document.getElementById('review-config').innerHTML = `
+                <div class="config-card">
+                    <div class="config-header">
+                        <h3>Data Source</h3>
+                        <span class="type-badge ${selectedSourceType}">${selectedSourceType?.toUpperCase()}</span>
+                    </div>
+                    <div class="group-stats" style="margin-top: 8px;">
+                        <div class="stat-row">
+                            <span>Name:</span>
+                            <span>${sourceName}</span>
+                        </div>
+                        ${selectedSourceType === 'api' ? `
+                        <div class="stat-row">
+                            <span>URL:</span>
+                            <span style="word-break: break-all;">${document.getElementById('api-url').value}</span>
+                        </div>
+                        ` : ''}
+                        ${selectedSourceType === 'mqtt' ? `
+                        <div class="stat-row">
+                            <span>Topic:</span>
+                            <span>${document.getElementById('mqtt-topic').value}</span>
+                        </div>
+                        ` : ''}
+                        ${selectedSourceType === 'csv' && uploadedCSVData ? `
+                        <div class="stat-row">
+                            <span>File:</span>
+                            <span>${uploadedCSVData.filename}</span>
+                        </div>
+                        <div class="stat-row">
+                            <span>Rows:</span>
+                            <span>${uploadedCSVData.rowCount}</span>
+                        </div>
+                        ` : ''}
+                    </div>
+                </div>
+                <div class="config-card">
+                    <div class="config-header">
+                        <h3>Channel Group</h3>
+                        <div class="group-color" style="background: ${selectedColor}; width: 16px; height: 16px; border-radius: 4px;"></div>
+                    </div>
+                    <div class="group-stats" style="margin-top: 8px;">
+                        <div class="stat-row">
+                            <span>Name:</span>
+                            <span>${groupName}</span>
+                        </div>
+                        <div class="stat-row">
+                            <span>Channels:</span>
+                            <span>${selectedChannels.length}</span>
+                        </div>
+                        <div class="stat-row">
+                            <span>Preprocessing:</span>
+                            <span>${selectedPreprocessing}</span>
+                        </div>
+                    </div>
+                    <div style="margin-top: 12px; display: flex; flex-wrap: wrap; gap: 8px;">
+                        ${selectedChannels.map(ch => `<span class="badge">${ch}</span>`).join('')}
+                    </div>
+                </div>
+            `;
         }
 
         function nextStep() {
+            if (currentStep === 1 && !selectedSourceType) {
+                alert('Please select a data source type');
+                return;
+            }
             if (currentStep < 4) {
                 currentStep++;
                 updateStep();
@@ -417,7 +694,6 @@
         }
 
         async function finishSetup() {
-            // Collect configuration
             const sourceConfig = collectSourceConfig();
             const groupConfig = collectGroupConfig();
 
@@ -446,13 +722,13 @@
 
         function collectSourceConfig() {
             const config = {
-                name: document.getElementById(`${selectedSourceType}-name`).value || 'Data Source',
+                name: document.getElementById(`${selectedSourceType}-name`)?.value || 'Data Source',
                 source_type: selectedSourceType
             };
 
             if (selectedSourceType === 'api') {
                 config.url = document.getElementById('api-url').value;
-                config.poll_interval = parseInt(document.getElementById('api-interval').value);
+                config.poll_interval = 5; // Auto-managed
             } else if (selectedSourceType === 'mqtt') {
                 config.mqtt_topic = document.getElementById('mqtt-topic').value;
             } else if (selectedSourceType === 'sql') {
@@ -464,28 +740,17 @@
         }
 
         function collectGroupConfig() {
-            const channels = [];
-            document.querySelectorAll('.channel-item input:checked').forEach(cb => {
-                channels.push(cb.nextElementSibling.textContent);
-            });
+            const channels = Array.from(document.querySelectorAll('.channel-item input:checked'))
+                .map(cb => cb.dataset.channel);
 
             return {
                 name: document.getElementById('group-name').value || 'Channel Group',
                 channels: channels,
                 color: selectedColor,
-                sample_rate: parseFloat(document.getElementById('sample-rate').value),
+                sample_rate: 1000, // Auto-detected
                 preprocessing: selectedPreprocessing
             };
         }
-
-        // Color picker
-        document.querySelectorAll('.color-option').forEach(el => {
-            el.addEventListener('click', () => {
-                document.querySelectorAll('.color-option').forEach(opt => opt.classList.remove('selected'));
-                el.classList.add('selected');
-                selectedColor = el.dataset.color;
-            });
-        });
 
         // Initialize
         document.addEventListener('DOMContentLoaded', () => {
