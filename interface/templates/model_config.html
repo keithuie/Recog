@@ -319,6 +319,44 @@
 
     <script>
         let selectedDuration = 60;
+        let selectedPreprocessing = 'basic';
+
+        // Load config on page load
+        async function loadConfig() {
+            try {
+                const response = await fetch('/api/model-config');
+                const config = await response.json();
+
+                // Apply loaded config to form
+                document.getElementById('kernel-type').value = config.kernel_type || 'triangular';
+                document.getElementById('num-bins').value = config.num_bins || 64;
+                document.getElementById('kernel-width').value = config.kernel_width || 0.5;
+                document.getElementById('threshold').value = config.threshold || 0.3;
+                document.getElementById('auto-scale').checked = config.auto_scale !== false;
+                document.getElementById('outlier-rejection').checked = config.outlier_rejection !== false;
+                document.getElementById('smoothing').value = config.smoothing_window || 5;
+
+                // Update display values
+                updateValue('kw-value', config.kernel_width || 0.5);
+                updateValue('threshold-value', config.threshold || 0.3);
+                updateValue('smooth-value', config.smoothing_window || 5);
+
+                // Set duration
+                selectedDuration = config.training_duration || 60;
+                document.querySelectorAll('.duration-btn').forEach(b => {
+                    b.classList.toggle('active', parseInt(b.dataset.value) === selectedDuration);
+                });
+
+                // Set preprocessing
+                selectedPreprocessing = config.preprocessing || 'basic';
+                document.querySelectorAll('.preprocess-card').forEach(card => {
+                    card.classList.toggle('selected', card.dataset.id === selectedPreprocessing);
+                });
+
+            } catch (error) {
+                console.error('Failed to load config:', error);
+            }
+        }
 
         function updateValue(elementId, value) {
             document.getElementById(elementId).textContent = value;
@@ -340,6 +378,15 @@
             });
         });
 
+        // Preprocessing card selection
+        document.querySelectorAll('.preprocess-card').forEach(card => {
+            card.addEventListener('click', () => {
+                document.querySelectorAll('.preprocess-card').forEach(c => c.classList.remove('selected'));
+                card.classList.add('selected');
+                selectedPreprocessing = card.dataset.id;
+            });
+        });
+
         function resetDefaults() {
             document.getElementById('kernel-type').value = 'triangular';
             document.getElementById('num-bins').value = '64';
@@ -356,32 +403,57 @@
             document.querySelectorAll('.duration-btn').forEach(b => b.classList.remove('active'));
             document.querySelector('.duration-btn[data-value="60"]').classList.add('active');
             selectedDuration = 60;
+
+            document.querySelectorAll('.preprocess-card').forEach(c => c.classList.remove('selected'));
+            document.querySelector('.preprocess-card[data-id="basic"]').classList.add('selected');
+            selectedPreprocessing = 'basic';
         }
 
-        function saveConfig() {
+        async function saveConfig() {
             const config = {
                 kernel_type: document.getElementById('kernel-type').value,
                 num_bins: parseInt(document.getElementById('num-bins').value),
                 kernel_width: parseFloat(document.getElementById('kernel-width').value),
                 threshold: parseFloat(document.getElementById('threshold').value),
                 training_duration: selectedDuration,
+                preprocessing: selectedPreprocessing,
                 auto_scale: document.getElementById('auto-scale').checked,
                 outlier_rejection: document.getElementById('outlier-rejection').checked,
                 smoothing_window: parseInt(document.getElementById('smoothing').value)
             };
 
-            // Save to backend (implement endpoint)
-            console.log('Saving config:', config);
-
-            // Show success feedback
             const btn = document.querySelector('.btn-primary');
-            btn.textContent = 'Saved!';
-            btn.classList.add('btn-success');
-            setTimeout(() => {
-                btn.textContent = 'Save Configuration';
-                btn.classList.remove('btn-success');
-            }, 2000);
+
+            try {
+                const response = await fetch('/api/model-config', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(config)
+                });
+
+                if (response.ok) {
+                    btn.textContent = 'Saved!';
+                    btn.classList.add('btn-success');
+                    setTimeout(() => {
+                        btn.textContent = 'Save Configuration';
+                        btn.classList.remove('btn-success');
+                    }, 2000);
+                } else {
+                    throw new Error('Save failed');
+                }
+            } catch (error) {
+                console.error('Failed to save config:', error);
+                btn.textContent = 'Error!';
+                btn.classList.add('btn-danger');
+                setTimeout(() => {
+                    btn.textContent = 'Save Configuration';
+                    btn.classList.remove('btn-danger');
+                }, 2000);
+            }
         }
+
+        // Initialize on page load
+        document.addEventListener('DOMContentLoaded', loadConfig);
     </script>
 </body>
 </html>

@@ -64,6 +64,19 @@ simulation_task: Optional[asyncio.Task] = None
 # Data cache for streaming
 latest_data: Dict[str, dict] = {}  # {group_name: {channel_values, confidence, timestamp}}
 
+# Model configuration (global defaults)
+current_model_config: dict = {
+    "kernel_type": "triangular",
+    "num_bins": 64,
+    "kernel_width": 0.5,
+    "threshold": 0.3,
+    "training_duration": 60,
+    "preprocessing": "basic",
+    "auto_scale": True,
+    "outlier_rejection": True,
+    "smoothing_window": 5
+}
+
 
 # Pydantic models for API
 class DataSourceConfig(BaseModel):
@@ -90,6 +103,11 @@ class ModelConfig(BaseModel):
     num_bins: int = 64
     kernel_width: float = 0.5
     threshold: float = 0.3
+    training_duration: int = 60
+    preprocessing: str = "basic"
+    auto_scale: bool = True
+    outlier_rejection: bool = True
+    smoothing_window: int = 5
 
 
 class TrainingRequest(BaseModel):
@@ -204,6 +222,32 @@ async def remove_channel_group(name: str):
         await broadcast_update("group_removed", {"name": name})
         return {"status": "success"}
     raise HTTPException(status_code=404, detail="Group not found")
+
+
+# Model Configuration API
+@app.get("/api/model-config")
+async def get_model_config():
+    """Get current model configuration."""
+    return current_model_config
+
+
+@app.post("/api/model-config")
+async def save_model_config(config: ModelConfig):
+    """Save model configuration."""
+    global current_model_config
+    current_model_config = {
+        "kernel_type": config.kernel_type,
+        "num_bins": config.num_bins,
+        "kernel_width": config.kernel_width,
+        "threshold": config.threshold,
+        "training_duration": config.training_duration,
+        "preprocessing": config.preprocessing,
+        "auto_scale": config.auto_scale,
+        "outlier_rejection": config.outlier_rejection,
+        "smoothing_window": config.smoothing_window
+    }
+    await broadcast_update("config_updated", current_model_config)
+    return {"status": "success", "config": current_model_config}
 
 
 @app.post("/api/training/start")
