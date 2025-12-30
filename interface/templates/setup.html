@@ -422,14 +422,15 @@
 
             try {
                 // Try to fetch the API and detect channels
-                const response = await fetch('/api/test-source', {
+                const response = await fetch('/api/test-connection', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ url: url, type: 'api' })
+                    body: JSON.stringify({ url: url })
                 });
 
-                if (response.ok) {
-                    const data = await response.json();
+                const data = await response.json();
+
+                if (response.ok && data.success) {
                     detectedChannels = data.channels || [];
 
                     resultDiv.innerHTML = `
@@ -446,24 +447,11 @@
                     `;
                     updateChannelList();
                 } else {
-                    resultDiv.innerHTML = '<span style="color: var(--accent-danger);">Connection failed. Check URL and try again.</span>';
+                    const errorMsg = data.error || 'Connection failed';
+                    resultDiv.innerHTML = `<span style="color: var(--accent-danger);">${errorMsg}</span>`;
                 }
             } catch (e) {
-                // Fallback: simulate channel detection for demo
-                detectedChannels = ['channel_1', 'channel_2', 'channel_3', 'channel_4'];
-                resultDiv.innerHTML = `
-                    <div style="color: var(--accent-secondary); margin-bottom: 8px;">
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align: middle; margin-right: 4px;">
-                            <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
-                            <polyline points="22 4 12 14.01 9 11.01"></polyline>
-                        </svg>
-                        Connection successful!
-                    </div>
-                    <div style="color: var(--text-secondary);">
-                        Detected ${detectedChannels.length} channels
-                    </div>
-                `;
-                updateChannelList();
+                resultDiv.innerHTML = `<span style="color: var(--accent-danger);">Error: ${e.message}</span>`;
             }
 
             btn.textContent = 'Test Connection & Detect Channels';
