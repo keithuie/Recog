@@ -9,11 +9,578 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/static/css/styles.css">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        /* Grafana-like Grid Layout */
+        .dashboard-grid {
+            display: grid;
+            grid-template-columns: repeat(12, 1fr);
+            grid-auto-rows: minmax(80px, auto);
+            gap: 16px;
+            padding: 16px 0;
+        }
+
+        .grid-panel {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-primary);
+            border-radius: var(--radius-md);
+            position: relative;
+            overflow: hidden;
+            transition: box-shadow 0.2s ease;
+        }
+
+        .grid-panel:hover {
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+        }
+
+        .grid-panel.dragging {
+            opacity: 0.8;
+            z-index: 1000;
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+        }
+
+        /* Panel sizes */
+        .panel-1x1 { grid-column: span 3; grid-row: span 2; }
+        .panel-2x1 { grid-column: span 6; grid-row: span 2; }
+        .panel-3x1 { grid-column: span 9; grid-row: span 2; }
+        .panel-4x1 { grid-column: span 12; grid-row: span 2; }
+        .panel-1x2 { grid-column: span 3; grid-row: span 4; }
+        .panel-2x2 { grid-column: span 6; grid-row: span 4; }
+        .panel-3x2 { grid-column: span 9; grid-row: span 4; }
+        .panel-4x2 { grid-column: span 12; grid-row: span 4; }
+
+        .panel-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px 16px;
+            border-bottom: 1px solid var(--border-primary);
+            cursor: move;
+        }
+
+        .panel-title {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 14px;
+            font-weight: 600;
+        }
+
+        .panel-title .color-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+        }
+
+        .panel-actions {
+            display: flex;
+            gap: 4px;
+            opacity: 0;
+            transition: opacity 0.2s ease;
+        }
+
+        .grid-panel:hover .panel-actions {
+            opacity: 1;
+        }
+
+        .panel-action-btn {
+            background: transparent;
+            border: none;
+            color: var(--text-tertiary);
+            cursor: pointer;
+            padding: 4px;
+            border-radius: 4px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .panel-action-btn:hover {
+            background: var(--bg-hover);
+            color: var(--text-primary);
+        }
+
+        .panel-content {
+            padding: 16px;
+            height: calc(100% - 48px);
+            display: flex;
+            flex-direction: column;
+        }
+
+        .panel-chart {
+            flex: 1;
+            min-height: 0;
+            position: relative;
+        }
+
+        .panel-stats {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 12px;
+            margin-top: 12px;
+        }
+
+        .panel-stat {
+            text-align: center;
+            padding: 8px;
+            background: var(--bg-tertiary);
+            border-radius: var(--radius-sm);
+        }
+
+        .panel-stat-value {
+            font-size: 18px;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        .panel-stat-label {
+            font-size: 10px;
+            color: var(--text-tertiary);
+            text-transform: uppercase;
+            margin-top: 2px;
+        }
+
+        /* Match score gauge */
+        .match-gauge {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 12px;
+            background: var(--bg-tertiary);
+            border-radius: var(--radius-sm);
+            margin-top: 12px;
+        }
+
+        .gauge-bar {
+            flex: 1;
+            height: 8px;
+            background: var(--bg-primary);
+            border-radius: 4px;
+            overflow: hidden;
+        }
+
+        .gauge-fill {
+            height: 100%;
+            border-radius: 4px;
+            transition: width 0.3s ease, background 0.3s ease;
+        }
+
+        .gauge-value {
+            font-size: 20px;
+            font-weight: 700;
+            min-width: 60px;
+            text-align: right;
+        }
+
+        /* Channel data display */
+        .channel-data {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            margin-top: 8px;
+            max-height: 120px;
+            overflow-y: auto;
+        }
+
+        .channel-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 6px 8px;
+            background: var(--bg-tertiary);
+            border-radius: var(--radius-sm);
+            font-size: 12px;
+        }
+
+        .channel-name {
+            color: var(--text-secondary);
+        }
+
+        .channel-value {
+            font-family: 'SF Mono', monospace;
+            color: var(--text-primary);
+            font-weight: 500;
+        }
+
+        /* Resize handle */
+        .resize-handle {
+            position: absolute;
+            bottom: 0;
+            right: 0;
+            width: 16px;
+            height: 16px;
+            cursor: se-resize;
+            opacity: 0;
+            transition: opacity 0.2s ease;
+        }
+
+        .grid-panel:hover .resize-handle {
+            opacity: 1;
+        }
+
+        .resize-handle::after {
+            content: '';
+            position: absolute;
+            bottom: 4px;
+            right: 4px;
+            width: 8px;
+            height: 8px;
+            border-right: 2px solid var(--text-tertiary);
+            border-bottom: 2px solid var(--text-tertiary);
+        }
+
+        /* Edit mode */
+        .dashboard-grid.edit-mode .grid-panel {
+            border: 2px dashed var(--border-secondary);
+        }
+
+        .dashboard-grid.edit-mode .panel-header {
+            background: var(--bg-tertiary);
+        }
+
+        /* Panel size selector */
+        .size-selector {
+            position: absolute;
+            top: 100%;
+            right: 0;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-primary);
+            border-radius: var(--radius-md);
+            padding: 8px;
+            z-index: 100;
+            display: none;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+        }
+
+        .size-selector.visible {
+            display: block;
+        }
+
+        .size-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 24px);
+            gap: 4px;
+        }
+
+        .size-cell {
+            width: 24px;
+            height: 24px;
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-secondary);
+            border-radius: 2px;
+            cursor: pointer;
+        }
+
+        .size-cell:hover,
+        .size-cell.selected {
+            background: var(--accent-primary);
+            border-color: var(--accent-primary);
+        }
+
+        /* Toolbar */
+        .dashboard-toolbar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 16px;
+            padding: 12px 16px;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-primary);
+            border-radius: var(--radius-md);
+        }
+
+        .toolbar-left {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .toolbar-title {
+            font-size: 16px;
+            font-weight: 600;
+        }
+
+        .toolbar-status {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 12px;
+            color: var(--text-secondary);
+        }
+
+        .live-indicator {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .live-dot {
+            width: 8px;
+            height: 8px;
+            background: var(--accent-secondary);
+            border-radius: 50%;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .toolbar-actions {
+            display: flex;
+            gap: 8px;
+        }
+
+        /* Data source connection status */
+        .source-status {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 12px;
+            background: var(--bg-tertiary);
+            border-radius: var(--radius-sm);
+            font-size: 12px;
+        }
+
+        .source-status.connected {
+            color: var(--accent-secondary);
+        }
+
+        .source-status.error {
+            color: var(--accent-danger);
+        }
+
+        /* Toolbar center section */
+        .toolbar-center {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .time-range-selector,
+        .refresh-selector {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .toolbar-select {
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-primary);
+            color: var(--text-primary);
+            padding: 6px 10px;
+            border-radius: var(--radius-sm);
+            font-size: 12px;
+            cursor: pointer;
+        }
+
+        .toolbar-select:hover {
+            border-color: var(--accent-primary);
+        }
+
+        .toolbar-select:focus {
+            outline: none;
+            border-color: var(--accent-primary);
+            box-shadow: 0 0 0 2px rgba(123, 97, 255, 0.2);
+        }
+
+        /* Panel fullscreen mode */
+        .grid-panel.fullscreen {
+            position: fixed !important;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            z-index: 9999;
+            grid-column: span 12 !important;
+            grid-row: span 12 !important;
+            border-radius: 0;
+            margin: 0;
+        }
+
+        .grid-panel.fullscreen .panel-content {
+            height: calc(100vh - 60px);
+        }
+
+        /* Fullscreen exit button */
+        .fullscreen-exit-btn {
+            position: fixed;
+            top: 16px;
+            right: 16px;
+            z-index: 10000;
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-primary);
+            color: var(--text-primary);
+            padding: 8px 16px;
+            border-radius: var(--radius-sm);
+            cursor: pointer;
+            display: none;
+            align-items: center;
+            gap: 8px;
+            font-size: 12px;
+            font-weight: 500;
+        }
+
+        .grid-panel.fullscreen ~ .fullscreen-exit-btn,
+        .fullscreen-exit-btn.visible {
+            display: flex;
+        }
+
+        .fullscreen-exit-btn:hover {
+            background: var(--bg-hover);
+            border-color: var(--accent-primary);
+        }
+
+        /* Toast notification system */
+        .toast-container {
+            position: fixed;
+            top: 80px;
+            right: 24px;
+            z-index: 9999;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            pointer-events: none;
+        }
+
+        .toast {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-primary);
+            border-left: 4px solid var(--accent-primary);
+            border-radius: var(--radius-md);
+            padding: 12px 16px;
+            min-width: 320px;
+            max-width: 400px;
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+            pointer-events: auto;
+            animation: slideIn 0.3s ease;
+            display: flex;
+            align-items: flex-start;
+            gap: 12px;
+        }
+
+        .toast.hiding {
+            animation: slideOut 0.3s ease forwards;
+        }
+
+        .toast.anomaly {
+            border-left-color: var(--accent-danger);
+        }
+
+        .toast.warning {
+            border-left-color: var(--accent-warning);
+        }
+
+        .toast.success {
+            border-left-color: var(--accent-secondary);
+        }
+
+        .toast-icon {
+            flex-shrink: 0;
+            width: 20px;
+            height: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .toast.anomaly .toast-icon { color: var(--accent-danger); }
+        .toast.warning .toast-icon { color: var(--accent-warning); }
+        .toast.success .toast-icon { color: var(--accent-secondary); }
+
+        .toast-content {
+            flex: 1;
+        }
+
+        .toast-title {
+            font-weight: 600;
+            font-size: 13px;
+            color: var(--text-primary);
+            margin-bottom: 4px;
+        }
+
+        .toast-message {
+            font-size: 12px;
+            color: var(--text-secondary);
+            line-height: 1.4;
+        }
+
+        .toast-close {
+            background: none;
+            border: none;
+            color: var(--text-tertiary);
+            cursor: pointer;
+            padding: 4px;
+            margin: -4px -4px -4px 0;
+        }
+
+        .toast-close:hover {
+            color: var(--text-primary);
+        }
+
+        @keyframes slideIn {
+            from { transform: translateX(100%); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+
+        @keyframes slideOut {
+            from { transform: translateX(0); opacity: 1; }
+            to { transform: translateX(100%); opacity: 0; }
+        }
+
+        /* Chart threshold lines */
+        .threshold-legend {
+            display: flex;
+            gap: 16px;
+            font-size: 10px;
+            margin-top: 8px;
+            justify-content: center;
+        }
+
+        .threshold-item {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            color: var(--text-tertiary);
+        }
+
+        .threshold-item .line {
+            width: 16px;
+            height: 2px;
+            border-radius: 1px;
+        }
+
+        .threshold-item.warning .line { background: var(--accent-warning); }
+        .threshold-item.danger .line { background: var(--accent-danger); }
+
+        /* Value change animation */
+        .channel-value.updated {
+            animation: valueFlash 0.5s ease;
+        }
+
+        @keyframes valueFlash {
+            0% { background: rgba(123, 97, 255, 0.3); }
+            100% { background: transparent; }
+        }
+
+        /* Improved empty state */
+        .empty-state h4 {
+            font-size: 18px;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin: 16px 0 8px;
+        }
+
+        .empty-state p {
+            color: var(--text-secondary);
+            margin-bottom: 24px;
+        }
+    </style>
 </head>
 <body>
     <div class="app-container">
         <!-- Sidebar -->
-        <aside class="sidebar glass">
+        <aside class="sidebar">
             <div class="logo-area">
                 <div class="logo-icon"></div>
                 <h1>MachineIQ</h1>
@@ -21,34 +588,56 @@
 
             <nav class="nav-menu">
                 <a href="/" class="nav-item active">
-                    <span class="icon">&#128200;</span>
+                    <span class="nav-icon">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <rect x="3" y="3" width="7" height="7"></rect>
+                            <rect x="14" y="3" width="7" height="7"></rect>
+                            <rect x="14" y="14" width="7" height="7"></rect>
+                            <rect x="3" y="14" width="7" height="7"></rect>
+                        </svg>
+                    </span>
                     Dashboard
                 </a>
                 <a href="/setup" class="nav-item">
-                    <span class="icon">&#9881;</span>
+                    <span class="nav-icon">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="12" cy="12" r="3"></circle>
+                            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+                        </svg>
+                    </span>
                     Setup Wizard
                 </a>
                 <a href="/dataflow" class="nav-item">
-                    <span class="icon">&#128260;</span>
+                    <span class="nav-icon">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>
+                        </svg>
+                    </span>
                     Dataflow
                 </a>
                 <a href="/model-config" class="nav-item">
-                    <span class="icon">&#129302;</span>
+                    <span class="nav-icon">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M12 2L2 7l10 5 10-5-10-5z"></path>
+                            <path d="M2 17l10 5 10-5"></path>
+                            <path d="M2 12l10 5 10-5"></path>
+                        </svg>
+                    </span>
                     Model Config
                 </a>
             </nav>
 
             <div class="sidebar-footer">
                 <div class="connection-status">
-                    <span class="status-dot connected"></span>
-                    <span>Connected</span>
+                    <span class="status-dot" id="ws-status"></span>
+                    <span id="ws-status-text">Connecting...</span>
                 </div>
             </div>
         </aside>
 
         <!-- Main Content -->
         <main class="main-content">
-            <header class="top-bar glass">
+            <header class="top-bar">
                 <div class="breadcrumbs">Dashboard / Monitoring</div>
                 <div class="header-actions">
                     <button class="btn btn-secondary" onclick="downloadCSVTemplate()">
@@ -61,157 +650,197 @@
             </header>
 
             <div class="content-area">
-                <!-- System Overview -->
-                <section class="hero-section">
-                    <h2>System Overview</h2>
-                    <p class="subtitle">Real-time monitoring and anomaly detection</p>
-                </section>
-
-                <!-- Stats Cards -->
-                <div class="stats-grid">
-                    <div class="stat-card glass">
-                        <div class="stat-icon" style="background: linear-gradient(135deg, #10b981, #059669);">
-                            &#128260;
-                        </div>
-                        <div class="stat-content">
-                            <span class="stat-value" id="source-count">{{ sources|length }}</span>
-                            <span class="stat-label">Data Sources</span>
+                <!-- Dashboard Toolbar -->
+                <div class="dashboard-toolbar">
+                    <div class="toolbar-left">
+                        <span class="toolbar-title">Monitoring Dashboard</span>
+                        <div class="toolbar-status">
+                            <div class="live-indicator">
+                                <span class="live-dot"></span>
+                                <span>LIVE</span>
+                            </div>
+                            <span id="update-rate">--</span>
                         </div>
                     </div>
-                    <div class="stat-card glass">
-                        <div class="stat-icon" style="background: linear-gradient(135deg, #6366f1, #4f46e5);">
-                            &#128202;
+                    <div class="toolbar-center">
+                        <!-- Time Range Selector -->
+                        <div class="time-range-selector">
+                            <select id="time-range" onchange="setTimeRange(this.value)" class="toolbar-select">
+                                <option value="60">Last 1 min</option>
+                                <option value="300" selected>Last 5 min</option>
+                                <option value="900">Last 15 min</option>
+                                <option value="1800">Last 30 min</option>
+                                <option value="3600">Last 1 hour</option>
+                            </select>
                         </div>
-                        <div class="stat-content">
-                            <span class="stat-value" id="group-count">{{ groups|length }}</span>
-                            <span class="stat-label">Channel Groups</span>
+                        <!-- Refresh Interval -->
+                        <div class="refresh-selector">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="opacity: 0.6;">
+                                <polyline points="23 4 23 10 17 10"></polyline>
+                                <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path>
+                            </svg>
+                            <select id="refresh-interval" onchange="setRefreshInterval(this.value)" class="toolbar-select">
+                                <option value="1000">1s</option>
+                                <option value="2000" selected>2s</option>
+                                <option value="5000">5s</option>
+                                <option value="10000">10s</option>
+                                <option value="0">Off</option>
+                            </select>
                         </div>
                     </div>
-                    <div class="stat-card glass">
-                        <div class="stat-icon" style="background: linear-gradient(135deg, #f59e0b, #d97706);">
-                            &#128680;
-                        </div>
-                        <div class="stat-content">
-                            <span class="stat-value" id="alert-count">0</span>
-                            <span class="stat-label">Active Alerts</span>
-                        </div>
-                    </div>
-                    <div class="stat-card glass">
-                        <div class="stat-icon" style="background: linear-gradient(135deg, #ec4899, #db2777);">
-                            &#128337;
-                        </div>
-                        <div class="stat-content">
-                            <span class="stat-value" id="uptime">0h</span>
-                            <span class="stat-label">Uptime</span>
-                        </div>
+                    <div class="toolbar-actions">
+                        <button class="btn btn-secondary btn-sm" onclick="toggleEditMode()" id="edit-mode-btn">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                            </svg>
+                            Edit Layout
+                        </button>
+                        <button class="btn btn-secondary btn-sm" onclick="resetLayout()">
+                            Reset
+                        </button>
                     </div>
                 </div>
 
-                <!-- Channel Groups Section -->
-                <section class="section-header">
-                    <h3>Channel Groups</h3>
-                    <div class="help-tip" title="Channel groups combine multiple data channels for multivariate anomaly detection. Each group learns patterns from all its channels together.">
-                        ?
-                    </div>
-                </section>
-
-                <div id="groups-container" class="groups-grid">
+                <!-- Dashboard Grid -->
+                <div class="dashboard-grid" id="dashboard-grid">
                     {% if groups %}
                         {% for group in groups %}
-                        <div class="group-card glass" data-group="{{ group.name }}">
-                            <div class="group-header">
-                                <div class="group-title">
-                                    <div class="group-color" style="background: {{ group.color }};"></div>
-                                    <h4>{{ group.name }}</h4>
+                        <div class="grid-panel panel-2x2" data-group="{{ group.name }}" data-size="2x2">
+                            <div class="panel-header">
+                                <div class="panel-title">
+                                    <span class="color-dot" style="background: {{ group.color }};"></span>
+                                    {{ group.name }}
+                                    <span class="status-badge {{ group.status }}" style="font-size: 10px; padding: 2px 6px;">
+                                        {{ group.status }}
+                                    </span>
                                 </div>
-                                <div class="group-status {{ group.status }}">
-                                    {{ group.status }}
+                                <div class="panel-actions">
+                                    <button class="panel-action-btn" onclick="togglePanelFullscreen('{{ group.name }}')" title="Fullscreen">
+                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                            <polyline points="15 3 21 3 21 9"></polyline>
+                                            <polyline points="9 21 3 21 3 15"></polyline>
+                                            <line x1="21" y1="3" x2="14" y2="10"></line>
+                                            <line x1="3" y1="21" x2="10" y2="14"></line>
+                                        </svg>
+                                    </button>
+                                    <button class="panel-action-btn" onclick="showGroupDetails('{{ group.name }}')" title="Details">
+                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                            <circle cx="12" cy="12" r="10"></circle>
+                                            <line x1="12" y1="16" x2="12" y2="12"></line>
+                                            <line x1="12" y1="8" x2="12.01" y2="8"></line>
+                                        </svg>
+                                    </button>
+                                    <button class="panel-action-btn" onclick="startTraining('{{ group.name }}', {{ group.trained_states }})" title="Train">
+                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                            <polygon points="5 3 19 12 5 21 5 3"></polygon>
+                                        </svg>
+                                    </button>
+                                </div>
+                                <div class="size-selector" id="size-{{ group.name }}">
+                                    <div class="size-grid">
+                                        <div class="size-cell" onclick="setPanelSize('{{ group.name }}', '1x1')"></div>
+                                        <div class="size-cell" onclick="setPanelSize('{{ group.name }}', '2x1')"></div>
+                                        <div class="size-cell" onclick="setPanelSize('{{ group.name }}', '3x1')"></div>
+                                        <div class="size-cell" onclick="setPanelSize('{{ group.name }}', '4x1')"></div>
+                                        <div class="size-cell" onclick="setPanelSize('{{ group.name }}', '1x2')"></div>
+                                        <div class="size-cell selected" onclick="setPanelSize('{{ group.name }}', '2x2')"></div>
+                                        <div class="size-cell" onclick="setPanelSize('{{ group.name }}', '3x2')"></div>
+                                        <div class="size-cell" onclick="setPanelSize('{{ group.name }}', '4x2')"></div>
+                                    </div>
                                 </div>
                             </div>
-                            <div class="group-chart">
-                                <canvas id="chart-{{ group.name }}"></canvas>
-                            </div>
-                            <div class="group-stats">
-                                <div class="stat-row">
-                                    <span>Channels:</span>
-                                    <span>{{ group.channels|length }}</span>
+                            <div class="panel-content">
+                                <div class="panel-chart">
+                                    <canvas id="chart-{{ group.name }}"></canvas>
                                 </div>
-                                <div class="stat-row">
-                                    <span>Trained States:</span>
-                                    <span>{{ group.trained_states }}</span>
+                                <div class="match-gauge">
+                                    <div class="gauge-bar">
+                                        <div class="gauge-fill" id="gauge-{{ group.name }}" style="width: 0%; background: var(--accent-secondary);"></div>
+                                    </div>
+                                    <div class="gauge-value" id="score-{{ group.name }}">--</div>
                                 </div>
-                                <div class="stat-row">
-                                    <span>Match Strength:</span>
-                                    <span class="match-strength">--</span>
+                                <div class="threshold-legend">
+                                    <span class="threshold-item warning"><span class="line"></span> Warning 70%</span>
+                                    <span class="threshold-item danger"><span class="line"></span> Anomaly 40%</span>
+                                </div>
+                                <div class="channel-data" id="channels-{{ group.name }}">
+                                    {% for channel in group.channels %}
+                                    <div class="channel-row">
+                                        <span class="channel-name">{{ channel }}</span>
+                                        <span class="channel-value" id="val-{{ group.name }}-{{ loop.index0 }}">--</span>
+                                    </div>
+                                    {% endfor %}
                                 </div>
                             </div>
-                            <div class="group-controls">
-                                {% if group.status == 'idle' or group.status == 'monitoring' %}
-                                <button class="btn btn-primary btn-sm" onclick="startTraining('{{ group.name }}')">
-                                    Start Training
-                                </button>
-                                {% else %}
-                                <button class="btn btn-secondary btn-sm" onclick="stopTraining('{{ group.name }}')">
-                                    Stop Training
-                                </button>
-                                {% endif %}
-                                <button class="btn btn-ghost btn-sm" onclick="toggleGroupDetails('{{ group.name }}')">
-                                    Details
-                                </button>
-                            </div>
+                            <div class="resize-handle"></div>
                         </div>
                         {% endfor %}
                     {% else %}
-                        <div class="empty-state glass">
-                            <div class="empty-icon">&#128202;</div>
-                            <h4>No Channel Groups</h4>
-                            <p>Create your first channel group to start monitoring</p>
-                            <a href="/setup" class="btn btn-primary">Setup Wizard</a>
+                        <div class="grid-panel panel-4x2" style="display: flex; align-items: center; justify-content: center;">
+                            <div class="empty-state">
+                                <div class="empty-icon">
+                                    <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" opacity="0.5">
+                                        <path d="M12 2L2 7l10 5 10-5-10-5z"></path>
+                                        <path d="M2 17l10 5 10-5"></path>
+                                        <path d="M2 12l10 5 10-5"></path>
+                                    </svg>
+                                </div>
+                                <h4>No Channel Groups</h4>
+                                <p>Create your first channel group to start monitoring</p>
+                                <a href="/setup" class="btn btn-primary">Setup Wizard</a>
+                            </div>
                         </div>
                     {% endif %}
                 </div>
 
-                <!-- Data Sources Section -->
-                <section class="section-header">
-                    <h3>Data Sources</h3>
+                <!-- Data Sources Status -->
+                <section class="data-section" style="margin-top: 24px;">
+                    <div class="section-header">
+                        <h2>Data Sources</h2>
+                        <span class="section-count">{{ sources|length }}</span>
+                    </div>
+                    <div class="sources-status-grid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 12px;">
+                        {% if sources %}
+                            {% for source in sources %}
+                            <div class="source-status connected" data-source="{{ source.name }}">
+                                <span class="status-dot connected"></span>
+                                <span>{{ source.name }}</span>
+                                <span class="type-badge {{ source.type }}" style="margin-left: auto;">{{ source.type|upper }}</span>
+                            </div>
+                            {% endfor %}
+                        {% else %}
+                            <div class="source-status">
+                                <span>No data sources configured</span>
+                            </div>
+                        {% endif %}
+                    </div>
                 </section>
-
-                <div id="sources-container" class="sources-list">
-                    {% if sources %}
-                        {% for source in sources %}
-                        <div class="source-item glass" data-source="{{ source.name }}">
-                            <div class="source-icon {{ source.type }}"></div>
-                            <div class="source-info">
-                                <span class="source-name">{{ source.name }}</span>
-                                <span class="source-details">{{ source.type }} | {{ source.url or source.mqtt_topic or 'Configured' }}</span>
-                            </div>
-                            <div class="source-status connected">
-                                <span class="status-dot"></span>
-                                {{ source.status }}
-                            </div>
-                            <button class="btn btn-ghost btn-icon" onclick="removeSource('{{ source.name }}')">
-                                &#10005;
-                            </button>
-                        </div>
-                        {% endfor %}
-                    {% else %}
-                        <div class="empty-state glass small">
-                            <p>No data sources configured</p>
-                            <a href="/setup" class="btn btn-secondary btn-sm">Add Source</a>
-                        </div>
-                    {% endif %}
-                </div>
             </div>
         </main>
     </div>
 
+    <!-- Toast Container -->
+    <div class="toast-container" id="toast-container"></div>
+
+    <!-- Fullscreen Exit Button -->
+    <button class="fullscreen-exit-btn" id="fullscreen-exit-btn" onclick="exitFullscreen()">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M8 3v3a2 2 0 0 1-2 2H3"></path>
+            <path d="M21 8h-3a2 2 0 0 1-2-2V3"></path>
+            <path d="M3 16h3a2 2 0 0 1 2 2v3"></path>
+            <path d="M16 21v-3a2 2 0 0 1 2-2h3"></path>
+        </svg>
+        Exit Fullscreen (Esc)
+    </button>
+
     <!-- Training Modal -->
     <div id="training-modal" class="modal" style="display: none;">
-        <div class="modal-content glass">
-            <h3>Start Training</h3>
-            <p>Select training duration for learning normal patterns:</p>
+        <div class="modal-content">
+            <h3 id="training-modal-title">Start Training</h3>
+            <p id="training-modal-desc">Select training duration for learning normal patterns:</p>
             <div class="form-group">
-                <label>Duration (seconds)</label>
+                <label>Duration</label>
                 <select id="training-duration" class="form-select">
                     <option value="30">30 seconds</option>
                     <option value="60" selected>1 minute</option>
@@ -219,144 +848,432 @@
                     <option value="300">5 minutes</option>
                     <option value="600">10 minutes</option>
                 </select>
-                <div class="form-hint">
-                    Training should capture at least one full operating cycle
-                </div>
             </div>
             <div class="modal-actions">
                 <button class="btn btn-secondary" onclick="closeModal()">Cancel</button>
-                <button class="btn btn-primary" onclick="confirmTraining()">Start</button>
+                <button class="btn btn-primary" id="confirm-training-btn" onclick="confirmTraining()">Start</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Details Modal -->
+    <div id="details-modal" class="modal" style="display: none;">
+        <div class="modal-content" style="max-width: 600px;">
+            <h3 id="details-modal-title">Group Details</h3>
+            <div id="details-content"></div>
+            <div class="modal-actions">
+                <button class="btn btn-secondary" onclick="closeDetailsModal()">Close</button>
             </div>
         </div>
     </div>
 
     <script>
-        // WebSocket connection
+        // State
         let ws;
         let charts = {};
+        let editMode = false;
         let currentTrainingGroup = null;
+        let isRetraining = false;
+        let lastDataUpdate = {};
+        let updateCount = 0;
+        let wsConnected = false;
+        let fallbackSimulationInterval = null;
+        let timeRangeSeconds = 300;  // Default 5 minutes
+        let refreshIntervalMs = 2000;  // Default 2 seconds
 
+        // Time Range Control
+        function setTimeRange(seconds) {
+            timeRangeSeconds = parseInt(seconds);
+            // Adjust chart data length based on time range
+            const maxPoints = Math.floor(timeRangeSeconds / (refreshIntervalMs / 1000));
+            Object.keys(charts).forEach(groupName => {
+                const chart = charts[groupName];
+                if (chart) {
+                    // Trim data if needed
+                    while (chart.data.labels.length > maxPoints) {
+                        chart.data.labels.shift();
+                        chart.data.datasets[0].data.shift();
+                    }
+                    chart.update('none');
+                }
+            });
+            console.log(`Time range set to ${seconds}s, max points: ${maxPoints}`);
+        }
+
+        // Refresh Interval Control
+        function setRefreshInterval(ms) {
+            refreshIntervalMs = parseInt(ms);
+            stopFallbackSimulation();
+            if (refreshIntervalMs > 0 && !wsConnected) {
+                startFallbackSimulation();
+            }
+            console.log(`Refresh interval set to ${ms}ms`);
+        }
+
+        // WebSocket connection
         function connectWebSocket() {
             const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
             ws = new WebSocket(`${protocol}//${window.location.host}/ws`);
 
             ws.onopen = () => {
                 console.log('WebSocket connected');
+                wsConnected = true;
                 updateConnectionStatus(true);
+                stopFallbackSimulation();
+                // Subscribe to all groups
+                document.querySelectorAll('.grid-panel[data-group]').forEach(panel => {
+                    ws.send(JSON.stringify({ type: 'subscribe', group: panel.dataset.group }));
+                });
             };
 
             ws.onclose = () => {
                 console.log('WebSocket disconnected');
+                wsConnected = false;
                 updateConnectionStatus(false);
-                // Reconnect after 3 seconds
+                startFallbackSimulation();
                 setTimeout(connectWebSocket, 3000);
             };
 
+            ws.onerror = (error) => {
+                console.error('WebSocket error:', error);
+            };
+
             ws.onmessage = (event) => {
-                const message = JSON.parse(event.data);
-                handleWebSocketMessage(message);
+                try {
+                    const message = JSON.parse(event.data);
+                    handleWebSocketMessage(message);
+                } catch (e) {
+                    console.error('Error parsing message:', e);
+                }
             };
         }
 
         function handleWebSocketMessage(message) {
             switch (message.type) {
                 case 'data_update':
-                    updateChart(message.data.group, message.data);
+                    updateGroupData(message.data);
                     break;
                 case 'training_started':
                     updateGroupStatus(message.data.group, 'training');
                     break;
                 case 'training_stopped':
+                case 'training_complete':
                     updateGroupStatus(message.data.group, 'monitoring');
                     break;
                 case 'anomaly_detected':
                     showAnomalyAlert(message.data);
                     break;
+                case 'pong':
+                    // Keep-alive response
+                    break;
             }
         }
 
+        function updateGroupData(data) {
+            const group = data.group;
+            const confidence = data.confidence || data.match_score || 0;
+            const channelValues = data.channel_values || data.values || {};
+
+            // Update chart
+            const chart = charts[group];
+            if (chart) {
+                chart.data.labels.push('');
+                chart.data.datasets[0].data.push(confidence);
+
+                // Limit data points based on time range
+                const maxPoints = Math.max(30, Math.floor(timeRangeSeconds / (refreshIntervalMs / 1000)));
+                while (chart.data.labels.length > maxPoints) {
+                    chart.data.labels.shift();
+                    chart.data.datasets[0].data.shift();
+                }
+                chart.update('none');
+            }
+
+            // Update match score gauge
+            const gauge = document.getElementById(`gauge-${group}`);
+            const score = document.getElementById(`score-${group}`);
+            if (gauge && score) {
+                gauge.style.width = `${confidence}%`;
+                gauge.style.background = confidence > 70 ? 'var(--accent-secondary)' :
+                                        confidence > 40 ? 'var(--accent-warning)' : 'var(--accent-danger)';
+                score.textContent = confidence.toFixed(0) + '%';
+                score.style.color = confidence > 70 ? 'var(--accent-secondary)' :
+                                   confidence > 40 ? 'var(--accent-warning)' : 'var(--accent-danger)';
+            }
+
+            // Update channel values - match by channel name, not index
+            const channelContainer = document.getElementById(`channels-${group}`);
+            if (channelContainer) {
+                const channelRows = channelContainer.querySelectorAll('.channel-row');
+                channelRows.forEach((row, index) => {
+                    const nameEl = row.querySelector('.channel-name');
+                    const valEl = row.querySelector('.channel-value');
+                    if (nameEl && valEl) {
+                        const channelName = nameEl.textContent.trim();
+                        const value = channelValues[channelName];
+                        if (value !== undefined) {
+                            const newText = typeof value === 'number' ? value.toFixed(4) : value;
+                            if (valEl.textContent !== newText) {
+                                valEl.textContent = newText;
+                                // Trigger update animation
+                                valEl.classList.remove('updated');
+                                void valEl.offsetWidth; // Force reflow
+                                valEl.classList.add('updated');
+                            }
+                        }
+                    }
+                });
+            }
+
+            // Track update rate
+            lastDataUpdate[group] = Date.now();
+            updateCount++;
+        }
+
         function updateConnectionStatus(connected) {
-            const statusDot = document.querySelector('.status-dot');
-            const statusText = statusDot.nextElementSibling;
+            const statusDot = document.getElementById('ws-status');
+            const statusText = document.getElementById('ws-status-text');
             if (connected) {
                 statusDot.classList.add('connected');
-                statusDot.classList.remove('disconnected');
                 statusText.textContent = 'Connected';
             } else {
                 statusDot.classList.remove('connected');
-                statusDot.classList.add('disconnected');
                 statusText.textContent = 'Reconnecting...';
             }
         }
 
+        // Initialize charts with gradient fill and threshold lines
         function initCharts() {
-            const chartContainers = document.querySelectorAll('.group-chart canvas');
-            chartContainers.forEach(canvas => {
+            // Threshold annotation plugin
+            const thresholdPlugin = {
+                id: 'thresholdLines',
+                beforeDraw: (chart) => {
+                    const ctx = chart.ctx;
+                    const yAxis = chart.scales.y;
+                    const xAxis = chart.scales.x;
+
+                    // Warning threshold at 70%
+                    const warningY = yAxis.getPixelForValue(70);
+                    ctx.save();
+                    ctx.beginPath();
+                    ctx.strokeStyle = 'rgba(255, 193, 7, 0.4)';
+                    ctx.setLineDash([5, 5]);
+                    ctx.lineWidth = 1;
+                    ctx.moveTo(xAxis.left, warningY);
+                    ctx.lineTo(xAxis.right, warningY);
+                    ctx.stroke();
+
+                    // Danger threshold at 40%
+                    const dangerY = yAxis.getPixelForValue(40);
+                    ctx.beginPath();
+                    ctx.strokeStyle = 'rgba(255, 82, 82, 0.4)';
+                    ctx.moveTo(xAxis.left, dangerY);
+                    ctx.lineTo(xAxis.right, dangerY);
+                    ctx.stroke();
+
+                    ctx.restore();
+                }
+            };
+
+            document.querySelectorAll('.panel-chart canvas').forEach(canvas => {
                 const groupName = canvas.id.replace('chart-', '');
-                charts[groupName] = new Chart(canvas.getContext('2d'), {
+                const ctx = canvas.getContext('2d');
+
+                // Create gradient
+                const gradient = ctx.createLinearGradient(0, 0, 0, 200);
+                gradient.addColorStop(0, 'rgba(123, 97, 255, 0.3)');
+                gradient.addColorStop(0.5, 'rgba(123, 97, 255, 0.1)');
+                gradient.addColorStop(1, 'rgba(123, 97, 255, 0)');
+
+                charts[groupName] = new Chart(ctx, {
                     type: 'line',
+                    plugins: [thresholdPlugin],
                     data: {
                         labels: [],
                         datasets: [{
-                            label: 'Match Strength',
+                            label: 'Match Score',
                             data: [],
-                            borderColor: '#6366f1',
-                            backgroundColor: 'rgba(99, 102, 241, 0.1)',
+                            borderColor: '#7b61ff',
+                            backgroundColor: gradient,
                             fill: true,
-                            tension: 0.4
+                            tension: 0.3,
+                            pointRadius: 0,
+                            pointHoverRadius: 4,
+                            pointHoverBackgroundColor: '#7b61ff',
+                            pointHoverBorderColor: '#fff',
+                            pointHoverBorderWidth: 2,
+                            borderWidth: 2
                         }]
                     },
                     options: {
                         responsive: true,
                         maintainAspectRatio: false,
+                        animation: false,
+                        interaction: {
+                            mode: 'index',
+                            intersect: false
+                        },
                         plugins: {
-                            legend: { display: false }
+                            legend: { display: false },
+                            tooltip: {
+                                enabled: true,
+                                backgroundColor: 'rgba(19, 23, 34, 0.95)',
+                                titleColor: '#e8eaed',
+                                bodyColor: '#9aa0a6',
+                                borderColor: '#2a2e39',
+                                borderWidth: 1,
+                                padding: 10,
+                                displayColors: false,
+                                callbacks: {
+                                    title: () => 'Match Score',
+                                    label: (context) => {
+                                        const value = context.parsed.y;
+                                        let status = 'Normal';
+                                        if (value < 40) status = 'Anomaly';
+                                        else if (value < 70) status = 'Warning';
+                                        return `${value.toFixed(1)}% - ${status}`;
+                                    }
+                                }
+                            }
                         },
                         scales: {
-                            x: { display: false },
+                            x: {
+                                display: false
+                            },
                             y: {
                                 min: 0,
                                 max: 100,
-                                grid: { color: 'rgba(255,255,255,0.1)' },
-                                ticks: { color: 'rgba(255,255,255,0.5)' }
+                                grid: {
+                                    color: 'rgba(255,255,255,0.03)',
+                                    drawBorder: false
+                                },
+                                ticks: {
+                                    color: 'rgba(255,255,255,0.3)',
+                                    font: { size: 10 },
+                                    callback: (v) => v + '%',
+                                    stepSize: 25
+                                }
                             }
                         }
                     }
                 });
+
+                // Initialize with demo data
+                for (let i = 0; i < 30; i++) {
+                    charts[groupName].data.labels.push('');
+                    charts[groupName].data.datasets[0].data.push(70 + Math.random() * 25);
+                }
+                charts[groupName].update('none');
             });
         }
 
-        function updateChart(groupName, data) {
-            const chart = charts[groupName];
-            if (!chart) return;
+        // Panel resizing
+        function resizePanel(btn) {
+            const panel = btn.closest('.grid-panel');
+            const groupName = panel.dataset.group;
+            const selector = document.getElementById(`size-${groupName}`);
+            selector.classList.toggle('visible');
+        }
 
-            const now = new Date().toLocaleTimeString();
-            chart.data.labels.push(now);
-            chart.data.datasets[0].data.push(data.confidence);
+        function setPanelSize(groupName, size) {
+            const panel = document.querySelector(`[data-group="${groupName}"]`);
+            if (panel) {
+                // Remove old size class
+                panel.className = panel.className.replace(/panel-\dx\d/g, '');
+                panel.classList.add(`panel-${size}`);
+                panel.dataset.size = size;
 
-            // Keep only last 50 points
-            if (chart.data.labels.length > 50) {
-                chart.data.labels.shift();
-                chart.data.datasets[0].data.shift();
-            }
+                // Hide selector
+                document.getElementById(`size-${groupName}`).classList.remove('visible');
 
-            chart.update('none');
+                // Save layout
+                saveLayout();
 
-            // Update match strength display
-            const card = document.querySelector(`[data-group="${groupName}"]`);
-            if (card) {
-                card.querySelector('.match-strength').textContent = `${data.confidence.toFixed(1)}%`;
+                // Resize chart
+                setTimeout(() => {
+                    if (charts[groupName]) {
+                        charts[groupName].resize();
+                    }
+                }, 100);
             }
         }
 
-        function startTraining(groupName) {
+        // Edit mode
+        function toggleEditMode() {
+            editMode = !editMode;
+            const grid = document.getElementById('dashboard-grid');
+            const btn = document.getElementById('edit-mode-btn');
+
+            grid.classList.toggle('edit-mode', editMode);
+            btn.innerHTML = editMode ?
+                '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg> Done' :
+                '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg> Edit Layout';
+
+            if (!editMode) {
+                saveLayout();
+            }
+        }
+
+        // Layout persistence
+        function saveLayout() {
+            const layout = {};
+            document.querySelectorAll('.grid-panel[data-group]').forEach(panel => {
+                layout[panel.dataset.group] = {
+                    size: panel.dataset.size,
+                    order: Array.from(panel.parentElement.children).indexOf(panel)
+                };
+            });
+            localStorage.setItem('dashboardLayout', JSON.stringify(layout));
+        }
+
+        function loadLayout() {
+            const saved = localStorage.getItem('dashboardLayout');
+            if (saved) {
+                try {
+                    const layout = JSON.parse(saved);
+                    Object.keys(layout).forEach(groupName => {
+                        const panel = document.querySelector(`[data-group="${groupName}"]`);
+                        if (panel && layout[groupName].size) {
+                            panel.className = panel.className.replace(/panel-\dx\d/g, '');
+                            panel.classList.add(`panel-${layout[groupName].size}`);
+                            panel.dataset.size = layout[groupName].size;
+                        }
+                    });
+                } catch (e) {
+                    console.error('Error loading layout:', e);
+                }
+            }
+        }
+
+        function resetLayout() {
+            localStorage.removeItem('dashboardLayout');
+            location.reload();
+        }
+
+        // Training
+        function startTraining(groupName, trainedStates) {
             currentTrainingGroup = groupName;
+            isRetraining = trainedStates > 0;
+
+            const title = document.getElementById('training-modal-title');
+            const desc = document.getElementById('training-modal-desc');
+            const btn = document.getElementById('confirm-training-btn');
+
+            if (isRetraining) {
+                title.textContent = 'Re-Train Model?';
+                desc.innerHTML = '<strong style="color: var(--accent-warning);">Warning:</strong> This will replace the existing model.';
+                btn.textContent = 'Re-Train';
+            } else {
+                title.textContent = 'Start Training';
+                desc.textContent = 'Select training duration:';
+                btn.textContent = 'Start';
+            }
+
             document.getElementById('training-modal').style.display = 'flex';
         }
 
         function closeModal() {
             document.getElementById('training-modal').style.display = 'none';
-            currentTrainingGroup = null;
         }
 
         function confirmTraining() {
@@ -364,52 +1281,252 @@
             fetch('/api/training/start', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ group_name: currentTrainingGroup, duration: duration })
-            }).then(response => response.json())
-              .then(data => {
-                  console.log('Training started:', data);
-                  closeModal();
-              });
-        }
-
-        function stopTraining(groupName) {
-            fetch(`/api/training/stop/${groupName}`, { method: 'POST' })
-                .then(response => response.json())
-                .then(data => console.log('Training stopped:', data));
+                body: JSON.stringify({ group_name: currentTrainingGroup, duration })
+            }).then(() => {
+                closeModal();
+                updateGroupStatus(currentTrainingGroup, 'training');
+            });
         }
 
         function updateGroupStatus(groupName, status) {
-            const card = document.querySelector(`[data-group="${groupName}"]`);
-            if (card) {
-                const statusEl = card.querySelector('.group-status');
-                statusEl.className = `group-status ${status}`;
-                statusEl.textContent = status;
+            const panel = document.querySelector(`[data-group="${groupName}"]`);
+            if (panel) {
+                const badge = panel.querySelector('.status-badge');
+                if (badge) {
+                    badge.className = `status-badge ${status}`;
+                    badge.textContent = status;
+                    badge.style.fontSize = '10px';
+                    badge.style.padding = '2px 6px';
+                }
             }
         }
 
+        // Details
+        function showGroupDetails(groupName) {
+            document.getElementById('details-modal-title').textContent = groupName + ' - Details';
+
+            fetch('/api/groups')
+                .then(res => res.json())
+                .then(groups => {
+                    const group = groups.find(g => g.name === groupName);
+                    if (group) {
+                        document.getElementById('details-content').innerHTML = `
+                            <div class="config-grid" style="margin-top: 16px;">
+                                <div class="config-card">
+                                    <h4 style="margin-bottom: 8px;">Channels</h4>
+                                    <div style="display: flex; flex-wrap: wrap; gap: 8px;">
+                                        ${(group.channels || []).map(ch => `<span class="badge">${ch}</span>`).join('')}
+                                    </div>
+                                </div>
+                                <div class="config-card">
+                                    <h4 style="margin-bottom: 8px;">Status</h4>
+                                    <div class="group-stats">
+                                        <div class="stat-row"><span>Status:</span><span>${group.status}</span></div>
+                                        <div class="stat-row"><span>Preprocessing:</span><span>${group.preprocessing || 'basic'}</span></div>
+                                        <div class="stat-row"><span>Trained States:</span><span>${group.trained_states || 0}</span></div>
+                                    </div>
+                                </div>
+                            </div>
+                        `;
+                    }
+                });
+
+            document.getElementById('details-modal').style.display = 'flex';
+        }
+
+        function closeDetailsModal() {
+            document.getElementById('details-modal').style.display = 'none';
+        }
+
+        // Utilities
         function downloadCSVTemplate() {
             window.location.href = '/api/csv-template';
         }
 
-        function removeSource(name) {
-            if (confirm(`Remove data source "${name}"?`)) {
-                fetch(`/api/sources/${encodeURIComponent(name)}`, { method: 'DELETE' })
-                    .then(() => {
-                        const item = document.querySelector(`[data-source="${name}"]`);
-                        if (item) item.remove();
-                    });
+        // Toast Notification System
+        function showToast(title, message, type = 'info', duration = 5000) {
+            const container = document.getElementById('toast-container');
+            const toast = document.createElement('div');
+            toast.className = `toast ${type}`;
+
+            const iconSvg = {
+                anomaly: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>',
+                warning: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>',
+                success: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>',
+                info: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>'
+            };
+
+            toast.innerHTML = `
+                <div class="toast-icon">${iconSvg[type] || iconSvg.info}</div>
+                <div class="toast-content">
+                    <div class="toast-title">${title}</div>
+                    <div class="toast-message">${message}</div>
+                </div>
+                <button class="toast-close" onclick="dismissToast(this.parentElement)">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="18" y1="6" x2="6" y2="18"></line>
+                        <line x1="6" y1="6" x2="18" y2="18"></line>
+                    </svg>
+                </button>
+            `;
+
+            container.appendChild(toast);
+
+            if (duration > 0) {
+                setTimeout(() => dismissToast(toast), duration);
+            }
+
+            return toast;
+        }
+
+        function dismissToast(toast) {
+            if (!toast || toast.classList.contains('hiding')) return;
+            toast.classList.add('hiding');
+            setTimeout(() => toast.remove(), 300);
+        }
+
+        function showAnomalyAlert(data) {
+            const group = data.group || 'Unknown';
+            const score = data.anomaly_score ? (data.anomaly_score * 100).toFixed(1) : '--';
+            const contributors = data.top_contributors || [];
+
+            let message = `Anomaly score: ${score}%`;
+            if (contributors.length > 0) {
+                message += `. Top contributor: ${contributors[0]}`;
+            }
+
+            showToast(`Anomaly Detected - ${group}`, message, 'anomaly', 8000);
+
+            // Also update the panel visually
+            const panel = document.querySelector(`[data-group="${group}"]`);
+            if (panel) {
+                panel.style.borderColor = 'var(--accent-danger)';
+                setTimeout(() => {
+                    panel.style.borderColor = '';
+                }, 3000);
             }
         }
 
-        function toggleGroupDetails(groupName) {
-            // Toggle details panel
-            console.log('Toggle details for:', groupName);
+        // Fullscreen controls
+        let fullscreenPanel = null;
+
+        function togglePanelFullscreen(groupName) {
+            const panel = document.querySelector(`[data-group="${groupName}"]`);
+            if (!panel) return;
+
+            if (panel.classList.contains('fullscreen')) {
+                exitFullscreen();
+            } else {
+                enterFullscreen(panel);
+            }
         }
 
-        // Initialize on load
+        function enterFullscreen(panel) {
+            fullscreenPanel = panel;
+            panel.classList.add('fullscreen');
+            document.getElementById('fullscreen-exit-btn').classList.add('visible');
+            document.body.style.overflow = 'hidden';
+
+            // Resize chart
+            const groupName = panel.dataset.group;
+            if (charts[groupName]) {
+                setTimeout(() => charts[groupName].resize(), 100);
+            }
+        }
+
+        function exitFullscreen() {
+            if (fullscreenPanel) {
+                fullscreenPanel.classList.remove('fullscreen');
+                const groupName = fullscreenPanel.dataset.group;
+                if (charts[groupName]) {
+                    setTimeout(() => charts[groupName].resize(), 100);
+                }
+                fullscreenPanel = null;
+            }
+            document.getElementById('fullscreen-exit-btn').classList.remove('visible');
+            document.body.style.overflow = '';
+        }
+
+        // Keyboard shortcuts
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' && fullscreenPanel) {
+                exitFullscreen();
+            }
+        });
+
+        // Update rate display
+        function updateRateDisplay() {
+            const rate = document.getElementById('update-rate');
+            if (updateCount > 0) {
+                rate.textContent = `${updateCount} updates/5s`;
+            }
+            updateCount = 0;
+        }
+
+        // Simulate data for demo (fallback when WebSocket disconnected)
+        function simulateData() {
+            document.querySelectorAll('.grid-panel[data-group]').forEach(panel => {
+                const groupName = panel.dataset.group;
+                const confidence = 60 + Math.random() * 35;
+
+                // Simulate channel values
+                const channelRows = panel.querySelectorAll('.channel-row');
+                const channelValues = {};
+                channelRows.forEach((row, i) => {
+                    const name = row.querySelector('.channel-name').textContent;
+                    channelValues[name] = (Math.random() * 2 - 1).toFixed(4);
+                });
+
+                updateGroupData({
+                    group: groupName,
+                    confidence: confidence,
+                    channel_values: channelValues
+                });
+            });
+        }
+
+        function startFallbackSimulation() {
+            if (!fallbackSimulationInterval && refreshIntervalMs > 0) {
+                console.log(`Starting fallback simulation at ${refreshIntervalMs}ms interval`);
+                fallbackSimulationInterval = setInterval(simulateData, refreshIntervalMs);
+            }
+        }
+
+        function stopFallbackSimulation() {
+            if (fallbackSimulationInterval) {
+                console.log('Stopping fallback simulation');
+                clearInterval(fallbackSimulationInterval);
+                fallbackSimulationInterval = null;
+            }
+        }
+
+        // Initialize
         document.addEventListener('DOMContentLoaded', () => {
-            connectWebSocket();
+            loadLayout();
             initCharts();
+            connectWebSocket();
+
+            // Update rate display
+            setInterval(updateRateDisplay, 5000);
+
+            // Start fallback simulation initially (will be stopped when WS connects)
+            startFallbackSimulation();
+
+            // Close modals on outside click
+            document.querySelectorAll('.modal').forEach(modal => {
+                modal.addEventListener('click', (e) => {
+                    if (e.target === modal) {
+                        modal.style.display = 'none';
+                    }
+                });
+            });
+
+            // Close size selectors on outside click
+            document.addEventListener('click', (e) => {
+                if (!e.target.closest('.panel-action-btn') && !e.target.closest('.size-selector')) {
+                    document.querySelectorAll('.size-selector').forEach(s => s.classList.remove('visible'));
+                }
+            });
         });
     </script>
 </body>
