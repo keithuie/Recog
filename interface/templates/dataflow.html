@@ -253,24 +253,6 @@
     </div>
 
     <script>
-        // Load data on page init
-        async function loadData() {
-            try {
-                const [sourcesRes, groupsRes] = await Promise.all([
-                    fetch('/api/sources'),
-                    fetch('/api/groups')
-                ]);
-
-                const sources = await sourcesRes.json();
-                const groups = await groupsRes.json();
-
-                updatePipelineCounts(sources, groups);
-                updateGroupsTable(groups);
-            } catch (error) {
-                console.error('Failed to load data:', error);
-            }
-        }
-
         function updatePipelineCounts(sources, groups) {
             document.getElementById('source-count').textContent = sources.length;
             document.getElementById('group-count').textContent = groups.length;
@@ -334,36 +316,115 @@
             `).join('');
         }
 
-        function testSource(name) {
-            console.log('Testing source:', name);
-            // Implement source test
+        // Store sources data for edit
+        let sourcesData = [];
+        let groupsData = [];
+
+        async function testSource(name) {
+            const source = sourcesData.find(s => s.name === name);
+            if (!source || !source.url) {
+                alert('Cannot test: Source has no URL');
+                return;
+            }
+
+            // Update UI to show testing
+            const row = document.querySelector(`tr[data-source="${name}"]`);
+            const statusCell = row?.querySelector('.status-badge');
+            if (statusCell) {
+                statusCell.className = 'status-badge testing';
+                statusCell.innerHTML = '<span class="status-indicator"></span>Testing...';
+            }
+
+            try {
+                const response = await fetch('/api/test-connection', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ url: source.url })
+                });
+
+                const data = await response.json();
+
+                if (statusCell) {
+                    if (data.success) {
+                        statusCell.className = 'status-badge connected';
+                        statusCell.innerHTML = '<span class="status-indicator"></span>Connected';
+                        alert(`Connection successful! Detected ${data.channels?.length || 0} channels.`);
+                    } else {
+                        statusCell.className = 'status-badge error';
+                        statusCell.innerHTML = '<span class="status-indicator"></span>Error';
+                        alert(`Connection failed: ${data.error}`);
+                    }
+                }
+            } catch (e) {
+                if (statusCell) {
+                    statusCell.className = 'status-badge error';
+                    statusCell.innerHTML = '<span class="status-indicator"></span>Error';
+                }
+                alert(`Test failed: ${e.message}`);
+            }
         }
 
         function editSource(name) {
-            console.log('Edit source:', name);
-            // Implement source edit
+            const source = sourcesData.find(s => s.name === name);
+            if (!source) return;
+
+            // For now, redirect to setup wizard (full edit modal would be complex)
+            alert(`To edit "${name}", delete it and create a new source via Setup Wizard.`);
         }
 
         function deleteSource(name) {
-            if (confirm(`Delete data source "${name}"?`)) {
+            if (confirm(`Delete data source "${name}"?\n\nThis will also affect any channel groups using this source.`)) {
                 fetch(`/api/sources/${encodeURIComponent(name)}`, { method: 'DELETE' })
-                    .then(() => location.reload());
+                    .then(res => {
+                        if (res.ok) {
+                            location.reload();
+                        } else {
+                            alert('Failed to delete source');
+                        }
+                    });
             }
         }
 
         function editGroup(name) {
-            console.log('Edit group:', name);
-            // Implement group edit
+            const group = groupsData.find(g => g.name === name);
+            if (!group) return;
+
+            // For now, show info (full edit modal would be complex)
+            alert(`Group: ${name}\nChannels: ${group.channels?.join(', ')}\nPreprocessing: ${group.preprocessing}\n\nTo edit, delete and recreate via Setup Wizard.`);
         }
 
         function deleteGroup(name) {
-            if (confirm(`Delete channel group "${name}"?`)) {
+            if (confirm(`Delete channel group "${name}"?\n\nThis will stop monitoring for this group.`)) {
                 fetch(`/api/groups/${encodeURIComponent(name)}`, { method: 'DELETE' })
-                    .then(() => location.reload());
+                    .then(res => {
+                        if (res.ok) {
+                            location.reload();
+                        } else {
+                            alert('Failed to delete group');
+                        }
+                    });
             }
         }
 
-        document.addEventListener('DOMContentLoaded', loadData);
+        // Update loadData to store the data
+        async function loadDataAndStore() {
+            try {
+                const [sourcesRes, groupsRes] = await Promise.all([
+                    fetch('/api/sources'),
+                    fetch('/api/groups')
+                ]);
+
+                sourcesData = await sourcesRes.json();
+                groupsData = await groupsRes.json();
+
+                updatePipelineCounts(sourcesData, groupsData);
+                updateGroupsTable(groupsData);
+            } catch (error) {
+                console.error('Failed to load data:', error);
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', loadDataAndStore);
     </script>
 </body>
 </html>

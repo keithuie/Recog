@@ -82,6 +82,7 @@ class ChannelGroupConfig(BaseModel):
     color: str = "#007AFF"
     sample_rate: float = 1000
     preprocessing: str = "basic"  # basic, vibration, bearing
+    source: Optional[str] = None  # Link to data source name
 
 
 class ModelConfig(BaseModel):
@@ -180,6 +181,7 @@ async def add_channel_group(config: ChannelGroupConfig):
         "color": config.color,
         "sample_rate": config.sample_rate,
         "preprocessing": config.preprocessing,
+        "source": config.source,  # Link to data source
         "status": "idle",
         "trained_states": 0,
         "created_at": datetime.now().isoformat()
@@ -216,8 +218,33 @@ async def start_training(req: TrainingRequest):
         "duration": req.duration
     })
 
-    # In production, this would call the ML service
+    # Try to call ML service
+    try:
+        async with aiohttp.ClientSession() as session:
+            async with session.post(
+                f"http://{ML_CORE_HOST}:{ML_CORE_PORT}/api/training/start",
+                json={"group": req.group_name, "duration": req.duration},
+                timeout=aiohttp.ClientTimeout(total=5)
+            ) as response:
+                if response.status == 200:
+                    print(f"[Training] Started ML training for {req.group_name}")
+    except Exception as e:
+        print(f"[Training] ML service not available: {e}")
+
+    # Schedule training completion
+    asyncio.create_task(complete_training_after(req.group_name, req.duration))
+
     return {"status": "training_started", "group": req.group_name, "duration": req.duration}
+
+
+async def complete_training_after(group_name: str, duration: int):
+    """Complete training after specified duration."""
+    await asyncio.sleep(duration)
+    if group_name in channel_groups and channel_groups[group_name]["status"] == "training":
+        channel_groups[group_name]["status"] = "monitoring"
+        channel_groups[group_name]["trained_states"] = channel_groups[group_name].get("trained_states", 0) + 1
+        await broadcast_update("training_complete", {"group": group_name})
+        print(f"[Training] Completed for {group_name}")
 
 
 @app.post("/api/training/stop/{group_name}")
@@ -396,7 +423,13 @@ async def websocket_endpoint(websocket: WebSocket):
                 await websocket.send_json({"type": "pong"})
 
     except WebSocketDisconnect:
-        active_websockets.remove(websocket)
+        pass  # Normal disconnect
+    except Exception as e:
+        print(f"[WebSocket] Error: {e}")
+    finally:
+        # Always remove from active list
+        if websocket in active_websockets:
+            active_websockets.remove(websocket)
 
 
 async def broadcast_update(event_type: str, data: dict):
@@ -407,11 +440,13 @@ async def broadcast_update(event_type: str, data: dict):
     for ws in active_websockets:
         try:
             await ws.send_text(message)
-        except:
+        except Exception as e:
+            print(f"[Broadcast] Failed to send to client: {e}")
             disconnected.append(ws)
 
     for ws in disconnected:
-        active_websockets.remove(ws)
+        if ws in active_websockets:
+            active_websockets.remove(ws)
 
 
 # =============================================================================

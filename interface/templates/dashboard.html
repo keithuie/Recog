@@ -698,14 +698,22 @@
                                    confidence > 40 ? 'var(--accent-warning)' : 'var(--accent-danger)';
             }
 
-            // Update channel values
-            Object.keys(channelValues).forEach((channel, index) => {
-                const valEl = document.getElementById(`val-${group}-${index}`);
-                if (valEl) {
-                    const value = channelValues[channel];
-                    valEl.textContent = typeof value === 'number' ? value.toFixed(4) : value;
-                }
-            });
+            // Update channel values - match by channel name, not index
+            const channelContainer = document.getElementById(`channels-${group}`);
+            if (channelContainer) {
+                const channelRows = channelContainer.querySelectorAll('.channel-row');
+                channelRows.forEach((row, index) => {
+                    const nameEl = row.querySelector('.channel-name');
+                    const valEl = row.querySelector('.channel-value');
+                    if (nameEl && valEl) {
+                        const channelName = nameEl.textContent.trim();
+                        const value = channelValues[channelName];
+                        if (value !== undefined) {
+                            valEl.textContent = typeof value === 'number' ? value.toFixed(4) : value;
+                        }
+                    }
+                });
+            }
 
             // Track update rate
             lastDataUpdate[group] = Date.now();

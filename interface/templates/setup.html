@@ -685,26 +685,50 @@
             const sourceConfig = collectSourceConfig();
             const groupConfig = collectGroupConfig();
 
+            // Validation
+            if (!sourceConfig.name || sourceConfig.name === 'Data Source') {
+                alert('Please enter a name for the data source');
+                return;
+            }
+            if (!groupConfig.name || groupConfig.name === 'Channel Group') {
+                alert('Please enter a name for the channel group');
+                return;
+            }
+            if (groupConfig.channels.length === 0) {
+                alert('Please select at least one channel');
+                return;
+            }
+
             try {
                 // Add data source
-                await fetch('/api/sources', {
+                const sourceRes = await fetch('/api/sources', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(sourceConfig)
                 });
 
-                // Add channel group
-                await fetch('/api/groups', {
+                if (!sourceRes.ok) {
+                    const err = await sourceRes.json();
+                    throw new Error(err.detail || 'Failed to create data source');
+                }
+
+                // Add channel group (linked to source)
+                const groupRes = await fetch('/api/groups', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(groupConfig)
                 });
 
+                if (!groupRes.ok) {
+                    const err = await groupRes.json();
+                    throw new Error(err.detail || 'Failed to create channel group');
+                }
+
                 // Redirect to dashboard
                 window.location.href = '/';
             } catch (error) {
                 console.error('Setup failed:', error);
-                alert('Setup failed. Please try again.');
+                alert('Setup failed: ' + error.message);
             }
         }
 
@@ -731,12 +755,16 @@
             const channels = Array.from(document.querySelectorAll('.channel-item input:checked'))
                 .map(cb => cb.dataset.channel);
 
+            // Get source name to link group to source
+            const sourceName = document.getElementById(`${selectedSourceType}-name`)?.value || 'Data Source';
+
             return {
                 name: document.getElementById('group-name').value || 'Channel Group',
                 channels: channels,
                 color: selectedColor,
                 sample_rate: 1000, // Auto-detected
-                preprocessing: selectedPreprocessing
+                preprocessing: selectedPreprocessing,
+                source: sourceName  // Link group to data source
             };
         }
 
