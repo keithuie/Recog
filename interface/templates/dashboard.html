@@ -401,6 +401,180 @@
         .grid-panel.fullscreen .panel-content {
             height: calc(100vh - 60px);
         }
+
+        /* Fullscreen exit button */
+        .fullscreen-exit-btn {
+            position: fixed;
+            top: 16px;
+            right: 16px;
+            z-index: 10000;
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-primary);
+            color: var(--text-primary);
+            padding: 8px 16px;
+            border-radius: var(--radius-sm);
+            cursor: pointer;
+            display: none;
+            align-items: center;
+            gap: 8px;
+            font-size: 12px;
+            font-weight: 500;
+        }
+
+        .grid-panel.fullscreen ~ .fullscreen-exit-btn,
+        .fullscreen-exit-btn.visible {
+            display: flex;
+        }
+
+        .fullscreen-exit-btn:hover {
+            background: var(--bg-hover);
+            border-color: var(--accent-primary);
+        }
+
+        /* Toast notification system */
+        .toast-container {
+            position: fixed;
+            top: 80px;
+            right: 24px;
+            z-index: 9999;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            pointer-events: none;
+        }
+
+        .toast {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-primary);
+            border-left: 4px solid var(--accent-primary);
+            border-radius: var(--radius-md);
+            padding: 12px 16px;
+            min-width: 320px;
+            max-width: 400px;
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+            pointer-events: auto;
+            animation: slideIn 0.3s ease;
+            display: flex;
+            align-items: flex-start;
+            gap: 12px;
+        }
+
+        .toast.hiding {
+            animation: slideOut 0.3s ease forwards;
+        }
+
+        .toast.anomaly {
+            border-left-color: var(--accent-danger);
+        }
+
+        .toast.warning {
+            border-left-color: var(--accent-warning);
+        }
+
+        .toast.success {
+            border-left-color: var(--accent-secondary);
+        }
+
+        .toast-icon {
+            flex-shrink: 0;
+            width: 20px;
+            height: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .toast.anomaly .toast-icon { color: var(--accent-danger); }
+        .toast.warning .toast-icon { color: var(--accent-warning); }
+        .toast.success .toast-icon { color: var(--accent-secondary); }
+
+        .toast-content {
+            flex: 1;
+        }
+
+        .toast-title {
+            font-weight: 600;
+            font-size: 13px;
+            color: var(--text-primary);
+            margin-bottom: 4px;
+        }
+
+        .toast-message {
+            font-size: 12px;
+            color: var(--text-secondary);
+            line-height: 1.4;
+        }
+
+        .toast-close {
+            background: none;
+            border: none;
+            color: var(--text-tertiary);
+            cursor: pointer;
+            padding: 4px;
+            margin: -4px -4px -4px 0;
+        }
+
+        .toast-close:hover {
+            color: var(--text-primary);
+        }
+
+        @keyframes slideIn {
+            from { transform: translateX(100%); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+
+        @keyframes slideOut {
+            from { transform: translateX(0); opacity: 1; }
+            to { transform: translateX(100%); opacity: 0; }
+        }
+
+        /* Chart threshold lines */
+        .threshold-legend {
+            display: flex;
+            gap: 16px;
+            font-size: 10px;
+            margin-top: 8px;
+            justify-content: center;
+        }
+
+        .threshold-item {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            color: var(--text-tertiary);
+        }
+
+        .threshold-item .line {
+            width: 16px;
+            height: 2px;
+            border-radius: 1px;
+        }
+
+        .threshold-item.warning .line { background: var(--accent-warning); }
+        .threshold-item.danger .line { background: var(--accent-danger); }
+
+        /* Value change animation */
+        .channel-value.updated {
+            animation: valueFlash 0.5s ease;
+        }
+
+        @keyframes valueFlash {
+            0% { background: rgba(123, 97, 255, 0.3); }
+            100% { background: transparent; }
+        }
+
+        /* Improved empty state */
+        .empty-state h4 {
+            font-size: 18px;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin: 16px 0 8px;
+        }
+
+        .empty-state p {
+            color: var(--text-secondary);
+            margin-bottom: 24px;
+        }
     </style>
 </head>
 <body>
@@ -542,7 +716,7 @@
                                     </span>
                                 </div>
                                 <div class="panel-actions">
-                                    <button class="panel-action-btn" onclick="resizePanel(this)" title="Resize">
+                                    <button class="panel-action-btn" onclick="togglePanelFullscreen('{{ group.name }}')" title="Fullscreen">
                                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                             <polyline points="15 3 21 3 21 9"></polyline>
                                             <polyline points="9 21 3 21 3 15"></polyline>
@@ -585,6 +759,10 @@
                                         <div class="gauge-fill" id="gauge-{{ group.name }}" style="width: 0%; background: var(--accent-secondary);"></div>
                                     </div>
                                     <div class="gauge-value" id="score-{{ group.name }}">--</div>
+                                </div>
+                                <div class="threshold-legend">
+                                    <span class="threshold-item warning"><span class="line"></span> Warning 70%</span>
+                                    <span class="threshold-item danger"><span class="line"></span> Anomaly 40%</span>
                                 </div>
                                 <div class="channel-data" id="channels-{{ group.name }}">
                                     {% for channel in group.channels %}
@@ -641,6 +819,20 @@
             </div>
         </main>
     </div>
+
+    <!-- Toast Container -->
+    <div class="toast-container" id="toast-container"></div>
+
+    <!-- Fullscreen Exit Button -->
+    <button class="fullscreen-exit-btn" id="fullscreen-exit-btn" onclick="exitFullscreen()">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M8 3v3a2 2 0 0 1-2 2H3"></path>
+            <path d="M21 8h-3a2 2 0 0 1-2-2V3"></path>
+            <path d="M3 16h3a2 2 0 0 1 2 2v3"></path>
+            <path d="M16 21v-3a2 2 0 0 1 2-2h3"></path>
+        </svg>
+        Exit Fullscreen (Esc)
+    </button>
 
     <!-- Training Modal -->
     <div id="training-modal" class="modal" style="display: none;">
@@ -820,7 +1012,14 @@
                         const channelName = nameEl.textContent.trim();
                         const value = channelValues[channelName];
                         if (value !== undefined) {
-                            valEl.textContent = typeof value === 'number' ? value.toFixed(4) : value;
+                            const newText = typeof value === 'number' ? value.toFixed(4) : value;
+                            if (valEl.textContent !== newText) {
+                                valEl.textContent = newText;
+                                // Trigger update animation
+                                valEl.classList.remove('updated');
+                                void valEl.offsetWidth; // Force reflow
+                                valEl.classList.add('updated');
+                            }
                         }
                     }
                 });
@@ -843,24 +1042,66 @@
             }
         }
 
-        // Initialize charts
+        // Initialize charts with gradient fill and threshold lines
         function initCharts() {
+            // Threshold annotation plugin
+            const thresholdPlugin = {
+                id: 'thresholdLines',
+                beforeDraw: (chart) => {
+                    const ctx = chart.ctx;
+                    const yAxis = chart.scales.y;
+                    const xAxis = chart.scales.x;
+
+                    // Warning threshold at 70%
+                    const warningY = yAxis.getPixelForValue(70);
+                    ctx.save();
+                    ctx.beginPath();
+                    ctx.strokeStyle = 'rgba(255, 193, 7, 0.4)';
+                    ctx.setLineDash([5, 5]);
+                    ctx.lineWidth = 1;
+                    ctx.moveTo(xAxis.left, warningY);
+                    ctx.lineTo(xAxis.right, warningY);
+                    ctx.stroke();
+
+                    // Danger threshold at 40%
+                    const dangerY = yAxis.getPixelForValue(40);
+                    ctx.beginPath();
+                    ctx.strokeStyle = 'rgba(255, 82, 82, 0.4)';
+                    ctx.moveTo(xAxis.left, dangerY);
+                    ctx.lineTo(xAxis.right, dangerY);
+                    ctx.stroke();
+
+                    ctx.restore();
+                }
+            };
+
             document.querySelectorAll('.panel-chart canvas').forEach(canvas => {
                 const groupName = canvas.id.replace('chart-', '');
                 const ctx = canvas.getContext('2d');
 
+                // Create gradient
+                const gradient = ctx.createLinearGradient(0, 0, 0, 200);
+                gradient.addColorStop(0, 'rgba(123, 97, 255, 0.3)');
+                gradient.addColorStop(0.5, 'rgba(123, 97, 255, 0.1)');
+                gradient.addColorStop(1, 'rgba(123, 97, 255, 0)');
+
                 charts[groupName] = new Chart(ctx, {
                     type: 'line',
+                    plugins: [thresholdPlugin],
                     data: {
                         labels: [],
                         datasets: [{
                             label: 'Match Score',
                             data: [],
                             borderColor: '#7b61ff',
-                            backgroundColor: 'rgba(123, 97, 255, 0.1)',
+                            backgroundColor: gradient,
                             fill: true,
-                            tension: 0.4,
+                            tension: 0.3,
                             pointRadius: 0,
+                            pointHoverRadius: 4,
+                            pointHoverBackgroundColor: '#7b61ff',
+                            pointHoverBorderColor: '#fff',
+                            pointHoverBorderWidth: 2,
                             borderWidth: 2
                         }]
                     },
@@ -868,8 +1109,32 @@
                         responsive: true,
                         maintainAspectRatio: false,
                         animation: false,
+                        interaction: {
+                            mode: 'index',
+                            intersect: false
+                        },
                         plugins: {
-                            legend: { display: false }
+                            legend: { display: false },
+                            tooltip: {
+                                enabled: true,
+                                backgroundColor: 'rgba(19, 23, 34, 0.95)',
+                                titleColor: '#e8eaed',
+                                bodyColor: '#9aa0a6',
+                                borderColor: '#2a2e39',
+                                borderWidth: 1,
+                                padding: 10,
+                                displayColors: false,
+                                callbacks: {
+                                    title: () => 'Match Score',
+                                    label: (context) => {
+                                        const value = context.parsed.y;
+                                        let status = 'Normal';
+                                        if (value < 40) status = 'Anomaly';
+                                        else if (value < 70) status = 'Warning';
+                                        return `${value.toFixed(1)}% - ${status}`;
+                                    }
+                                }
+                            }
                         },
                         scales: {
                             x: {
@@ -879,12 +1144,14 @@
                                 min: 0,
                                 max: 100,
                                 grid: {
-                                    color: 'rgba(255,255,255,0.05)'
+                                    color: 'rgba(255,255,255,0.03)',
+                                    drawBorder: false
                                 },
                                 ticks: {
                                     color: 'rgba(255,255,255,0.3)',
                                     font: { size: 10 },
-                                    callback: (v) => v + '%'
+                                    callback: (v) => v + '%',
+                                    stepSize: 25
                                 }
                             }
                         }
@@ -1076,10 +1343,116 @@
             window.location.href = '/api/csv-template';
         }
 
-        function showAnomalyAlert(data) {
-            console.log('Anomaly detected:', data);
-            // Could show toast notification
+        // Toast Notification System
+        function showToast(title, message, type = 'info', duration = 5000) {
+            const container = document.getElementById('toast-container');
+            const toast = document.createElement('div');
+            toast.className = `toast ${type}`;
+
+            const iconSvg = {
+                anomaly: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>',
+                warning: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>',
+                success: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>',
+                info: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>'
+            };
+
+            toast.innerHTML = `
+                <div class="toast-icon">${iconSvg[type] || iconSvg.info}</div>
+                <div class="toast-content">
+                    <div class="toast-title">${title}</div>
+                    <div class="toast-message">${message}</div>
+                </div>
+                <button class="toast-close" onclick="dismissToast(this.parentElement)">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="18" y1="6" x2="6" y2="18"></line>
+                        <line x1="6" y1="6" x2="18" y2="18"></line>
+                    </svg>
+                </button>
+            `;
+
+            container.appendChild(toast);
+
+            if (duration > 0) {
+                setTimeout(() => dismissToast(toast), duration);
+            }
+
+            return toast;
         }
+
+        function dismissToast(toast) {
+            if (!toast || toast.classList.contains('hiding')) return;
+            toast.classList.add('hiding');
+            setTimeout(() => toast.remove(), 300);
+        }
+
+        function showAnomalyAlert(data) {
+            const group = data.group || 'Unknown';
+            const score = data.anomaly_score ? (data.anomaly_score * 100).toFixed(1) : '--';
+            const contributors = data.top_contributors || [];
+
+            let message = `Anomaly score: ${score}%`;
+            if (contributors.length > 0) {
+                message += `. Top contributor: ${contributors[0]}`;
+            }
+
+            showToast(`Anomaly Detected - ${group}`, message, 'anomaly', 8000);
+
+            // Also update the panel visually
+            const panel = document.querySelector(`[data-group="${group}"]`);
+            if (panel) {
+                panel.style.borderColor = 'var(--accent-danger)';
+                setTimeout(() => {
+                    panel.style.borderColor = '';
+                }, 3000);
+            }
+        }
+
+        // Fullscreen controls
+        let fullscreenPanel = null;
+
+        function togglePanelFullscreen(groupName) {
+            const panel = document.querySelector(`[data-group="${groupName}"]`);
+            if (!panel) return;
+
+            if (panel.classList.contains('fullscreen')) {
+                exitFullscreen();
+            } else {
+                enterFullscreen(panel);
+            }
+        }
+
+        function enterFullscreen(panel) {
+            fullscreenPanel = panel;
+            panel.classList.add('fullscreen');
+            document.getElementById('fullscreen-exit-btn').classList.add('visible');
+            document.body.style.overflow = 'hidden';
+
+            // Resize chart
+            const groupName = panel.dataset.group;
+            if (charts[groupName]) {
+                setTimeout(() => charts[groupName].resize(), 100);
+            }
+        }
+
+        function exitFullscreen() {
+            if (fullscreenPanel) {
+                fullscreenPanel.classList.remove('fullscreen');
+                const groupName = fullscreenPanel.dataset.group;
+                if (charts[groupName]) {
+                    setTimeout(() => charts[groupName].resize(), 100);
+                }
+                fullscreenPanel = null;
+            }
+            document.getElementById('fullscreen-exit-btn').classList.remove('visible');
+            document.body.style.overflow = '';
+        }
+
+        // Keyboard shortcuts
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' && fullscreenPanel) {
+                exitFullscreen();
+            }
+        });
 
         // Update rate display
         function updateRateDisplay() {
