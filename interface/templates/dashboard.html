@@ -349,6 +349,58 @@
         .source-status.error {
             color: var(--accent-danger);
         }
+
+        /* Toolbar center section */
+        .toolbar-center {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .time-range-selector,
+        .refresh-selector {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .toolbar-select {
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-primary);
+            color: var(--text-primary);
+            padding: 6px 10px;
+            border-radius: var(--radius-sm);
+            font-size: 12px;
+            cursor: pointer;
+        }
+
+        .toolbar-select:hover {
+            border-color: var(--accent-primary);
+        }
+
+        .toolbar-select:focus {
+            outline: none;
+            border-color: var(--accent-primary);
+            box-shadow: 0 0 0 2px rgba(123, 97, 255, 0.2);
+        }
+
+        /* Panel fullscreen mode */
+        .grid-panel.fullscreen {
+            position: fixed !important;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            z-index: 9999;
+            grid-column: span 12 !important;
+            grid-row: span 12 !important;
+            border-radius: 0;
+            margin: 0;
+        }
+
+        .grid-panel.fullscreen .panel-content {
+            height: calc(100vh - 60px);
+        }
     </style>
 </head>
 <body>
@@ -434,6 +486,32 @@
                                 <span>LIVE</span>
                             </div>
                             <span id="update-rate">--</span>
+                        </div>
+                    </div>
+                    <div class="toolbar-center">
+                        <!-- Time Range Selector -->
+                        <div class="time-range-selector">
+                            <select id="time-range" onchange="setTimeRange(this.value)" class="toolbar-select">
+                                <option value="60">Last 1 min</option>
+                                <option value="300" selected>Last 5 min</option>
+                                <option value="900">Last 15 min</option>
+                                <option value="1800">Last 30 min</option>
+                                <option value="3600">Last 1 hour</option>
+                            </select>
+                        </div>
+                        <!-- Refresh Interval -->
+                        <div class="refresh-selector">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="opacity: 0.6;">
+                                <polyline points="23 4 23 10 17 10"></polyline>
+                                <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path>
+                            </svg>
+                            <select id="refresh-interval" onchange="setRefreshInterval(this.value)" class="toolbar-select">
+                                <option value="1000">1s</option>
+                                <option value="2000" selected>2s</option>
+                                <option value="5000">5s</option>
+                                <option value="10000">10s</option>
+                                <option value="0">Off</option>
+                            </select>
                         </div>
                     </div>
                     <div class="toolbar-actions">
@@ -608,6 +686,37 @@
         let updateCount = 0;
         let wsConnected = false;
         let fallbackSimulationInterval = null;
+        let timeRangeSeconds = 300;  // Default 5 minutes
+        let refreshIntervalMs = 2000;  // Default 2 seconds
+
+        // Time Range Control
+        function setTimeRange(seconds) {
+            timeRangeSeconds = parseInt(seconds);
+            // Adjust chart data length based on time range
+            const maxPoints = Math.floor(timeRangeSeconds / (refreshIntervalMs / 1000));
+            Object.keys(charts).forEach(groupName => {
+                const chart = charts[groupName];
+                if (chart) {
+                    // Trim data if needed
+                    while (chart.data.labels.length > maxPoints) {
+                        chart.data.labels.shift();
+                        chart.data.datasets[0].data.shift();
+                    }
+                    chart.update('none');
+                }
+            });
+            console.log(`Time range set to ${seconds}s, max points: ${maxPoints}`);
+        }
+
+        // Refresh Interval Control
+        function setRefreshInterval(ms) {
+            refreshIntervalMs = parseInt(ms);
+            stopFallbackSimulation();
+            if (refreshIntervalMs > 0 && !wsConnected) {
+                startFallbackSimulation();
+            }
+            console.log(`Refresh interval set to ${ms}ms`);
+        }
 
         // WebSocket connection
         function connectWebSocket() {
@@ -679,7 +788,9 @@
                 chart.data.labels.push('');
                 chart.data.datasets[0].data.push(confidence);
 
-                if (chart.data.labels.length > 60) {
+                // Limit data points based on time range
+                const maxPoints = Math.max(30, Math.floor(timeRangeSeconds / (refreshIntervalMs / 1000)));
+                while (chart.data.labels.length > maxPoints) {
                     chart.data.labels.shift();
                     chart.data.datasets[0].data.shift();
                 }
@@ -1002,9 +1113,9 @@
         }
 
         function startFallbackSimulation() {
-            if (!fallbackSimulationInterval) {
-                console.log('Starting fallback simulation');
-                fallbackSimulationInterval = setInterval(simulateData, 1000);
+            if (!fallbackSimulationInterval && refreshIntervalMs > 0) {
+                console.log(`Starting fallback simulation at ${refreshIntervalMs}ms interval`);
+                fallbackSimulationInterval = setInterval(simulateData, refreshIntervalMs);
             }
         }
 
