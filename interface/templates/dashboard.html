@@ -761,8 +761,8 @@
                                     <div class="gauge-value" id="score-{{ group.name }}">--</div>
                                 </div>
                                 <div class="threshold-legend">
-                                    <span class="threshold-item warning"><span class="line"></span> Warning 70%</span>
-                                    <span class="threshold-item danger"><span class="line"></span> Anomaly 40%</span>
+                                    <span class="threshold-item warning"><span class="line"></span> Low confidence 70%</span>
+                                    <span class="threshold-item danger"><span class="line"></span> Anomaly threshold 40%</span>
                                 </div>
                                 <div class="channel-data" id="channels-{{ group.name }}">
                                     {% for channel in group.channels %}
@@ -871,6 +871,7 @@
         // State
         let ws;
         let charts = {};
+        let chartData = {};  // Store channel history per group
         let editMode = false;
         let currentTrainingGroup = null;
         let isRetraining = false;
@@ -880,6 +881,13 @@
         let fallbackSimulationInterval = null;
         let timeRangeSeconds = 300;  // Default 5 minutes
         let refreshIntervalMs = 2000;  // Default 2 seconds
+        let anomalyMarkers = {};  // Store anomaly timestamps per group
+
+        // Channel colors for multi-line charts
+        const channelColors = [
+            '#00c853', '#ff6b6b', '#4ecdc4', '#ffe66d', '#ff8a5b',
+            '#a8e6cf', '#dcedc1', '#ffd3b6', '#ffaaa5', '#98d8c8'
+        ];
 
         // Time Range Control
         function setTimeRange(seconds) {
@@ -889,10 +897,14 @@
             Object.keys(charts).forEach(groupName => {
                 const chart = charts[groupName];
                 if (chart) {
-                    // Trim data if needed
+                    // Trim data if needed for all datasets
                     while (chart.data.labels.length > maxPoints) {
                         chart.data.labels.shift();
-                        chart.data.datasets[0].data.shift();
+                        chart.data.datasets.forEach(ds => ds.data.shift());
+                    }
+                    // Also trim anomaly markers
+                    if (anomalyMarkers[groupName]) {
+                        anomalyMarkers[groupName] = anomalyMarkers[groupName].filter(idx => idx < chart.data.labels.length);
                     }
                     chart.update('none');
                 }
@@ -973,23 +985,64 @@
             const group = data.group;
             const confidence = data.confidence || data.match_score || 0;
             const channelValues = data.channel_values || data.values || {};
+            const timestamp = new Date().toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' });
 
-            // Update chart
+            // Update chart with all channels
             const chart = charts[group];
             if (chart) {
-                chart.data.labels.push('');
+                chart.data.labels.push(timestamp);
+
+                // Update confidence (first dataset)
                 chart.data.datasets[0].data.push(confidence);
+
+                // Update channel datasets (datasets 1+)
+                const channelNames = Object.keys(channelValues);
+                channelNames.forEach((channelName, idx) => {
+                    const datasetIdx = idx + 1;  // Channels start at index 1
+                    if (chart.data.datasets[datasetIdx]) {
+                        // Normalize channel value to 0-100 scale for display
+                        const rawValue = channelValues[channelName];
+                        // Store raw value for tooltip, normalize for display
+                        if (!chartData[group]) chartData[group] = {};
+                        if (!chartData[group][channelName]) chartData[group][channelName] = [];
+                        chartData[group][channelName].push(rawValue);
+
+                        // Scale value to percentage (assuming -1 to 1 range, map to 0-100)
+                        const normalizedValue = ((rawValue + 1) / 2) * 100;
+                        chart.data.datasets[datasetIdx].data.push(normalizedValue);
+                    }
+                });
+
+                // Add anomaly marker if confidence drops below threshold
+                if (confidence < 40) {
+                    if (!anomalyMarkers[group]) anomalyMarkers[group] = [];
+                    anomalyMarkers[group].push(chart.data.labels.length - 1);
+                }
 
                 // Limit data points based on time range
                 const maxPoints = Math.max(30, Math.floor(timeRangeSeconds / (refreshIntervalMs / 1000)));
                 while (chart.data.labels.length > maxPoints) {
                     chart.data.labels.shift();
-                    chart.data.datasets[0].data.shift();
+                    chart.data.datasets.forEach(ds => ds.data.shift());
+                    // Adjust anomaly marker indices
+                    if (anomalyMarkers[group]) {
+                        anomalyMarkers[group] = anomalyMarkers[group]
+                            .map(idx => idx - 1)
+                            .filter(idx => idx >= 0);
+                    }
+                    // Trim raw channel data
+                    if (chartData[group]) {
+                        Object.keys(chartData[group]).forEach(ch => {
+                            if (chartData[group][ch].length > maxPoints) {
+                                chartData[group][ch].shift();
+                            }
+                        });
+                    }
                 }
                 chart.update('none');
             }
 
-            // Update match score gauge
+            // Update confidence gauge (renamed from match score)
             const gauge = document.getElementById(`gauge-${group}`);
             const score = document.getElementById(`score-${group}`);
             if (gauge && score) {
@@ -1042,23 +1095,25 @@
             }
         }
 
-        // Initialize charts with gradient fill and threshold lines
+        // Initialize charts with multi-channel trends and anomaly markers
         function initCharts() {
-            // Threshold annotation plugin
-            const thresholdPlugin = {
-                id: 'thresholdLines',
+            // Combined plugin for thresholds and anomaly markers
+            const chartPlugin = {
+                id: 'customAnnotations',
                 beforeDraw: (chart) => {
                     const ctx = chart.ctx;
                     const yAxis = chart.scales.y;
                     const xAxis = chart.scales.x;
+                    const groupName = chart.canvas.id.replace('chart-', '');
+
+                    ctx.save();
+                    ctx.setLineDash([5, 5]);
+                    ctx.lineWidth = 1;
 
                     // Warning threshold at 70%
                     const warningY = yAxis.getPixelForValue(70);
-                    ctx.save();
                     ctx.beginPath();
                     ctx.strokeStyle = 'rgba(255, 193, 7, 0.4)';
-                    ctx.setLineDash([5, 5]);
-                    ctx.lineWidth = 1;
                     ctx.moveTo(xAxis.left, warningY);
                     ctx.lineTo(xAxis.right, warningY);
                     ctx.stroke();
@@ -1071,6 +1126,31 @@
                     ctx.lineTo(xAxis.right, dangerY);
                     ctx.stroke();
 
+                    // Draw vertical anomaly markers
+                    ctx.setLineDash([]);
+                    if (anomalyMarkers[groupName]) {
+                        anomalyMarkers[groupName].forEach(idx => {
+                            const x = xAxis.getPixelForValue(idx);
+                            if (x >= xAxis.left && x <= xAxis.right) {
+                                ctx.beginPath();
+                                ctx.strokeStyle = 'rgba(255, 82, 82, 0.6)';
+                                ctx.lineWidth = 2;
+                                ctx.moveTo(x, yAxis.top);
+                                ctx.lineTo(x, yAxis.bottom);
+                                ctx.stroke();
+
+                                // Draw small triangle marker at top
+                                ctx.fillStyle = 'rgba(255, 82, 82, 0.8)';
+                                ctx.beginPath();
+                                ctx.moveTo(x - 5, yAxis.top);
+                                ctx.lineTo(x + 5, yAxis.top);
+                                ctx.lineTo(x, yAxis.top + 8);
+                                ctx.closePath();
+                                ctx.fill();
+                            }
+                        });
+                    }
+
                     ctx.restore();
                 }
             };
@@ -1078,32 +1158,60 @@
             document.querySelectorAll('.panel-chart canvas').forEach(canvas => {
                 const groupName = canvas.id.replace('chart-', '');
                 const ctx = canvas.getContext('2d');
+                const panel = canvas.closest('.grid-panel');
 
-                // Create gradient
+                // Get channel names from the panel
+                const channelRows = panel.querySelectorAll('.channel-row .channel-name');
+                const channelNames = Array.from(channelRows).map(el => el.textContent.trim());
+
+                // Create gradient for confidence
                 const gradient = ctx.createLinearGradient(0, 0, 0, 200);
-                gradient.addColorStop(0, 'rgba(123, 97, 255, 0.3)');
-                gradient.addColorStop(0.5, 'rgba(123, 97, 255, 0.1)');
+                gradient.addColorStop(0, 'rgba(123, 97, 255, 0.2)');
                 gradient.addColorStop(1, 'rgba(123, 97, 255, 0)');
+
+                // Build datasets: confidence first, then channels
+                const datasets = [{
+                    label: 'Confidence',
+                    data: [],
+                    borderColor: '#7b61ff',
+                    backgroundColor: gradient,
+                    fill: true,
+                    tension: 0.3,
+                    pointRadius: 0,
+                    pointHoverRadius: 5,
+                    pointHoverBackgroundColor: '#7b61ff',
+                    pointHoverBorderColor: '#fff',
+                    pointHoverBorderWidth: 2,
+                    borderWidth: 2.5,
+                    order: 0  // Draw on top
+                }];
+
+                // Add channel datasets
+                channelNames.forEach((name, idx) => {
+                    datasets.push({
+                        label: name,
+                        data: [],
+                        borderColor: channelColors[idx % channelColors.length],
+                        backgroundColor: 'transparent',
+                        fill: false,
+                        tension: 0.3,
+                        pointRadius: 0,
+                        pointHoverRadius: 4,
+                        borderWidth: 1.5,
+                        borderDash: [],
+                        order: idx + 1
+                    });
+                });
+
+                // Initialize anomaly markers
+                anomalyMarkers[groupName] = [];
 
                 charts[groupName] = new Chart(ctx, {
                     type: 'line',
-                    plugins: [thresholdPlugin],
+                    plugins: [chartPlugin],
                     data: {
                         labels: [],
-                        datasets: [{
-                            label: 'Match Score',
-                            data: [],
-                            borderColor: '#7b61ff',
-                            backgroundColor: gradient,
-                            fill: true,
-                            tension: 0.3,
-                            pointRadius: 0,
-                            pointHoverRadius: 4,
-                            pointHoverBackgroundColor: '#7b61ff',
-                            pointHoverBorderColor: '#fff',
-                            pointHoverBorderWidth: 2,
-                            borderWidth: 2
-                        }]
+                        datasets: datasets
                     },
                     options: {
                         responsive: true,
@@ -1114,7 +1222,17 @@
                             intersect: false
                         },
                         plugins: {
-                            legend: { display: false },
+                            legend: {
+                                display: true,
+                                position: 'bottom',
+                                labels: {
+                                    color: 'rgba(255,255,255,0.6)',
+                                    font: { size: 10 },
+                                    boxWidth: 12,
+                                    padding: 8,
+                                    usePointStyle: true
+                                }
+                            },
                             tooltip: {
                                 enabled: true,
                                 backgroundColor: 'rgba(19, 23, 34, 0.95)',
@@ -1122,23 +1240,50 @@
                                 bodyColor: '#9aa0a6',
                                 borderColor: '#2a2e39',
                                 borderWidth: 1,
-                                padding: 10,
-                                displayColors: false,
+                                padding: 12,
+                                displayColors: true,
                                 callbacks: {
-                                    title: () => 'Match Score',
+                                    title: (items) => {
+                                        if (items.length > 0) {
+                                            return items[0].label || 'Data Point';
+                                        }
+                                        return '';
+                                    },
                                     label: (context) => {
+                                        const dsLabel = context.dataset.label;
                                         const value = context.parsed.y;
-                                        let status = 'Normal';
-                                        if (value < 40) status = 'Anomaly';
-                                        else if (value < 70) status = 'Warning';
-                                        return `${value.toFixed(1)}% - ${status}`;
+
+                                        if (dsLabel === 'Confidence') {
+                                            let status = 'Normal';
+                                            if (value < 40) status = 'ANOMALY';
+                                            else if (value < 70) status = 'Warning';
+                                            return `${dsLabel}: ${value.toFixed(1)}% (${status})`;
+                                        } else {
+                                            // Show raw value for channels
+                                            const rawData = chartData[groupName]?.[dsLabel];
+                                            const rawValue = rawData ? rawData[context.dataIndex] : null;
+                                            if (rawValue !== null && rawValue !== undefined) {
+                                                return `${dsLabel}: ${rawValue.toFixed(4)}`;
+                                            }
+                                            return `${dsLabel}: ${value.toFixed(1)}%`;
+                                        }
                                     }
                                 }
                             }
                         },
                         scales: {
                             x: {
-                                display: false
+                                display: true,
+                                grid: {
+                                    color: 'rgba(255,255,255,0.03)',
+                                    drawBorder: false
+                                },
+                                ticks: {
+                                    color: 'rgba(255,255,255,0.3)',
+                                    font: { size: 9 },
+                                    maxRotation: 0,
+                                    maxTicksLimit: 6
+                                }
                             },
                             y: {
                                 min: 0,
@@ -1159,9 +1304,27 @@
                 });
 
                 // Initialize with demo data
+                const now = new Date();
                 for (let i = 0; i < 30; i++) {
-                    charts[groupName].data.labels.push('');
-                    charts[groupName].data.datasets[0].data.push(70 + Math.random() * 25);
+                    const time = new Date(now.getTime() - (30 - i) * 2000);
+                    const timeStr = time.toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' });
+                    charts[groupName].data.labels.push(timeStr);
+
+                    // Demo confidence data
+                    const confidence = 70 + Math.random() * 25;
+                    charts[groupName].data.datasets[0].data.push(confidence);
+
+                    // Demo channel data
+                    channelNames.forEach((name, idx) => {
+                        const rawVal = (Math.random() * 2 - 1);
+                        const normVal = ((rawVal + 1) / 2) * 100;
+                        charts[groupName].data.datasets[idx + 1].data.push(normVal);
+
+                        // Store raw values
+                        if (!chartData[groupName]) chartData[groupName] = {};
+                        if (!chartData[groupName][name]) chartData[groupName][name] = [];
+                        chartData[groupName][name].push(rawVal);
+                    });
                 }
                 charts[groupName].update('none');
             });
@@ -1463,18 +1626,26 @@
             updateCount = 0;
         }
 
-        // Simulate data for demo (fallback when WebSocket disconnected)
+        // Simulate data for demo (occasionally generates anomalies for testing)
         function simulateData() {
             document.querySelectorAll('.grid-panel[data-group]').forEach(panel => {
                 const groupName = panel.dataset.group;
-                const confidence = 60 + Math.random() * 35;
 
-                // Simulate channel values
+                // Occasionally generate an anomaly (5% chance)
+                const isAnomaly = Math.random() < 0.05;
+                const confidence = isAnomaly ? (15 + Math.random() * 20) : (65 + Math.random() * 30);
+
+                // Simulate channel values (as numbers, not strings)
                 const channelRows = panel.querySelectorAll('.channel-row');
                 const channelValues = {};
                 channelRows.forEach((row, i) => {
-                    const name = row.querySelector('.channel-name').textContent;
-                    channelValues[name] = (Math.random() * 2 - 1).toFixed(4);
+                    const name = row.querySelector('.channel-name').textContent.trim();
+                    // Generate slightly correlated values during anomalies
+                    if (isAnomaly) {
+                        channelValues[name] = (Math.random() * 2 - 1) * 1.5;  // Larger deviation
+                    } else {
+                        channelValues[name] = (Math.random() * 2 - 1) * 0.8;  // Normal range
+                    }
                 });
 
                 updateGroupData({
