@@ -2315,3 +2315,227 @@ body {
     border-radius: 2px;
     margin-right: 4px;
 }
+
+/* ============================================
+   FORENSICS CONTROLLER UI
+   Global/Local Time, Focus Mode, Anomaly Count
+   ============================================ */
+
+/* Global Time Control */
+.global-time-control {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+    padding: 0 var(--spacing-sm);
+    border-left: 1px solid var(--border-primary);
+    margin-left: var(--spacing-sm);
+}
+
+.global-time-control .control-label {
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+/* Local Time Control (per-tile) */
+.local-time-control {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-left: auto;
+    margin-right: var(--spacing-sm);
+}
+
+.local-time-select {
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-primary);
+    border-radius: var(--radius-sm);
+    color: var(--text-primary);
+    font-size: 11px;
+    padding: 4px 8px;
+    cursor: pointer;
+    transition: var(--transition-fast);
+}
+
+.local-time-select:hover {
+    border-color: var(--border-secondary);
+    background: var(--bg-hover);
+}
+
+.local-time-select:focus {
+    outline: none;
+    border-color: var(--accent-primary);
+}
+
+.local-time-status {
+    display: flex;
+    align-items: center;
+    font-size: 10px;
+    color: var(--text-secondary);
+}
+
+.local-time-status.paused {
+    color: var(--accent-warning);
+}
+
+/* Anomaly Counter */
+.anomaly-counter {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 2px 8px;
+    background: rgba(242, 73, 92, 0.1);
+    border: 1px solid rgba(242, 73, 92, 0.2);
+    border-radius: 10px;
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--accent-danger);
+    margin-left: var(--spacing-sm);
+    transition: var(--transition-fast);
+}
+
+.anomaly-counter svg {
+    opacity: 0.7;
+}
+
+.anomaly-counter.no-anomalies {
+    background: rgba(0, 200, 83, 0.1);
+    border-color: rgba(0, 200, 83, 0.2);
+    color: var(--accent-secondary);
+}
+
+.anomaly-counter.few-anomalies {
+    background: rgba(255, 193, 7, 0.1);
+    border-color: rgba(255, 193, 7, 0.2);
+    color: var(--accent-warning);
+}
+
+.anomaly-counter.many-anomalies {
+    background: rgba(242, 73, 92, 0.2);
+    border-color: rgba(242, 73, 92, 0.4);
+    color: var(--accent-danger);
+    animation: anomaly-pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes anomaly-pulse {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.05); }
+}
+
+/* Chart Row Controls */
+.chart-row-controls {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    flex-shrink: 0;
+}
+
+/* Focus Button */
+.focus-btn {
+    background: transparent;
+    border: 1px solid transparent;
+    color: var(--text-tertiary);
+    cursor: pointer;
+    padding: 4px;
+    border-radius: var(--radius-sm);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    transition: var(--transition-fast);
+}
+
+.chart-row:hover .focus-btn {
+    opacity: 0.7;
+}
+
+.focus-btn:hover {
+    opacity: 1 !important;
+    background: var(--bg-hover);
+    border-color: var(--border-secondary);
+    color: var(--accent-primary);
+}
+
+.focus-btn:active {
+    transform: scale(0.95);
+}
+
+/* Chart Row Focus States */
+.chart-row {
+    transition:
+        flex var(--transition-slow),
+        opacity var(--transition-normal),
+        height var(--transition-slow);
+}
+
+.chart-row.focused {
+    flex: 1 !important;
+    min-height: 200px;
+}
+
+.chart-row.hidden-focus {
+    flex: 0 !important;
+    min-height: 0 !important;
+    height: 0 !important;
+    opacity: 0;
+    overflow: hidden;
+    padding: 0;
+    margin: 0;
+}
+
+/* Exit Focus Button */
+.exit-focus-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 8px 16px;
+    margin: var(--spacing-sm) auto;
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-secondary);
+    border-radius: var(--radius-md);
+    color: var(--text-secondary);
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: var(--transition-fast);
+}
+
+.exit-focus-btn:hover {
+    background: var(--accent-primary);
+    border-color: var(--accent-primary);
+    color: white;
+}
+
+.exit-focus-btn svg {
+    transition: transform var(--transition-fast);
+}
+
+.exit-focus-btn:hover svg {
+    transform: scale(1.1);
+}
+
+/* Legend hidden in focus mode */
+.chart-legend.focus-hidden {
+    opacity: 0;
+    height: 0;
+    overflow: hidden;
+    padding: 0;
+    margin: 0;
+    border: none;
+    transition:
+        opacity var(--transition-normal),
+        height var(--transition-slow);
+}
+
+/* Local Time Control visibility on hover */
+.panel-header .local-time-control {
+    opacity: 0.7;
+    transition: opacity var(--transition-fast);
+}
+
+.grid-panel:hover .panel-header .local-time-control {
+    opacity: 1;
+}

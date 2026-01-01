@@ -790,6 +790,16 @@
                             <option value="5000">5s</option>
                         </select>
 
+                        <!-- Global Time Control (for minimized sparklines) -->
+                        <div class="global-time-control">
+                            <span class="control-label">Overview:</span>
+                            <select id="global-time-range" onchange="setGlobalTimeRange(this.value)" class="toolbar-select">
+                                <option value="3600" selected>1 hour</option>
+                                <option value="86400">24 hours</option>
+                                <option value="604800">7 days</option>
+                            </select>
+                        </div>
+
                         <!-- Global Tile Controls -->
                         <div class="tile-global-controls">
                             <button class="tile-control-btn" onclick="minimizeAllTiles()" id="minimize-all-btn" title="Minimize All Tiles">
@@ -829,6 +839,27 @@
                                 <div class="panel-title">
                                     <span class="status-indicator" id="status-{{ group.name }}"></span>
                                     {{ group.name }}
+                                    <!-- Anomalies Counter -->
+                                    <span class="anomaly-counter" id="anomaly-count-{{ group.name }}" title="Anomalies detected in time range">
+                                        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                            <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
+                                        </svg>
+                                        <span id="anomaly-count-value-{{ group.name }}">0</span>
+                                    </span>
+                                </div>
+                                <!-- Local Time Control (per-tile) -->
+                                <div class="local-time-control" id="local-time-{{ group.name }}">
+                                    <select class="local-time-select" onchange="setLocalTimeRange('{{ group.name }}', this.value)">
+                                        <option value="live">Live</option>
+                                        <option value="60">1 min</option>
+                                        <option value="300">5 min</option>
+                                        <option value="600">10 min</option>
+                                        <option value="1800">30 min</option>
+                                        <option value="3600">1 hour</option>
+                                    </select>
+                                    <span class="local-time-status" id="local-time-status-{{ group.name }}">
+                                        <span class="live-indicator"></span>
+                                    </span>
                                 </div>
                                 <div class="panel-actions">
                                     <!-- Minimize/Expand Toggle -->
@@ -924,13 +955,28 @@
                                 <div class="charts-stack" id="charts-{{ group.name }}">
                                     {% for channel in group.channels %}
                                     <div class="chart-row" data-channel="{{ channel }}" data-index="{{ loop.index0 }}">
-                                        <span class="chart-label" title="{{ channel }}">{{ channel }}</span>
+                                        <div class="chart-row-controls">
+                                            <button class="focus-btn" onclick="toggleFocusMode('{{ group.name }}', {{ loop.index0 }})" title="Focus on this channel">
+                                                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                                    <circle cx="12" cy="12" r="10"></circle>
+                                                    <circle cx="12" cy="12" r="3"></circle>
+                                                </svg>
+                                            </button>
+                                            <span class="chart-label" title="{{ channel }}">{{ channel }}</span>
+                                        </div>
                                         <div class="chart-wrapper" id="chart-wrap-{{ group.name }}-{{ loop.index0 }}">
                                             <div class="crosshair-line" id="crosshair-{{ group.name }}-{{ loop.index0 }}"></div>
                                         </div>
                                         <span class="chart-value" id="value-{{ group.name }}-{{ loop.index0 }}">--</span>
                                     </div>
                                     {% endfor %}
+                                    <!-- Focus Mode Exit Button (hidden by default) -->
+                                    <button class="exit-focus-btn" id="exit-focus-{{ group.name }}" onclick="exitFocusMode('{{ group.name }}')" style="display:none">
+                                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                            <path d="M18 6L6 18M6 6l12 12"></path>
+                                        </svg>
+                                        Exit Focus Mode
+                                    </button>
                                 </div>
 
                                 <!-- Legend -->
@@ -2175,6 +2221,195 @@
             container.appendChild(toast);
             setTimeout(() => toast.remove(), 5000);
         }
+
+        // ==================== FORENSICS CONTROLLER ====================
+        // Global time range state (for minimized sparklines)
+        state.globalTimeRange = 3600;  // Default 1 hour
+        state.localTimeRanges = {};    // Per-tile time range overrides
+        state.focusMode = {};          // { groupName: channelIdx or null }
+        state.anomalyCounts = {};      // Per-group anomaly counts
+
+        function setGlobalTimeRange(seconds) {
+            state.globalTimeRange = parseInt(seconds);
+
+            // Update sparkline data fetch/display for all minimized tiles
+            document.querySelectorAll('.smart-tile.minimized').forEach(tile => {
+                const groupName = tile.dataset.group;
+                // Sparklines will use this range when updating
+                updateSparklineTimeRange(groupName);
+            });
+
+            const labels = { 3600: '1 hour', 86400: '24 hours', 604800: '7 days' };
+            showToast('Overview Range', `Sparklines showing ${labels[seconds]}`, 'info');
+        }
+
+        function updateSparklineTimeRange(groupName) {
+            // Trim sparkline data to match global time range
+            // This affects the density of points shown in the mini sparkline
+            const maxPoints = Math.min(60, Math.floor(state.globalTimeRange / 60));
+            if (state.sparklineData[groupName]) {
+                while (state.sparklineData[groupName].length > maxPoints) {
+                    state.sparklineData[groupName].shift();
+                }
+                updateSparkline(groupName);
+            }
+        }
+
+        function setLocalTimeRange(groupName, value) {
+            const statusEl = document.getElementById(`local-time-status-${groupName}`);
+            const selectEl = document.querySelector(`#local-time-${groupName} .local-time-select`);
+
+            if (value === 'live') {
+                // Resume live mode
+                state.localTimeRanges[groupName] = null;
+                state.liveMode[groupName] = true;
+                state.forensicsMode[groupName] = { enabled: false, zoomRange: null };
+
+                if (statusEl) {
+                    statusEl.innerHTML = '<span class="live-indicator"></span>';
+                    statusEl.classList.remove('paused');
+                }
+
+                // Reset charts to live view
+                resetToLiveMode(groupName);
+            } else {
+                // Pause live scrolling, show fixed time range
+                const seconds = parseInt(value);
+                state.localTimeRanges[groupName] = seconds;
+                state.liveMode[groupName] = false;
+
+                if (statusEl) {
+                    statusEl.innerHTML = '<span class="paused-indicator"></span>';
+                    statusEl.classList.add('paused');
+                }
+
+                // Calculate time range based on current data
+                const chartData = state.chartData[groupName];
+                if (chartData && chartData[0] && chartData[0].times.length > 0) {
+                    const times = chartData[0].times;
+                    const now = times[times.length - 1];
+                    const xMin = now - seconds;
+                    const xMax = now;
+
+                    applyForensicsZoom(groupName, xMin, xMax);
+                }
+
+                const labels = { 60: '1 min', 300: '5 min', 600: '10 min', 1800: '30 min', 3600: '1 hour' };
+                showToast('Local View', `${groupName}: Showing last ${labels[seconds]}`, 'info');
+            }
+        }
+
+        function toggleFocusMode(groupName, channelIdx) {
+            const chartsStack = document.getElementById(`charts-${groupName}`);
+            const chartRows = chartsStack.querySelectorAll('.chart-row');
+            const exitBtn = document.getElementById(`exit-focus-${groupName}`);
+
+            if (state.focusMode[groupName] === channelIdx) {
+                // Already focused on this channel - exit focus
+                exitFocusMode(groupName);
+                return;
+            }
+
+            // Enter focus mode
+            state.focusMode[groupName] = channelIdx;
+
+            chartRows.forEach((row, idx) => {
+                if (idx === channelIdx) {
+                    row.classList.add('focused');
+                    row.classList.remove('hidden-focus');
+                } else {
+                    row.classList.add('hidden-focus');
+                    row.classList.remove('focused');
+                }
+            });
+
+            // Show exit button
+            if (exitBtn) {
+                exitBtn.style.display = 'flex';
+            }
+
+            // Hide legend
+            const legend = document.getElementById(`legend-${groupName}`);
+            if (legend) legend.classList.add('focus-hidden');
+
+            // Resize the focused chart after transition
+            setTimeout(() => {
+                const chart = state.charts[groupName]?.[channelIdx];
+                if (chart) {
+                    const wrap = chart.root.parentElement;
+                    chart.setSize({ width: wrap.clientWidth, height: wrap.clientHeight });
+                }
+            }, 350);
+
+            const channelName = chartRows[channelIdx]?.dataset.channel || `Channel ${channelIdx + 1}`;
+            showToast('Focus Mode', `Isolating: ${channelName}`, 'info');
+        }
+
+        function exitFocusMode(groupName) {
+            const chartsStack = document.getElementById(`charts-${groupName}`);
+            const chartRows = chartsStack.querySelectorAll('.chart-row');
+            const exitBtn = document.getElementById(`exit-focus-${groupName}`);
+            const legend = document.getElementById(`legend-${groupName}`);
+
+            state.focusMode[groupName] = null;
+
+            // Restore all rows
+            chartRows.forEach(row => {
+                row.classList.remove('focused', 'hidden-focus');
+            });
+
+            // Hide exit button
+            if (exitBtn) {
+                exitBtn.style.display = 'none';
+            }
+
+            // Show legend
+            if (legend) legend.classList.remove('focus-hidden');
+
+            // Resize all charts after transition
+            setTimeout(() => {
+                Object.values(state.charts[groupName] || {}).forEach(chart => {
+                    const wrap = chart.root.parentElement;
+                    chart.setSize({ width: wrap.clientWidth, height: wrap.clientHeight });
+                });
+            }, 350);
+
+            showToast('Focus Mode', 'Returned to multi-channel view', 'info');
+        }
+
+        function updateAnomalyCount(groupName) {
+            const countEl = document.getElementById(`anomaly-count-value-${groupName}`);
+            const counterEl = document.getElementById(`anomaly-count-${groupName}`);
+            if (!countEl || !counterEl) return;
+
+            // Count anomalies within the current time range (based on local or global setting)
+            const timeRange = state.localTimeRanges[groupName] || state.timeRangeSeconds;
+            const now = Date.now() / 1000;
+            const cutoff = now - timeRange;
+
+            const anomalies = state.anomalyTimestamps[groupName] || [];
+            const recentCount = anomalies.filter(a => a.timestamp > cutoff).length;
+
+            countEl.textContent = recentCount;
+            state.anomalyCounts[groupName] = recentCount;
+
+            // Update visual state based on count
+            counterEl.classList.remove('no-anomalies', 'few-anomalies', 'many-anomalies');
+            if (recentCount === 0) {
+                counterEl.classList.add('no-anomalies');
+            } else if (recentCount < 5) {
+                counterEl.classList.add('few-anomalies');
+            } else {
+                counterEl.classList.add('many-anomalies');
+            }
+        }
+
+        // Update anomaly counts periodically
+        setInterval(() => {
+            document.querySelectorAll('.grid-panel[data-group]').forEach(panel => {
+                updateAnomalyCount(panel.dataset.group);
+            });
+        }, 2000);
 
         // ==================== UTILS ====================
         function updateRateDisplay() {
