@@ -8,12 +8,21 @@ import json
 import asyncio
 import aiohttp
 import random
+import threading
 from datetime import datetime
 from typing import Dict, List, Optional
 from io import StringIO
 
 # Ensure project root is in path
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+# Import NASA CMAPSS loader
+try:
+    from miq.samples.nasa_cmapss import NASACMAPSSLoader, get_nasa_sample_config, SENSOR_DICTIONARY, DEFAULT_SENSORS
+    NASA_LOADER_AVAILABLE = True
+except ImportError:
+    NASA_LOADER_AVAILABLE = False
+    print("[Warning] NASA CMAPSS loader not available")
 
 from fastapi import FastAPI, Request, WebSocket, WebSocketDisconnect, HTTPException
 from fastapi.staticfiles import StaticFiles
@@ -60,9 +69,22 @@ data_sources: Dict[str, dict] = {}
 active_websockets: List[WebSocket] = []
 data_polling_task: Optional[asyncio.Task] = None
 simulation_task: Optional[asyncio.Task] = None
+nasa_streaming_task: Optional[asyncio.Task] = None
 
 # Data cache for streaming
 latest_data: Dict[str, dict] = {}  # {group_name: {channel_values, confidence, timestamp}}
+
+# NASA sample data state
+nasa_loader: Optional['NASACMAPSSLoader'] = None
+nasa_streaming_state: Dict = {
+    'active': False,
+    'engine_nr': 1,
+    'current_cycle': 0,
+    'total_cycles': 0,
+    'speed_multiplier': 1.0,
+    'sensors': [],
+    'paused': False
+}
 
 # Model configuration (global defaults)
 current_model_config: dict = {
@@ -96,6 +118,13 @@ class ChannelGroupConfig(BaseModel):
     sample_rate: float = 1000
     preprocessing: str = "basic"  # basic, vibration, bearing
     source: Optional[str] = None  # Link to data source name
+    channel_preprocessing: Optional[Dict[str, str]] = None  # Per-channel preprocessing
+
+
+class NASAStreamConfig(BaseModel):
+    engine_nr: int = 1
+    speed_multiplier: float = 1.0
+    sensors: Optional[List[str]] = None
 
 
 class ModelConfig(BaseModel):
@@ -445,6 +474,327 @@ async def get_model_config_info():
                   "For machinery: at least one complete rotation at slowest speed."
         }
     }
+
+
+# =============================================================================
+# NASA CMAPSS Sample Data API
+# =============================================================================
+
+@app.get("/api/nasa/status")
+async def get_nasa_status():
+    """Get NASA sample data availability and status."""
+    global nasa_loader
+
+    if not NASA_LOADER_AVAILABLE:
+        return {"available": False, "reason": "NASA loader module not installed"}
+
+    if nasa_loader is None:
+        nasa_loader = NASACMAPSSLoader()
+
+    return {
+        "available": True,
+        "loaded": nasa_loader.is_loaded(),
+        "streaming": nasa_streaming_state['active'],
+        "current_state": nasa_streaming_state
+    }
+
+
+@app.post("/api/nasa/load")
+async def load_nasa_data():
+    """Download and load the NASA CMAPSS dataset."""
+    global nasa_loader
+
+    if not NASA_LOADER_AVAILABLE:
+        raise HTTPException(status_code=503, detail="NASA loader module not available")
+
+    if nasa_loader is None:
+        nasa_loader = NASACMAPSSLoader()
+
+    if nasa_loader.is_loaded():
+        stats = nasa_loader.get_statistics()
+        return {
+            "status": "already_loaded",
+            "statistics": stats
+        }
+
+    try:
+        # Load data (this may take a few seconds)
+        result = nasa_loader.download_and_load()
+        return {
+            "status": "loaded",
+            "statistics": result
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to load NASA data: {str(e)}")
+
+
+@app.get("/api/nasa/config")
+async def get_nasa_config():
+    """Get pre-configured setup for NASA sample data."""
+    if not NASA_LOADER_AVAILABLE:
+        raise HTTPException(status_code=503, detail="NASA loader not available")
+
+    return get_nasa_sample_config()
+
+
+@app.get("/api/nasa/engines")
+async def get_nasa_engines():
+    """Get list of available engines in the NASA dataset."""
+    global nasa_loader
+
+    if not NASA_LOADER_AVAILABLE:
+        raise HTTPException(status_code=503, detail="NASA loader not available")
+
+    if nasa_loader is None:
+        nasa_loader = NASACMAPSSLoader()
+
+    if not nasa_loader.is_loaded():
+        raise HTTPException(status_code=400, detail="NASA data not loaded. Call /api/nasa/load first.")
+
+    engines = nasa_loader.get_engine_list()
+    return {
+        "engines": engines,
+        "recommended": [1, 5, 10, 20],  # Engines with good variety
+        "total": len(engines)
+    }
+
+
+@app.get("/api/nasa/sensors")
+async def get_nasa_sensors():
+    """Get sensor information for NASA CMAPSS dataset."""
+    if not NASA_LOADER_AVAILABLE:
+        raise HTTPException(status_code=503, detail="NASA loader not available")
+
+    return {
+        "sensors": SENSOR_DICTIONARY,
+        "default": DEFAULT_SENSORS,
+        "all": list(SENSOR_DICTIONARY.keys())
+    }
+
+
+@app.post("/api/nasa/stream/start")
+async def start_nasa_stream(config: NASAStreamConfig):
+    """Start streaming NASA sample data."""
+    global nasa_loader, nasa_streaming_task, nasa_streaming_state
+
+    if not NASA_LOADER_AVAILABLE:
+        raise HTTPException(status_code=503, detail="NASA loader not available")
+
+    if nasa_loader is None:
+        nasa_loader = NASACMAPSSLoader()
+
+    if not nasa_loader.is_loaded():
+        # Auto-load if not loaded
+        try:
+            nasa_loader.download_and_load()
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Failed to load NASA data: {str(e)}")
+
+    # Stop any existing stream
+    if nasa_streaming_task and not nasa_streaming_task.done():
+        nasa_streaming_task.cancel()
+        try:
+            await nasa_streaming_task
+        except asyncio.CancelledError:
+            pass
+
+    # Get engine data
+    engines = nasa_loader.get_engine_list()
+    engine = next((e for e in engines if e['unit_nr'] == config.engine_nr), None)
+    if not engine:
+        raise HTTPException(status_code=404, detail=f"Engine {config.engine_nr} not found")
+
+    # Configure streaming state
+    sensors = config.sensors or DEFAULT_SENSORS
+    nasa_streaming_state.update({
+        'active': True,
+        'engine_nr': config.engine_nr,
+        'current_cycle': 0,
+        'total_cycles': engine['total_cycles'],
+        'speed_multiplier': config.speed_multiplier,
+        'sensors': sensors,
+        'paused': False
+    })
+
+    # Create data source and group for NASA data
+    source_name = "NASA Turbofan Engine"
+    group_name = f"Engine #{config.engine_nr}"
+
+    data_sources[source_name] = {
+        "name": source_name,
+        "type": "sample",
+        "sample_type": "nasa_cmapss",
+        "engine_nr": config.engine_nr,
+        "status": "streaming",
+        "created_at": datetime.now().isoformat()
+    }
+
+    channel_groups[group_name] = {
+        "name": group_name,
+        "channels": sensors,
+        "color": "#5794f2",
+        "sample_rate": 1.0,
+        "preprocessing": "basic",
+        "source": source_name,
+        "status": "monitoring",
+        "trained_states": 1,  # Pre-trained for demo
+        "created_at": datetime.now().isoformat(),
+        "channel_preprocessing": {s: "basic" for s in sensors}
+    }
+
+    # Start streaming task
+    nasa_streaming_task = asyncio.create_task(nasa_data_streaming_loop())
+
+    await broadcast_update("source_added", data_sources[source_name])
+    await broadcast_update("group_added", channel_groups[group_name])
+
+    return {
+        "status": "streaming",
+        "engine": engine,
+        "sensors": sensors,
+        "group_name": group_name
+    }
+
+
+@app.post("/api/nasa/stream/stop")
+async def stop_nasa_stream():
+    """Stop NASA data streaming."""
+    global nasa_streaming_task, nasa_streaming_state
+
+    if nasa_streaming_task and not nasa_streaming_task.done():
+        nasa_streaming_task.cancel()
+        try:
+            await nasa_streaming_task
+        except asyncio.CancelledError:
+            pass
+
+    nasa_streaming_state['active'] = False
+    nasa_streaming_state['paused'] = False
+
+    return {"status": "stopped"}
+
+
+@app.post("/api/nasa/stream/pause")
+async def pause_nasa_stream():
+    """Pause/resume NASA data streaming."""
+    global nasa_streaming_state
+
+    if not nasa_streaming_state['active']:
+        raise HTTPException(status_code=400, detail="No active stream to pause")
+
+    nasa_streaming_state['paused'] = not nasa_streaming_state['paused']
+
+    return {
+        "status": "paused" if nasa_streaming_state['paused'] else "resumed",
+        "paused": nasa_streaming_state['paused']
+    }
+
+
+@app.post("/api/nasa/stream/speed")
+async def set_nasa_stream_speed(request: Request):
+    """Set NASA stream playback speed."""
+    global nasa_streaming_state
+
+    body = await request.json()
+    speed = float(body.get('speed', 1.0))
+
+    if speed < 0.1 or speed > 100:
+        raise HTTPException(status_code=400, detail="Speed must be between 0.1 and 100")
+
+    nasa_streaming_state['speed_multiplier'] = speed
+
+    return {"status": "ok", "speed": speed}
+
+
+async def nasa_data_streaming_loop():
+    """Background task to stream NASA engine data."""
+    global nasa_loader, nasa_streaming_state
+
+    engine_nr = nasa_streaming_state['engine_nr']
+    sensors = nasa_streaming_state['sensors']
+    group_name = f"Engine #{engine_nr}"
+
+    # Get engine data
+    engine_data = nasa_loader.get_engine_data(engine_nr, sensors)
+
+    if not engine_data:
+        print(f"[NASA] No data found for engine {engine_nr}")
+        nasa_streaming_state['active'] = False
+        return
+
+    print(f"[NASA] Starting stream for Engine {engine_nr}: {len(engine_data)} cycles")
+
+    try:
+        for i, record in enumerate(engine_data):
+            # Check if cancelled
+            if not nasa_streaming_state['active']:
+                break
+
+            # Handle pause
+            while nasa_streaming_state['paused']:
+                await asyncio.sleep(0.1)
+                if not nasa_streaming_state['active']:
+                    break
+
+            if not nasa_streaming_state['active']:
+                break
+
+            # Update state
+            nasa_streaming_state['current_cycle'] = int(record['time_cycles'])
+
+            # Prepare channel values
+            channel_values = {s: record[s] for s in sensors if s in record}
+
+            # Calculate confidence based on RUL (simulates degradation detection)
+            rul = int(record['rul'])
+            total_cycles = nasa_streaming_state['total_cycles']
+
+            # Simulate confidence: starts high, degrades as RUL decreases
+            # Add some realistic noise
+            if rul > total_cycles * 0.7:
+                # Healthy phase: high confidence
+                base_confidence = 85 + random.uniform(-5, 10)
+            elif rul > total_cycles * 0.3:
+                # Wear phase: confidence starts dropping
+                progress = 1 - (rul / (total_cycles * 0.7))
+                base_confidence = 85 - (progress * 30) + random.uniform(-8, 8)
+            else:
+                # Failure approaching: low confidence, high variance
+                progress = 1 - (rul / (total_cycles * 0.3))
+                base_confidence = 55 - (progress * 35) + random.uniform(-15, 10)
+
+            confidence = max(5, min(98, base_confidence))
+
+            # Broadcast data update
+            await broadcast_update("data_update", {
+                "group": group_name,
+                "confidence": round(confidence, 1),
+                "channel_values": channel_values,
+                "cycle": nasa_streaming_state['current_cycle'],
+                "rul": rul,
+                "progress": (i + 1) / len(engine_data),
+                "timestamp": datetime.now().isoformat(),
+                "is_trained": True
+            })
+
+            # Calculate sleep based on speed multiplier
+            base_interval = 1.0  # 1 second per cycle
+            sleep_time = base_interval / nasa_streaming_state['speed_multiplier']
+            await asyncio.sleep(sleep_time)
+
+        # Stream complete
+        print(f"[NASA] Stream complete for Engine {engine_nr}")
+        await broadcast_update("nasa_stream_complete", {
+            "engine": engine_nr,
+            "total_cycles": len(engine_data)
+        })
+
+    except asyncio.CancelledError:
+        print(f"[NASA] Stream cancelled for Engine {engine_nr}")
+    except Exception as e:
+        print(f"[NASA] Stream error: {e}")
+    finally:
+        nasa_streaming_state['active'] = False
 
 
 # WebSocket for real-time updates

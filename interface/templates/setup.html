@@ -104,6 +104,20 @@
                         <p class="step-description">Choose how to connect your data to MachineIQ</p>
 
                         <div class="source-options">
+                            <!-- NASA Sample Data - Featured -->
+                            <div class="source-option featured" data-type="nasa" onclick="selectSourceType('nasa')">
+                                <div class="featured-badge">Sample Data</div>
+                                <div class="option-icon">
+                                    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                                        <circle cx="12" cy="12" r="10"></circle>
+                                        <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path>
+                                        <path d="M2 12h20"></path>
+                                    </svg>
+                                </div>
+                                <h4>NASA Turbofan</h4>
+                                <p>Engine degradation demo</p>
+                            </div>
+
                             <div class="source-option" data-type="api" onclick="selectSourceType('api')">
                                 <div class="option-icon">
                                     <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
@@ -238,6 +252,79 @@
                                 <div id="csv-preview" style="margin-top: 16px; display: none;"></div>
                             </div>
                         </div>
+
+                        <!-- NASA Sample Data Config -->
+                        <div id="config-nasa" class="source-config" style="display: none;">
+                            <div class="nasa-header">
+                                <div class="nasa-logo">
+                                    <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="var(--accent-primary)" stroke-width="1.5">
+                                        <circle cx="12" cy="12" r="10"></circle>
+                                        <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path>
+                                        <path d="M2 12h20"></path>
+                                    </svg>
+                                </div>
+                                <div class="nasa-info">
+                                    <h3>NASA CMAPSS Turbofan Dataset</h3>
+                                    <p>Run-to-failure simulation of turbofan engines with 21 sensors. Watch the engine degrade in real-time and see how MachineIQ detects the approaching failure.</p>
+                                </div>
+                            </div>
+
+                            <div id="nasa-loading" class="nasa-loading" style="display: none;">
+                                <div class="loading-spinner"></div>
+                                <span>Downloading NASA dataset...</span>
+                            </div>
+
+                            <div id="nasa-config-form">
+                                <div class="form-group">
+                                    <label>Select Engine</label>
+                                    <select id="nasa-engine" class="form-input">
+                                        <option value="1">Engine #1 (192 cycles to failure)</option>
+                                        <option value="5">Engine #5 (128 cycles - fast failure)</option>
+                                        <option value="10">Engine #10 (156 cycles)</option>
+                                        <option value="20">Engine #20 (206 cycles - slow degradation)</option>
+                                    </select>
+                                    <div class="form-hint">Each engine has a unique degradation pattern</div>
+                                </div>
+
+                                <div class="form-group">
+                                    <label>Playback Speed</label>
+                                    <div class="speed-controls">
+                                        <button type="button" class="speed-btn" data-speed="1" onclick="setNasaSpeed(1)">1x</button>
+                                        <button type="button" class="speed-btn active" data-speed="5" onclick="setNasaSpeed(5)">5x</button>
+                                        <button type="button" class="speed-btn" data-speed="10" onclick="setNasaSpeed(10)">10x</button>
+                                        <button type="button" class="speed-btn" data-speed="50" onclick="setNasaSpeed(50)">50x</button>
+                                    </div>
+                                    <div class="form-hint">Higher speed = faster simulation (1 cycle per second at 1x)</div>
+                                </div>
+
+                                <div class="form-group">
+                                    <label>Sensors to Monitor</label>
+                                    <div id="nasa-sensors" class="sensor-grid">
+                                        <!-- Populated by JavaScript -->
+                                    </div>
+                                </div>
+
+                                <div class="info-box" style="margin-top: 16px;">
+                                    <div class="info-icon">
+                                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
+                                        </svg>
+                                    </div>
+                                    <div class="info-content">
+                                        <strong>What you'll see</strong>
+                                        <p>The engine starts healthy (high confidence). As it degrades, sensor readings change and MachineIQ's confidence drops, eventually triggering anomaly alerts before failure.</p>
+                                    </div>
+                                </div>
+
+                                <button type="button" class="btn btn-primary" onclick="loadNasaData()" id="nasa-load-btn" style="margin-top: 16px; width: 100%;">
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right: 8px;">
+                                        <polyline points="1 4 1 10 7 10"></polyline>
+                                        <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"></path>
+                                    </svg>
+                                    Load Sample Data & Start Demo
+                                </button>
+                            </div>
+                        </div>
                     </div>
                 </div>
 
@@ -281,8 +368,30 @@
                         <h2>Preprocessing Options</h2>
                         <p class="step-description">Select how to process raw signals before analysis</p>
 
-                        <div id="preprocessing-options" class="preprocessing-grid">
-                            <!-- Populated by JavaScript -->
+                        <!-- Default preprocessing for all channels -->
+                        <div class="form-group">
+                            <label>Default Preprocessing</label>
+                            <div id="preprocessing-options" class="preprocessing-grid">
+                                <!-- Populated by JavaScript -->
+                            </div>
+                        </div>
+
+                        <!-- Per-channel preprocessing toggle -->
+                        <div class="form-group" style="margin-top: 24px;">
+                            <label class="toggle-label">
+                                <input type="checkbox" id="per-channel-toggle" onchange="togglePerChannelPreprocessing()">
+                                <span class="toggle-slider"></span>
+                                <span>Customize preprocessing per channel</span>
+                            </label>
+                            <div class="form-hint">Enable to set different preprocessing for each channel</div>
+                        </div>
+
+                        <!-- Per-channel preprocessing options -->
+                        <div id="per-channel-preprocessing" class="per-channel-section" style="display: none;">
+                            <h4>Channel-Specific Preprocessing</h4>
+                            <div id="channel-preprocessing-list" class="channel-preprocessing-list">
+                                <!-- Populated by JavaScript -->
+                            </div>
                         </div>
 
                         <div class="info-box" style="margin-top: 24px;">
@@ -350,6 +459,10 @@
         let preprocessingInfo = null;
         let detectedChannels = [];
         let uploadedCSVData = null;
+        let nasaSensorInfo = null;
+        let nasaSpeed = 5;
+        let channelPreprocessing = {};  // Per-channel preprocessing settings
+        let perChannelEnabled = false;
 
         // Load preprocessing info
         async function loadConfigInfo() {
@@ -360,6 +473,163 @@
             } catch (e) {
                 console.error('Failed to load config info:', e);
             }
+        }
+
+        // Load NASA sensor info
+        async function loadNasaSensorInfo() {
+            try {
+                const res = await fetch('/api/nasa/sensors');
+                nasaSensorInfo = await res.json();
+                renderNasaSensors();
+            } catch (e) {
+                console.error('Failed to load NASA sensor info:', e);
+            }
+        }
+
+        function renderNasaSensors() {
+            const container = document.getElementById('nasa-sensors');
+            if (!nasaSensorInfo) return;
+
+            const defaultSensors = nasaSensorInfo.default || [];
+            const allSensors = nasaSensorInfo.sensors || {};
+
+            container.innerHTML = Object.entries(allSensors).map(([id, info]) => {
+                const isDefault = defaultSensors.includes(id);
+                return `
+                    <div class="sensor-item ${isDefault ? 'recommended' : ''}">
+                        <input type="checkbox" id="nasa-${id}" data-sensor="${id}" ${isDefault ? 'checked' : ''}>
+                        <label for="nasa-${id}">
+                            <span class="sensor-id">${id}</span>
+                            <span class="sensor-name">${info.name}</span>
+                            ${isDefault ? '<span class="rec-badge">Recommended</span>' : ''}
+                        </label>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function setNasaSpeed(speed) {
+            nasaSpeed = speed;
+            document.querySelectorAll('.speed-btn').forEach(btn => {
+                btn.classList.toggle('active', parseInt(btn.dataset.speed) === speed);
+            });
+        }
+
+        async function loadNasaData() {
+            const btn = document.getElementById('nasa-load-btn');
+            const loading = document.getElementById('nasa-loading');
+            const form = document.getElementById('nasa-config-form');
+
+            btn.disabled = true;
+            btn.innerHTML = '<span class="loading-spinner small"></span> Loading...';
+
+            try {
+                // Get selected sensors
+                const selectedSensors = Array.from(document.querySelectorAll('#nasa-sensors input:checked'))
+                    .map(cb => cb.dataset.sensor);
+
+                if (selectedSensors.length === 0) {
+                    alert('Please select at least one sensor');
+                    btn.disabled = false;
+                    btn.innerHTML = 'Load Sample Data & Start Demo';
+                    return;
+                }
+
+                const engineNr = parseInt(document.getElementById('nasa-engine').value);
+
+                // Start the NASA stream
+                const response = await fetch('/api/nasa/stream/start', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        engine_nr: engineNr,
+                        speed_multiplier: nasaSpeed,
+                        sensors: selectedSensors
+                    })
+                });
+
+                if (!response.ok) {
+                    const err = await response.json();
+                    throw new Error(err.detail || 'Failed to start NASA stream');
+                }
+
+                const result = await response.json();
+
+                // Update detected channels for other wizard steps
+                detectedChannels = selectedSensors;
+
+                // Set group name automatically
+                document.getElementById('group-name').value = result.group_name;
+
+                // Set source name
+                uploadedCSVData = null;  // Clear any CSV data
+
+                // Show success and redirect to dashboard
+                alert(`NASA Turbofan Demo Started!\n\nEngine: #${engineNr}\nSensors: ${selectedSensors.length}\nSpeed: ${nasaSpeed}x\n\nRedirecting to dashboard...`);
+                window.location.href = '/';
+
+            } catch (error) {
+                console.error('NASA load error:', error);
+                alert('Failed to load NASA data: ' + error.message);
+                btn.disabled = false;
+                btn.innerHTML = 'Load Sample Data & Start Demo';
+            }
+        }
+
+        // Per-channel preprocessing functions
+        function togglePerChannelPreprocessing() {
+            perChannelEnabled = document.getElementById('per-channel-toggle').checked;
+            const section = document.getElementById('per-channel-preprocessing');
+            section.style.display = perChannelEnabled ? 'block' : 'none';
+
+            if (perChannelEnabled) {
+                renderChannelPreprocessingList();
+            }
+        }
+
+        function renderChannelPreprocessingList() {
+            const container = document.getElementById('channel-preprocessing-list');
+            const selectedChannels = Array.from(document.querySelectorAll('.channel-item input:checked'))
+                .map(cb => cb.dataset.channel);
+
+            if (selectedChannels.length === 0) {
+                container.innerHTML = '<p class="no-channels">Select channels in Step 2 first</p>';
+                return;
+            }
+
+            // Get sensor info if available (for NASA data)
+            const getSensorLabel = (ch) => {
+                if (nasaSensorInfo && nasaSensorInfo.sensors && nasaSensorInfo.sensors[ch]) {
+                    return `<span class="channel-label">${ch}</span><span class="channel-desc">${nasaSensorInfo.sensors[ch].name}</span>`;
+                }
+                return `<span class="channel-label">${ch}</span>`;
+            };
+
+            container.innerHTML = selectedChannels.map(ch => {
+                const current = channelPreprocessing[ch] || selectedPreprocessing;
+                return `
+                    <div class="channel-preprocessing-row">
+                        <div class="channel-info">
+                            ${getSensorLabel(ch)}
+                        </div>
+                        <select class="preprocessing-select" onchange="setChannelPreprocessing('${ch}', this.value)">
+                            ${preprocessingInfo ? preprocessingInfo.algorithms.map(algo => `
+                                <option value="${algo.id}" ${current === algo.id ? 'selected' : ''}>
+                                    ${algo.name}
+                                </option>
+                            `).join('') : `
+                                <option value="basic" ${current === 'basic' ? 'selected' : ''}>Basic Time Domain</option>
+                                <option value="vibration" ${current === 'vibration' ? 'selected' : ''}>Vibration Analysis</option>
+                                <option value="frequency" ${current === 'frequency' ? 'selected' : ''}>Frequency Analysis</option>
+                            `}
+                        </select>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function setChannelPreprocessing(channel, preprocessing) {
+            channelPreprocessing[channel] = preprocessing;
         }
 
         function renderPreprocessingOptions() {
@@ -758,19 +1028,30 @@
             // Get source name to link group to source
             const sourceName = document.getElementById(`${selectedSourceType}-name`)?.value || 'Data Source';
 
+            // Build per-channel preprocessing if enabled
+            let channelPreprocessingConfig = null;
+            if (perChannelEnabled && Object.keys(channelPreprocessing).length > 0) {
+                channelPreprocessingConfig = {};
+                channels.forEach(ch => {
+                    channelPreprocessingConfig[ch] = channelPreprocessing[ch] || selectedPreprocessing;
+                });
+            }
+
             return {
                 name: document.getElementById('group-name').value || 'Channel Group',
                 channels: channels,
                 color: selectedColor,
                 sample_rate: 1000, // Auto-detected
                 preprocessing: selectedPreprocessing,
-                source: sourceName  // Link group to data source
+                source: sourceName,  // Link group to data source
+                channel_preprocessing: channelPreprocessingConfig
             };
         }
 
         // Initialize
         document.addEventListener('DOMContentLoaded', () => {
             loadConfigInfo();
+            loadNasaSensorInfo();
             updateStep();
         });
     </script>

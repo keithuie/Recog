@@ -8,53 +8,67 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/static/css/styles.css">
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- uPlot - Fast, lightweight time series charting (same as Grafana uses) -->
+    <link rel="stylesheet" href="https://unpkg.com/uplot@1.6.32/dist/uPlot.min.css">
+    <script src="https://unpkg.com/uplot@1.6.32/dist/uPlot.iife.min.js"></script>
     <style>
-        /* Grafana-like Grid Layout */
+        /* Grafana-inspired dark theme variables */
+        :root {
+            --grafana-bg-canvas: #0b0c0e;
+            --grafana-bg-primary: #111217;
+            --grafana-bg-secondary: #181b1f;
+            --grafana-bg-hover: #22252b;
+            --grafana-border-weak: #2c3235;
+            --grafana-border-medium: #34393e;
+            --grafana-text-primary: #e8eaed;
+            --grafana-text-secondary: #9da5b0;
+            --grafana-text-disabled: #6e7681;
+            --grafana-blue: #5794f2;
+            --grafana-green: #73bf69;
+            --grafana-yellow: #fade2a;
+            --grafana-orange: #ff9830;
+            --grafana-red: #f2495c;
+            --grafana-purple: #b877d9;
+        }
+
+        /* Dashboard Grid */
         .dashboard-grid {
             display: grid;
             grid-template-columns: repeat(12, 1fr);
-            grid-auto-rows: minmax(80px, auto);
-            gap: 16px;
-            padding: 16px 0;
+            grid-auto-rows: minmax(100px, auto);
+            gap: 8px;
+            padding: 8px 0;
         }
 
         .grid-panel {
-            background: var(--bg-secondary);
-            border: 1px solid var(--border-primary);
-            border-radius: var(--radius-md);
+            background: var(--grafana-bg-secondary);
+            border: 1px solid var(--grafana-border-weak);
+            border-radius: 4px;
             position: relative;
             overflow: hidden;
-            transition: box-shadow 0.2s ease;
+            display: flex;
+            flex-direction: column;
         }
 
         .grid-panel:hover {
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
-        }
-
-        .grid-panel.dragging {
-            opacity: 0.8;
-            z-index: 1000;
-            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+            border-color: var(--grafana-border-medium);
         }
 
         /* Panel sizes */
-        .panel-1x1 { grid-column: span 3; grid-row: span 2; }
-        .panel-2x1 { grid-column: span 6; grid-row: span 2; }
-        .panel-3x1 { grid-column: span 9; grid-row: span 2; }
-        .panel-4x1 { grid-column: span 12; grid-row: span 2; }
-        .panel-1x2 { grid-column: span 3; grid-row: span 4; }
-        .panel-2x2 { grid-column: span 6; grid-row: span 4; }
-        .panel-3x2 { grid-column: span 9; grid-row: span 4; }
-        .panel-4x2 { grid-column: span 12; grid-row: span 4; }
+        .panel-2x2 { grid-column: span 6; grid-row: span 4; min-height: 350px; }
+        .panel-2x3 { grid-column: span 6; grid-row: span 5; min-height: 450px; }
+        .panel-4x2 { grid-column: span 12; grid-row: span 4; min-height: 350px; }
+        .panel-4x3 { grid-column: span 12; grid-row: span 5; min-height: 450px; }
 
+        /* Panel Header - Grafana style */
         .panel-header {
             display: flex;
-            justify-content: space-between;
             align-items: center;
-            padding: 12px 16px;
-            border-bottom: 1px solid var(--border-primary);
-            cursor: move;
+            justify-content: space-between;
+            padding: 8px 12px;
+            background: transparent;
+            border-bottom: 1px solid var(--grafana-border-weak);
+            min-height: 32px;
         }
 
         .panel-title {
@@ -62,230 +76,422 @@
             align-items: center;
             gap: 8px;
             font-size: 14px;
-            font-weight: 600;
+            font-weight: 500;
+            color: var(--grafana-text-primary);
         }
 
-        .panel-title .color-dot {
-            width: 10px;
-            height: 10px;
+        .panel-title .status-indicator {
+            width: 8px;
+            height: 8px;
             border-radius: 50%;
+            background: var(--grafana-green);
         }
+
+        .panel-title .status-indicator.training { background: var(--grafana-yellow); animation: pulse 1s infinite; }
+        .panel-title .status-indicator.error { background: var(--grafana-red); }
 
         .panel-actions {
             display: flex;
             gap: 4px;
             opacity: 0;
-            transition: opacity 0.2s ease;
+            transition: opacity 0.15s;
         }
 
-        .grid-panel:hover .panel-actions {
-            opacity: 1;
-        }
+        .grid-panel:hover .panel-actions { opacity: 1; }
 
         .panel-action-btn {
             background: transparent;
             border: none;
-            color: var(--text-tertiary);
+            color: var(--grafana-text-secondary);
             cursor: pointer;
-            padding: 4px;
-            border-radius: 4px;
+            padding: 4px 6px;
+            border-radius: 3px;
+            font-size: 11px;
             display: flex;
             align-items: center;
-            justify-content: center;
+            gap: 4px;
         }
 
         .panel-action-btn:hover {
-            background: var(--bg-hover);
-            color: var(--text-primary);
+            background: var(--grafana-bg-hover);
+            color: var(--grafana-text-primary);
         }
 
+        /* Panel Content */
         .panel-content {
-            padding: 16px;
-            height: calc(100% - 48px);
+            flex: 1;
             display: flex;
             flex-direction: column;
-        }
-
-        .panel-chart {
-            flex: 1;
+            padding: 8px;
             min-height: 0;
             position: relative;
         }
 
-        .panel-stats {
-            display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            gap: 12px;
-            margin-top: 12px;
+        /* Charts Container - stacked channel charts */
+        .charts-stack {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+            min-height: 0;
+            position: relative;
         }
 
-        .panel-stat {
-            text-align: center;
-            padding: 8px;
-            background: var(--bg-tertiary);
-            border-radius: var(--radius-sm);
+        .chart-row {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            min-height: 40px;
+            position: relative;
         }
 
-        .panel-stat-value {
-            font-size: 18px;
-            font-weight: 600;
-            color: var(--text-primary);
+        .chart-label {
+            width: 100px;
+            font-size: 11px;
+            color: var(--grafana-text-secondary);
+            text-align: right;
+            padding-right: 8px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            flex-shrink: 0;
         }
 
-        .panel-stat-label {
-            font-size: 10px;
-            color: var(--text-tertiary);
-            text-transform: uppercase;
-            margin-top: 2px;
+        .chart-wrapper {
+            flex: 1;
+            height: 100%;
+            position: relative;
+            overflow: hidden;
         }
 
-        /* Match score gauge */
-        .match-gauge {
+        .chart-value {
+            width: 70px;
+            font-size: 11px;
+            font-family: 'Roboto Mono', monospace;
+            color: var(--grafana-text-primary);
+            text-align: right;
+            padding-left: 8px;
+            flex-shrink: 0;
+        }
+
+        /* uPlot overrides for Grafana style */
+        .uplot {
+            width: 100% !important;
+            height: 100% !important;
+        }
+
+        .u-legend { display: none !important; }
+
+        /* Synchronized Crosshair */
+        .crosshair-line {
+            position: absolute;
+            top: 0;
+            bottom: 0;
+            width: 1px;
+            background: rgba(255, 255, 255, 0.3);
+            pointer-events: none;
+            z-index: 10;
+            display: none;
+        }
+
+        .crosshair-line.visible { display: block; }
+
+        /* Shared Tooltip - Grafana style */
+        .shared-tooltip {
+            position: fixed;
+            background: var(--grafana-bg-secondary);
+            border: 1px solid var(--grafana-border-medium);
+            border-radius: 4px;
+            padding: 8px 12px;
+            font-size: 12px;
+            z-index: 1000;
+            pointer-events: none;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+            min-width: 180px;
+            display: none;
+        }
+
+        .shared-tooltip.visible { display: block; }
+
+        .tooltip-header {
+            color: var(--grafana-text-secondary);
+            font-size: 11px;
+            margin-bottom: 6px;
+            padding-bottom: 6px;
+            border-bottom: 1px solid var(--grafana-border-weak);
+        }
+
+        .tooltip-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 16px;
+            padding: 2px 0;
+        }
+
+        .tooltip-series {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .tooltip-color {
+            width: 10px;
+            height: 3px;
+            border-radius: 1px;
+        }
+
+        .tooltip-label {
+            color: var(--grafana-text-secondary);
+        }
+
+        .tooltip-value {
+            color: var(--grafana-text-primary);
+            font-family: 'Roboto Mono', monospace;
+            font-weight: 500;
+        }
+
+        /* Interactive Legend - Click to toggle */
+        .chart-legend {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            padding: 8px 0;
+            border-top: 1px solid var(--grafana-border-weak);
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 4px 8px;
+            border-radius: 3px;
+            cursor: pointer;
+            font-size: 11px;
+            color: var(--grafana-text-secondary);
+            transition: all 0.15s;
+        }
+
+        .legend-item:hover {
+            background: var(--grafana-bg-hover);
+            color: var(--grafana-text-primary);
+        }
+
+        .legend-item.hidden {
+            opacity: 0.4;
+        }
+
+        .legend-item.hidden .legend-color {
+            background: var(--grafana-text-disabled) !important;
+        }
+
+        .legend-color {
+            width: 12px;
+            height: 3px;
+            border-radius: 1px;
+        }
+
+        .legend-value {
+            font-family: 'Roboto Mono', monospace;
+            color: var(--grafana-text-primary);
+            margin-left: 4px;
+        }
+
+        /* Confidence Gauge - Grafana gauge style */
+        .confidence-gauge {
             display: flex;
             align-items: center;
             gap: 12px;
-            padding: 12px;
-            background: var(--bg-tertiary);
-            border-radius: var(--radius-sm);
-            margin-top: 12px;
+            padding: 8px 12px;
+            background: var(--grafana-bg-primary);
+            border-radius: 4px;
+            margin-bottom: 8px;
         }
 
-        .gauge-bar {
+        .gauge-label {
+            font-size: 11px;
+            color: var(--grafana-text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .gauge-track {
             flex: 1;
-            height: 8px;
-            background: var(--bg-primary);
-            border-radius: 4px;
+            height: 6px;
+            background: var(--grafana-bg-canvas);
+            border-radius: 3px;
             overflow: hidden;
+            position: relative;
         }
 
         .gauge-fill {
             height: 100%;
-            border-radius: 4px;
-            transition: width 0.3s ease, background 0.3s ease;
+            border-radius: 3px;
+            transition: width 0.3s, background 0.3s;
+        }
+
+        /* Threshold markers on gauge */
+        .gauge-threshold {
+            position: absolute;
+            top: -2px;
+            bottom: -2px;
+            width: 2px;
+            background: var(--grafana-red);
         }
 
         .gauge-value {
-            font-size: 20px;
-            font-weight: 700;
+            font-size: 18px;
+            font-weight: 600;
+            font-family: 'Roboto Mono', monospace;
             min-width: 60px;
             text-align: right;
         }
 
-        /* Channel data display */
-        .channel-data {
+        /* Activity Heatmap (Anomaly Density) */
+        .activity-heatmap {
+            margin-top: 8px;
+        }
+
+        .heatmap-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            font-size: 10px;
+            color: var(--grafana-text-disabled);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 4px;
+        }
+
+        .heatmap-legend {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            font-size: 9px;
+        }
+
+        .heatmap-gradient {
+            width: 40px;
+            height: 6px;
+            background: linear-gradient(to right, rgba(242,73,92,0.1), rgba(242,73,92,0.9));
+            border-radius: 2px;
+        }
+
+        .heatmap-track {
+            height: 20px;
+            background: var(--grafana-bg-primary);
+            border-radius: 3px;
+            display: flex;
+            gap: 1px;
+            overflow: hidden;
+        }
+
+        .heatmap-bar {
+            flex: 1;
+            background: var(--grafana-red);
+            opacity: 0.1;
+            transition: opacity 0.2s;
+        }
+
+        /* Threshold Controls */
+        .threshold-controls {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 6px 8px;
+            background: var(--grafana-bg-primary);
+            border-radius: 4px;
+            margin-bottom: 8px;
+        }
+
+        .threshold-label {
+            font-size: 11px;
+            color: var(--grafana-text-secondary);
+        }
+
+        .threshold-slider {
+            flex: 1;
+            -webkit-appearance: none;
+            height: 4px;
+            background: var(--grafana-bg-canvas);
+            border-radius: 2px;
+            outline: none;
+        }
+
+        .threshold-slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 14px;
+            height: 14px;
+            background: var(--grafana-red);
+            border-radius: 50%;
+            cursor: pointer;
+            border: 2px solid var(--grafana-bg-secondary);
+        }
+
+        .threshold-value {
+            font-size: 12px;
+            font-family: 'Roboto Mono', monospace;
+            color: var(--grafana-red);
+            min-width: 40px;
+            text-align: right;
+        }
+
+        /* Training Overlay */
+        .training-overlay {
+            position: absolute;
+            inset: 0;
+            background: rgba(11, 12, 14, 0.92);
             display: flex;
             flex-direction: column;
-            gap: 8px;
-            margin-top: 8px;
-            max-height: 120px;
-            overflow-y: auto;
-        }
-
-        .channel-row {
-            display: flex;
-            justify-content: space-between;
             align-items: center;
-            padding: 6px 8px;
-            background: var(--bg-tertiary);
-            border-radius: var(--radius-sm);
+            justify-content: center;
+            z-index: 20;
+            border-radius: 4px;
+        }
+
+        .training-overlay.hidden { display: none; }
+
+        .training-spinner {
+            width: 36px;
+            height: 36px;
+            border: 3px solid var(--grafana-border-weak);
+            border-top-color: var(--grafana-blue);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-bottom: 12px;
+        }
+
+        @keyframes spin { to { transform: rotate(360deg); } }
+        @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.5; } }
+
+        .training-overlay h4 {
+            font-size: 14px;
+            color: var(--grafana-text-primary);
+            margin-bottom: 4px;
+        }
+
+        .training-overlay p {
             font-size: 12px;
+            color: var(--grafana-text-secondary);
+            margin-bottom: 12px;
         }
 
-        .channel-name {
-            color: var(--text-secondary);
-        }
-
-        .channel-value {
-            font-family: 'SF Mono', monospace;
-            color: var(--text-primary);
-            font-weight: 500;
-        }
-
-        /* Resize handle */
-        .resize-handle {
-            position: absolute;
-            bottom: 0;
-            right: 0;
-            width: 16px;
-            height: 16px;
-            cursor: se-resize;
-            opacity: 0;
-            transition: opacity 0.2s ease;
-        }
-
-        .grid-panel:hover .resize-handle {
-            opacity: 1;
-        }
-
-        .resize-handle::after {
-            content: '';
-            position: absolute;
-            bottom: 4px;
-            right: 4px;
-            width: 8px;
-            height: 8px;
-            border-right: 2px solid var(--text-tertiary);
-            border-bottom: 2px solid var(--text-tertiary);
-        }
-
-        /* Edit mode */
-        .dashboard-grid.edit-mode .grid-panel {
-            border: 2px dashed var(--border-secondary);
-        }
-
-        .dashboard-grid.edit-mode .panel-header {
-            background: var(--bg-tertiary);
-        }
-
-        /* Panel size selector */
-        .size-selector {
-            position: absolute;
-            top: 100%;
-            right: 0;
-            background: var(--bg-secondary);
-            border: 1px solid var(--border-primary);
-            border-radius: var(--radius-md);
-            padding: 8px;
-            z-index: 100;
-            display: none;
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
-        }
-
-        .size-selector.visible {
-            display: block;
-        }
-
-        .size-grid {
-            display: grid;
-            grid-template-columns: repeat(4, 24px);
-            gap: 4px;
-        }
-
-        .size-cell {
-            width: 24px;
-            height: 24px;
-            background: var(--bg-tertiary);
-            border: 1px solid var(--border-secondary);
-            border-radius: 2px;
-            cursor: pointer;
-        }
-
-        .size-cell:hover,
-        .size-cell.selected {
-            background: var(--accent-primary);
-            border-color: var(--accent-primary);
+        .training-progress {
+            font-size: 18px;
+            font-weight: 600;
+            color: var(--grafana-blue);
         }
 
         /* Toolbar */
         .dashboard-toolbar {
             display: flex;
-            justify-content: space-between;
             align-items: center;
-            margin-bottom: 16px;
-            padding: 12px 16px;
-            background: var(--bg-secondary);
-            border: 1px solid var(--border-primary);
-            border-radius: var(--radius-md);
+            justify-content: space-between;
+            padding: 8px 12px;
+            background: var(--grafana-bg-secondary);
+            border: 1px solid var(--grafana-border-weak);
+            border-radius: 4px;
+            margin-bottom: 8px;
         }
 
         .toolbar-left {
@@ -296,7 +502,8 @@
 
         .toolbar-title {
             font-size: 16px;
-            font-weight: 600;
+            font-weight: 500;
+            color: var(--grafana-text-primary);
         }
 
         .toolbar-status {
@@ -304,218 +511,73 @@
             align-items: center;
             gap: 8px;
             font-size: 12px;
-            color: var(--text-secondary);
-        }
-
-        .live-indicator {
-            display: flex;
-            align-items: center;
-            gap: 6px;
+            color: var(--grafana-text-secondary);
         }
 
         .live-dot {
             width: 8px;
             height: 8px;
-            background: var(--accent-secondary);
+            background: var(--grafana-green);
             border-radius: 50%;
             animation: pulse 2s infinite;
         }
 
-        @keyframes pulse {
-            0%, 100% { opacity: 1; }
-            50% { opacity: 0.5; }
-        }
-
-        .toolbar-actions {
-            display: flex;
-            gap: 8px;
-        }
-
-        /* Data source connection status */
-        .source-status {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            padding: 8px 12px;
-            background: var(--bg-tertiary);
-            border-radius: var(--radius-sm);
-            font-size: 12px;
-        }
-
-        .source-status.connected {
-            color: var(--accent-secondary);
-        }
-
-        .source-status.error {
-            color: var(--accent-danger);
-        }
-
-        /* Toolbar center section */
         .toolbar-center {
             display: flex;
             align-items: center;
-            gap: 16px;
-        }
-
-        .time-range-selector,
-        .refresh-selector {
-            display: flex;
-            align-items: center;
-            gap: 6px;
+            gap: 12px;
         }
 
         .toolbar-select {
-            background: var(--bg-tertiary);
-            border: 1px solid var(--border-primary);
-            color: var(--text-primary);
+            background: var(--grafana-bg-primary);
+            border: 1px solid var(--grafana-border-weak);
+            color: var(--grafana-text-primary);
             padding: 6px 10px;
-            border-radius: var(--radius-sm);
+            border-radius: 3px;
             font-size: 12px;
             cursor: pointer;
         }
 
-        .toolbar-select:hover {
-            border-color: var(--accent-primary);
-        }
+        .toolbar-select:hover { border-color: var(--grafana-border-medium); }
 
-        .toolbar-select:focus {
-            outline: none;
-            border-color: var(--accent-primary);
-            box-shadow: 0 0 0 2px rgba(123, 97, 255, 0.2);
-        }
+        .toolbar-actions { display: flex; gap: 8px; }
 
-        /* Panel fullscreen mode */
-        .grid-panel.fullscreen {
-            position: fixed !important;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            z-index: 9999;
-            grid-column: span 12 !important;
-            grid-row: span 12 !important;
-            border-radius: 0;
-            margin: 0;
-        }
-
-        .grid-panel.fullscreen .panel-content {
-            height: calc(100vh - 60px);
-        }
-
-        /* Fullscreen exit button */
-        .fullscreen-exit-btn {
+        /* Toast notifications */
+        .toast-container {
             position: fixed;
             top: 16px;
             right: 16px;
-            z-index: 10000;
-            background: var(--bg-tertiary);
-            border: 1px solid var(--border-primary);
-            color: var(--text-primary);
-            padding: 8px 16px;
-            border-radius: var(--radius-sm);
-            cursor: pointer;
-            display: none;
-            align-items: center;
-            gap: 8px;
-            font-size: 12px;
-            font-weight: 500;
-        }
-
-        .grid-panel.fullscreen ~ .fullscreen-exit-btn,
-        .fullscreen-exit-btn.visible {
-            display: flex;
-        }
-
-        .fullscreen-exit-btn:hover {
-            background: var(--bg-hover);
-            border-color: var(--accent-primary);
-        }
-
-        /* Toast notification system */
-        .toast-container {
-            position: fixed;
-            top: 80px;
-            right: 24px;
             z-index: 9999;
             display: flex;
             flex-direction: column;
-            gap: 12px;
-            pointer-events: none;
+            gap: 8px;
         }
 
         .toast {
-            background: var(--bg-secondary);
-            border: 1px solid var(--border-primary);
-            border-left: 4px solid var(--accent-primary);
-            border-radius: var(--radius-md);
+            background: var(--grafana-bg-secondary);
+            border: 1px solid var(--grafana-border-weak);
+            border-left: 4px solid var(--grafana-blue);
+            border-radius: 4px;
             padding: 12px 16px;
-            min-width: 320px;
-            max-width: 400px;
-            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
-            pointer-events: auto;
-            animation: slideIn 0.3s ease;
-            display: flex;
-            align-items: flex-start;
-            gap: 12px;
+            min-width: 280px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+            animation: slideIn 0.2s ease;
         }
 
-        .toast.hiding {
-            animation: slideOut 0.3s ease forwards;
-        }
-
-        .toast.anomaly {
-            border-left-color: var(--accent-danger);
-        }
-
-        .toast.warning {
-            border-left-color: var(--accent-warning);
-        }
-
-        .toast.success {
-            border-left-color: var(--accent-secondary);
-        }
-
-        .toast-icon {
-            flex-shrink: 0;
-            width: 20px;
-            height: 20px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-
-        .toast.anomaly .toast-icon { color: var(--accent-danger); }
-        .toast.warning .toast-icon { color: var(--accent-warning); }
-        .toast.success .toast-icon { color: var(--accent-secondary); }
-
-        .toast-content {
-            flex: 1;
-        }
+        .toast.success { border-left-color: var(--grafana-green); }
+        .toast.warning { border-left-color: var(--grafana-yellow); }
+        .toast.error { border-left-color: var(--grafana-red); }
 
         .toast-title {
-            font-weight: 600;
             font-size: 13px;
-            color: var(--text-primary);
+            font-weight: 500;
+            color: var(--grafana-text-primary);
             margin-bottom: 4px;
         }
 
         .toast-message {
             font-size: 12px;
-            color: var(--text-secondary);
-            line-height: 1.4;
-        }
-
-        .toast-close {
-            background: none;
-            border: none;
-            color: var(--text-tertiary);
-            cursor: pointer;
-            padding: 4px;
-            margin: -4px -4px -4px 0;
-        }
-
-        .toast-close:hover {
-            color: var(--text-primary);
+            color: var(--grafana-text-secondary);
         }
 
         @keyframes slideIn {
@@ -523,57 +585,126 @@
             to { transform: translateX(0); opacity: 1; }
         }
 
-        @keyframes slideOut {
-            from { transform: translateX(0); opacity: 1; }
-            to { transform: translateX(100%); opacity: 0; }
+        /* Fullscreen mode */
+        .grid-panel.fullscreen {
+            position: fixed !important;
+            inset: 0;
+            z-index: 9998;
+            border-radius: 0;
         }
 
-        /* Chart threshold lines */
-        .threshold-legend {
-            display: flex;
-            gap: 16px;
-            font-size: 10px;
-            margin-top: 8px;
-            justify-content: center;
+        .fullscreen-exit-btn {
+            position: fixed;
+            top: 12px;
+            right: 12px;
+            z-index: 10000;
+            background: var(--grafana-bg-secondary);
+            border: 1px solid var(--grafana-border-weak);
+            color: var(--grafana-text-primary);
+            padding: 8px 16px;
+            border-radius: 4px;
+            cursor: pointer;
+            display: none;
+            font-size: 12px;
         }
 
-        .threshold-item {
-            display: flex;
-            align-items: center;
-            gap: 4px;
-            color: var(--text-tertiary);
+        .fullscreen-exit-btn.visible { display: flex; align-items: center; gap: 6px; }
+        .fullscreen-exit-btn:hover { background: var(--grafana-bg-hover); }
+
+        /* Size selector dropdown */
+        .size-selector {
+            position: absolute;
+            top: 100%;
+            right: 0;
+            background: var(--grafana-bg-secondary);
+            border: 1px solid var(--grafana-border-weak);
+            border-radius: 4px;
+            padding: 8px;
+            z-index: 100;
+            display: none;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
         }
 
-        .threshold-item .line {
-            width: 16px;
-            height: 2px;
-            border-radius: 1px;
+        .size-selector.visible { display: block; }
+
+        .size-option {
+            padding: 6px 12px;
+            font-size: 12px;
+            color: var(--grafana-text-secondary);
+            cursor: pointer;
+            border-radius: 3px;
+            white-space: nowrap;
         }
 
-        .threshold-item.warning .line { background: var(--accent-warning); }
-        .threshold-item.danger .line { background: var(--accent-danger); }
-
-        /* Value change animation */
-        .channel-value.updated {
-            animation: valueFlash 0.5s ease;
+        .size-option:hover {
+            background: var(--grafana-bg-hover);
+            color: var(--grafana-text-primary);
         }
 
-        @keyframes valueFlash {
-            0% { background: rgba(123, 97, 255, 0.3); }
-            100% { background: transparent; }
+        /* Empty state */
+        .empty-state {
+            text-align: center;
+            padding: 48px;
         }
 
-        /* Improved empty state */
         .empty-state h4 {
-            font-size: 18px;
-            font-weight: 600;
-            color: var(--text-primary);
+            font-size: 16px;
+            color: var(--grafana-text-primary);
             margin: 16px 0 8px;
         }
 
         .empty-state p {
-            color: var(--text-secondary);
-            margin-bottom: 24px;
+            color: var(--grafana-text-secondary);
+            margin-bottom: 16px;
+        }
+
+        /* Data sources section */
+        .data-section { margin-top: 16px; }
+
+        .section-header {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 12px;
+        }
+
+        .section-header h2 {
+            font-size: 14px;
+            font-weight: 500;
+            color: var(--grafana-text-primary);
+        }
+
+        .section-count {
+            background: var(--grafana-bg-hover);
+            color: var(--grafana-text-secondary);
+            padding: 2px 8px;
+            border-radius: 10px;
+            font-size: 11px;
+        }
+
+        .source-card {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 10px 12px;
+            background: var(--grafana-bg-secondary);
+            border: 1px solid var(--grafana-border-weak);
+            border-radius: 4px;
+            font-size: 12px;
+        }
+
+        .source-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: var(--grafana-green);
+        }
+
+        .source-name { color: var(--grafana-text-primary); flex: 1; }
+        .source-type {
+            color: var(--grafana-text-disabled);
+            font-size: 10px;
+            text-transform: uppercase;
         }
     </style>
 </head>
@@ -585,11 +716,10 @@
                 <div class="logo-icon"></div>
                 <h1>MachineIQ</h1>
             </div>
-
             <nav class="nav-menu">
                 <a href="/" class="nav-item active">
                     <span class="nav-icon">
-                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                             <rect x="3" y="3" width="7" height="7"></rect>
                             <rect x="14" y="3" width="7" height="7"></rect>
                             <rect x="14" y="14" width="7" height="7"></rect>
@@ -600,24 +730,16 @@
                 </a>
                 <a href="/setup" class="nav-item">
                     <span class="nav-icon">
-                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                             <circle cx="12" cy="12" r="3"></circle>
                             <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
                         </svg>
                     </span>
-                    Setup Wizard
-                </a>
-                <a href="/dataflow" class="nav-item">
-                    <span class="nav-icon">
-                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>
-                        </svg>
-                    </span>
-                    Dataflow
+                    Setup
                 </a>
                 <a href="/model-config" class="nav-item">
                     <span class="nav-icon">
-                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                             <path d="M12 2L2 7l10 5 10-5-10-5z"></path>
                             <path d="M2 17l10 5 10-5"></path>
                             <path d="M2 12l10 5 10-5"></path>
@@ -626,7 +748,6 @@
                     Model Config
                 </a>
             </nav>
-
             <div class="sidebar-footer">
                 <div class="connection-status">
                     <span class="status-dot" id="ws-status"></span>
@@ -640,65 +761,72 @@
             <header class="top-bar">
                 <div class="breadcrumbs">Dashboard / Monitoring</div>
                 <div class="header-actions">
-                    <button class="btn btn-secondary" onclick="downloadCSVTemplate()">
-                        Download CSV Template
-                    </button>
-                    <a href="/setup" class="btn btn-primary">
-                        + Add Data Source
-                    </a>
+                    <a href="/setup" class="btn btn-primary">+ Add Data Source</a>
                 </div>
             </header>
 
             <div class="content-area">
-                <!-- Dashboard Toolbar -->
+                <!-- Toolbar -->
                 <div class="dashboard-toolbar">
                     <div class="toolbar-left">
                         <span class="toolbar-title">Monitoring Dashboard</span>
                         <div class="toolbar-status">
-                            <div class="live-indicator">
-                                <span class="live-dot"></span>
-                                <span>LIVE</span>
-                            </div>
+                            <span class="live-dot"></span>
+                            <span>LIVE</span>
                             <span id="update-rate">--</span>
                         </div>
                     </div>
                     <div class="toolbar-center">
-                        <!-- Time Range Selector -->
-                        <div class="time-range-selector">
-                            <select id="time-range" onchange="setTimeRange(this.value)" class="toolbar-select">
-                                <option value="60">Last 1 min</option>
-                                <option value="300" selected>Last 5 min</option>
-                                <option value="900">Last 15 min</option>
-                                <option value="1800">Last 30 min</option>
-                                <option value="3600">Last 1 hour</option>
+                        <select id="time-range" onchange="setTimeRange(this.value)" class="toolbar-select">
+                            <option value="60">Last 1 min</option>
+                            <option value="300" selected>Last 5 min</option>
+                            <option value="900">Last 15 min</option>
+                            <option value="3600">Last 1 hour</option>
+                        </select>
+                        <select id="refresh-interval" onchange="setRefreshInterval(this.value)" class="toolbar-select">
+                            <option value="500">500ms</option>
+                            <option value="1000">1s</option>
+                            <option value="2000" selected>2s</option>
+                            <option value="5000">5s</option>
+                        </select>
+
+                        <!-- Global Time Control (for minimized sparklines) -->
+                        <div class="global-time-control">
+                            <span class="control-label">Overview:</span>
+                            <select id="global-time-range" onchange="setGlobalTimeRange(this.value)" class="toolbar-select">
+                                <option value="3600" selected>1 hour</option>
+                                <option value="86400">24 hours</option>
+                                <option value="604800">7 days</option>
                             </select>
                         </div>
-                        <!-- Refresh Interval -->
-                        <div class="refresh-selector">
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="opacity: 0.6;">
-                                <polyline points="23 4 23 10 17 10"></polyline>
-                                <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path>
-                            </svg>
-                            <select id="refresh-interval" onchange="setRefreshInterval(this.value)" class="toolbar-select">
-                                <option value="1000">1s</option>
-                                <option value="2000" selected>2s</option>
-                                <option value="5000">5s</option>
-                                <option value="10000">10s</option>
-                                <option value="0">Off</option>
-                            </select>
+
+                        <!-- Global Tile Controls -->
+                        <div class="tile-global-controls">
+                            <button class="tile-control-btn" onclick="minimizeAllTiles()" id="minimize-all-btn" title="Minimize All Tiles">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <polyline points="4 14 10 14 10 20"></polyline>
+                                    <polyline points="20 10 14 10 14 4"></polyline>
+                                </svg>
+                                Minimize All
+                            </button>
+                            <button class="tile-control-btn" onclick="expandAllTiles()" id="expand-all-btn" title="Expand All Tiles">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <polyline points="15 3 21 3 21 9"></polyline>
+                                    <polyline points="9 21 3 21 3 15"></polyline>
+                                </svg>
+                                Expand All
+                            </button>
                         </div>
                     </div>
                     <div class="toolbar-actions">
-                        <button class="btn btn-secondary btn-sm" onclick="toggleEditMode()" id="edit-mode-btn">
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
-                                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
-                            </svg>
-                            Edit Layout
-                        </button>
-                        <button class="btn btn-secondary btn-sm" onclick="resetLayout()">
-                            Reset
-                        </button>
+                        <!-- Theme Switcher -->
+                        <div class="theme-switcher">
+                            <button class="theme-btn active" data-theme="dark" data-tooltip="Dark (Kraken)" onclick="setTheme('dark')"></button>
+                            <button class="theme-btn" data-theme="silver" data-tooltip="Silver (Bloomberg)" onclick="setTheme('silver')"></button>
+                            <button class="theme-btn" data-theme="notion" data-tooltip="Notion (Light)" onclick="setTheme('notion')"></button>
+                        </div>
+                        <button class="btn btn-secondary btn-sm" onclick="toggleEditMode()" id="edit-mode-btn">Edit Layout</button>
+                        <button class="btn btn-secondary btn-sm" onclick="resetLayout()">Reset</button>
                     </div>
                 </div>
 
@@ -706,86 +834,190 @@
                 <div class="dashboard-grid" id="dashboard-grid">
                     {% if groups %}
                         {% for group in groups %}
-                        <div class="grid-panel panel-2x2" data-group="{{ group.name }}" data-size="2x2">
+                        <div class="grid-panel smart-tile expanded panel-2x3" data-group="{{ group.name }}" data-size="2x3">
                             <div class="panel-header">
                                 <div class="panel-title">
-                                    <span class="color-dot" style="background: {{ group.color }};"></span>
+                                    <span class="status-indicator" id="status-{{ group.name }}"></span>
                                     {{ group.name }}
-                                    <span class="status-badge {{ group.status }}" style="font-size: 10px; padding: 2px 6px;">
-                                        {{ group.status }}
+                                    <!-- Anomalies Counter -->
+                                    <span class="anomaly-counter" id="anomaly-count-{{ group.name }}" title="Anomalies detected in time range">
+                                        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                            <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
+                                        </svg>
+                                        <span id="anomaly-count-value-{{ group.name }}">0</span>
+                                    </span>
+                                </div>
+                                <!-- Local Time Control (per-tile) -->
+                                <div class="local-time-control" id="local-time-{{ group.name }}">
+                                    <select class="local-time-select" onchange="setLocalTimeRange('{{ group.name }}', this.value)">
+                                        <option value="live">Live</option>
+                                        <option value="60">1 min</option>
+                                        <option value="300">5 min</option>
+                                        <option value="600">10 min</option>
+                                        <option value="1800">30 min</option>
+                                        <option value="3600">1 hour</option>
+                                    </select>
+                                    <span class="local-time-status" id="local-time-status-{{ group.name }}">
+                                        <span class="live-indicator"></span>
                                     </span>
                                 </div>
                                 <div class="panel-actions">
-                                    <button class="panel-action-btn" onclick="togglePanelFullscreen('{{ group.name }}')" title="Fullscreen">
+                                    <!-- Minimize/Expand Toggle -->
+                                    <button class="tile-toggle-btn" onclick="toggleTile('{{ group.name }}')" title="Minimize/Expand">
                                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                            <polyline points="18 15 12 9 6 15"></polyline>
+                                        </svg>
+                                    </button>
+                                    <button class="panel-action-btn" onclick="toggleFullscreen('{{ group.name }}')">
+                                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                             <polyline points="15 3 21 3 21 9"></polyline>
                                             <polyline points="9 21 3 21 3 15"></polyline>
-                                            <line x1="21" y1="3" x2="14" y2="10"></line>
-                                            <line x1="3" y1="21" x2="10" y2="14"></line>
                                         </svg>
                                     </button>
-                                    <button class="panel-action-btn" onclick="showGroupDetails('{{ group.name }}')" title="Details">
-                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                            <circle cx="12" cy="12" r="10"></circle>
-                                            <line x1="12" y1="16" x2="12" y2="12"></line>
-                                            <line x1="12" y1="8" x2="12.01" y2="8"></line>
+                                    <button class="panel-action-btn" onclick="showSizeMenu('{{ group.name }}')">
+                                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                            <rect x="3" y="3" width="18" height="18" rx="2"></rect>
                                         </svg>
                                     </button>
-                                    <button class="panel-action-btn" onclick="startTraining('{{ group.name }}', {{ group.trained_states }})" title="Train">
-                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                            <polygon points="5 3 19 12 5 21 5 3"></polygon>
-                                        </svg>
-                                    </button>
-                                </div>
-                                <div class="size-selector" id="size-{{ group.name }}">
-                                    <div class="size-grid">
-                                        <div class="size-cell" onclick="setPanelSize('{{ group.name }}', '1x1')"></div>
-                                        <div class="size-cell" onclick="setPanelSize('{{ group.name }}', '2x1')"></div>
-                                        <div class="size-cell" onclick="setPanelSize('{{ group.name }}', '3x1')"></div>
-                                        <div class="size-cell" onclick="setPanelSize('{{ group.name }}', '4x1')"></div>
-                                        <div class="size-cell" onclick="setPanelSize('{{ group.name }}', '1x2')"></div>
-                                        <div class="size-cell selected" onclick="setPanelSize('{{ group.name }}', '2x2')"></div>
-                                        <div class="size-cell" onclick="setPanelSize('{{ group.name }}', '3x2')"></div>
-                                        <div class="size-cell" onclick="setPanelSize('{{ group.name }}', '4x2')"></div>
+                                    <button class="panel-action-btn" onclick="startTraining('{{ group.name }}', {{ group.trained_states }})">Train</button>
+                                    <div class="size-selector" id="size-menu-{{ group.name }}">
+                                        <div class="size-option" onclick="setPanelSize('{{ group.name }}', '2x2')">Medium (2x2)</div>
+                                        <div class="size-option" onclick="setPanelSize('{{ group.name }}', '2x3')">Large (2x3)</div>
+                                        <div class="size-option" onclick="setPanelSize('{{ group.name }}', '4x2')">Wide (4x2)</div>
+                                        <div class="size-option" onclick="setPanelSize('{{ group.name }}', '4x3')">Full (4x3)</div>
                                     </div>
                                 </div>
                             </div>
-                            <div class="panel-content">
-                                <div class="panel-chart">
-                                    <canvas id="chart-{{ group.name }}"></canvas>
+
+                            <!-- Health Beacon (visible when minimized) -->
+                            <div class="health-beacon" id="beacon-{{ group.name }}">
+                                <div class="health-beacon-glow status-idle" id="beacon-glow-{{ group.name }}"></div>
+                                <div class="health-beacon-info">
+                                    <div class="health-beacon-title">{{ group.name }}</div>
+                                    <div class="health-beacon-status" id="beacon-status-{{ group.name }}">Idle</div>
                                 </div>
-                                <div class="match-gauge">
-                                    <div class="gauge-bar">
-                                        <div class="gauge-fill" id="gauge-{{ group.name }}" style="width: 0%; background: var(--accent-secondary);"></div>
+                                <div class="mini-sparkline" id="sparkline-{{ group.name }}">
+                                    <svg viewBox="0 0 120 32" preserveAspectRatio="none">
+                                        <defs>
+                                            <linearGradient id="sparkline-grad-{{ group.name }}" x1="0" y1="0" x2="0" y2="1">
+                                                <stop offset="0%" stop-color="var(--accent-secondary)" stop-opacity="0.4"/>
+                                                <stop offset="100%" stop-color="var(--accent-secondary)" stop-opacity="0"/>
+                                            </linearGradient>
+                                        </defs>
+                                        <path class="mini-sparkline-fill" id="sparkline-fill-{{ group.name }}" d="" fill="url(#sparkline-grad-{{ group.name }})"/>
+                                        <path class="mini-sparkline-path" id="sparkline-path-{{ group.name }}" d=""/>
+                                    </svg>
+                                </div>
+                                <div class="health-beacon-value" id="beacon-value-{{ group.name }}">--</div>
+                            </div>
+
+                            <div class="panel-content panel-content-expanded" id="content-{{ group.name }}">
+                                <!-- Training overlay -->
+                                <div class="training-overlay" id="overlay-{{ group.name }}" data-state="{% if group.trained_states > 0 %}trained{% else %}untrained{% endif %}">
+                                    <div class="overlay-untrained" {% if group.trained_states > 0 %}style="display:none"{% endif %}>
+                                        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="opacity:0.5;margin-bottom:12px">
+                                            <path d="M12 2L2 7l10 5 10-5-10-5z"></path>
+                                            <path d="M2 17l10 5 10-5"></path>
+                                            <path d="M2 12l10 5 10-5"></path>
+                                        </svg>
+                                        <h4>Model Not Trained</h4>
+                                        <p>Train the model to enable anomaly detection</p>
+                                        <button class="btn btn-primary btn-sm" onclick="startTraining('{{ group.name }}', 0)">Start Training</button>
                                     </div>
-                                    <div class="gauge-value" id="score-{{ group.name }}">--</div>
+                                    <div class="overlay-training" style="display:none">
+                                        <div class="training-spinner"></div>
+                                        <h4>Training in Progress</h4>
+                                        <p>Learning normal patterns...</p>
+                                        <div class="training-progress" id="progress-{{ group.name }}">0%</div>
+                                    </div>
                                 </div>
-                                <div class="threshold-legend">
-                                    <span class="threshold-item warning"><span class="line"></span> Warning 70%</span>
-                                    <span class="threshold-item danger"><span class="line"></span> Anomaly 40%</span>
+
+                                <!-- Confidence Gauge -->
+                                <div class="confidence-gauge" id="gauge-{{ group.name }}">
+                                    <span class="gauge-label">Confidence</span>
+                                    <div class="gauge-track">
+                                        <div class="gauge-fill" id="gauge-fill-{{ group.name }}" style="width:0%"></div>
+                                        <div class="gauge-threshold" id="gauge-threshold-{{ group.name }}" style="left:40%"></div>
+                                    </div>
+                                    <span class="gauge-value" id="gauge-value-{{ group.name }}">--</span>
                                 </div>
-                                <div class="channel-data" id="channels-{{ group.name }}">
+
+                                <!-- Threshold Control -->
+                                <div class="threshold-controls">
+                                    <span class="threshold-label">Anomaly Threshold</span>
+                                    <input type="range" class="threshold-slider" min="10" max="90" value="40"
+                                           id="threshold-slider-{{ group.name }}"
+                                           oninput="updateThreshold('{{ group.name }}', this.value)">
+                                    <span class="threshold-value" id="threshold-value-{{ group.name }}">40%</span>
+                                </div>
+
+                                <!-- Charts Stack -->
+                                <div class="charts-stack" id="charts-{{ group.name }}">
                                     {% for channel in group.channels %}
-                                    <div class="channel-row">
-                                        <span class="channel-name">{{ channel }}</span>
-                                        <span class="channel-value" id="val-{{ group.name }}-{{ loop.index0 }}">--</span>
+                                    <div class="chart-row" data-channel="{{ channel }}" data-index="{{ loop.index0 }}">
+                                        <div class="chart-row-controls">
+                                            <button class="focus-btn" onclick="toggleFocusMode('{{ group.name }}', {{ loop.index0 }})" title="Focus on this channel">
+                                                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                                    <circle cx="12" cy="12" r="10"></circle>
+                                                    <circle cx="12" cy="12" r="3"></circle>
+                                                </svg>
+                                            </button>
+                                            <span class="chart-label" title="{{ channel }}">{{ channel }}</span>
+                                        </div>
+                                        <div class="chart-wrapper" id="chart-wrap-{{ group.name }}-{{ loop.index0 }}">
+                                            <div class="crosshair-line" id="crosshair-{{ group.name }}-{{ loop.index0 }}"></div>
+                                        </div>
+                                        <span class="chart-value" id="value-{{ group.name }}-{{ loop.index0 }}">--</span>
+                                    </div>
+                                    {% endfor %}
+                                    <!-- Focus Mode Exit Button (hidden by default) -->
+                                    <button class="exit-focus-btn" id="exit-focus-{{ group.name }}" onclick="exitFocusMode('{{ group.name }}')" style="display:none">
+                                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                            <path d="M18 6L6 18M6 6l12 12"></path>
+                                        </svg>
+                                        Exit Focus Mode
+                                    </button>
+                                </div>
+
+                                <!-- Legend -->
+                                <div class="chart-legend" id="legend-{{ group.name }}">
+                                    {% for channel in group.channels %}
+                                    <div class="legend-item" data-channel="{{ channel }}" data-index="{{ loop.index0 }}"
+                                         onclick="toggleSeries('{{ group.name }}', {{ loop.index0 }})">
+                                        <span class="legend-color" id="legend-color-{{ group.name }}-{{ loop.index0 }}"></span>
+                                        <span class="legend-label">{{ channel }}</span>
+                                        <span class="legend-value" id="legend-value-{{ group.name }}-{{ loop.index0 }}">--</span>
                                     </div>
                                     {% endfor %}
                                 </div>
+
+                                <!-- Activity Heatmap -->
+                                <div class="activity-heatmap">
+                                    <div class="heatmap-header">
+                                        <span>Activity Heatmap</span>
+                                        <div class="heatmap-legend">
+                                            <span>Low</span>
+                                            <div class="heatmap-gradient"></div>
+                                            <span>High</span>
+                                        </div>
+                                    </div>
+                                    <div class="heatmap-track" id="heatmap-{{ group.name }}">
+                                        {% for i in range(60) %}
+                                        <div class="heatmap-bar"></div>
+                                        {% endfor %}
+                                    </div>
+                                </div>
                             </div>
-                            <div class="resize-handle"></div>
                         </div>
                         {% endfor %}
                     {% else %}
-                        <div class="grid-panel panel-4x2" style="display: flex; align-items: center; justify-content: center;">
+                        <div class="grid-panel panel-4x2" style="display:flex;align-items:center;justify-content:center;">
                             <div class="empty-state">
-                                <div class="empty-icon">
-                                    <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" opacity="0.5">
-                                        <path d="M12 2L2 7l10 5 10-5-10-5z"></path>
-                                        <path d="M2 17l10 5 10-5"></path>
-                                        <path d="M2 12l10 5 10-5"></path>
-                                    </svg>
-                                </div>
+                                <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="opacity:0.4">
+                                    <path d="M12 2L2 7l10 5 10-5-10-5z"></path>
+                                    <path d="M2 17l10 5 10-5"></path>
+                                    <path d="M2 12l10 5 10-5"></path>
+                                </svg>
                                 <h4>No Channel Groups</h4>
                                 <p>Create your first channel group to start monitoring</p>
                                 <a href="/setup" class="btn btn-primary">Setup Wizard</a>
@@ -794,30 +1026,30 @@
                     {% endif %}
                 </div>
 
-                <!-- Data Sources Status -->
-                <section class="data-section" style="margin-top: 24px;">
+                <!-- Data Sources -->
+                <section class="data-section">
                     <div class="section-header">
                         <h2>Data Sources</h2>
                         <span class="section-count">{{ sources|length }}</span>
                     </div>
-                    <div class="sources-status-grid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 12px;">
-                        {% if sources %}
-                            {% for source in sources %}
-                            <div class="source-status connected" data-source="{{ source.name }}">
-                                <span class="status-dot connected"></span>
-                                <span>{{ source.name }}</span>
-                                <span class="type-badge {{ source.type }}" style="margin-left: auto;">{{ source.type|upper }}</span>
-                            </div>
-                            {% endfor %}
-                        {% else %}
-                            <div class="source-status">
-                                <span>No data sources configured</span>
-                            </div>
-                        {% endif %}
+                    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:8px;">
+                        {% for source in sources %}
+                        <div class="source-card">
+                            <span class="source-dot"></span>
+                            <span class="source-name">{{ source.name }}</span>
+                            <span class="source-type">{{ source.type }}</span>
+                        </div>
+                        {% endfor %}
                     </div>
                 </section>
             </div>
         </main>
+    </div>
+
+    <!-- Shared Tooltip -->
+    <div class="shared-tooltip" id="shared-tooltip">
+        <div class="tooltip-header" id="tooltip-time">--:--:--</div>
+        <div class="tooltip-content" id="tooltip-content"></div>
     </div>
 
     <!-- Toast Container -->
@@ -825,450 +1057,987 @@
 
     <!-- Fullscreen Exit Button -->
     <button class="fullscreen-exit-btn" id="fullscreen-exit-btn" onclick="exitFullscreen()">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <path d="M8 3v3a2 2 0 0 1-2 2H3"></path>
             <path d="M21 8h-3a2 2 0 0 1-2-2V3"></path>
             <path d="M3 16h3a2 2 0 0 1 2 2v3"></path>
             <path d="M16 21v-3a2 2 0 0 1 2-2h3"></path>
         </svg>
-        Exit Fullscreen (Esc)
+        Exit (Esc)
     </button>
 
     <!-- Training Modal -->
-    <div id="training-modal" class="modal" style="display: none;">
+    <div id="training-modal" class="modal" style="display:none;">
         <div class="modal-content">
             <h3 id="training-modal-title">Start Training</h3>
-            <p id="training-modal-desc">Select training duration for learning normal patterns:</p>
+            <p id="training-modal-desc">Select training duration:</p>
             <div class="form-group">
-                <label>Duration</label>
                 <select id="training-duration" class="form-select">
                     <option value="30">30 seconds</option>
                     <option value="60" selected>1 minute</option>
                     <option value="120">2 minutes</option>
                     <option value="300">5 minutes</option>
-                    <option value="600">10 minutes</option>
                 </select>
             </div>
             <div class="modal-actions">
                 <button class="btn btn-secondary" onclick="closeModal()">Cancel</button>
-                <button class="btn btn-primary" id="confirm-training-btn" onclick="confirmTraining()">Start</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- Details Modal -->
-    <div id="details-modal" class="modal" style="display: none;">
-        <div class="modal-content" style="max-width: 600px;">
-            <h3 id="details-modal-title">Group Details</h3>
-            <div id="details-content"></div>
-            <div class="modal-actions">
-                <button class="btn btn-secondary" onclick="closeDetailsModal()">Close</button>
+                <button class="btn btn-primary" onclick="confirmTraining()">Start</button>
             </div>
         </div>
     </div>
 
     <script>
-        // State
-        let ws;
-        let charts = {};
-        let editMode = false;
-        let currentTrainingGroup = null;
-        let isRetraining = false;
-        let lastDataUpdate = {};
-        let updateCount = 0;
-        let wsConnected = false;
-        let fallbackSimulationInterval = null;
-        let timeRangeSeconds = 300;  // Default 5 minutes
-        let refreshIntervalMs = 2000;  // Default 2 seconds
+        // ==================== STATE ====================
+        const state = {
+            ws: null,
+            wsConnected: false,
+            charts: {},           // uPlot instances per group per channel
+            chartData: {},        // Raw data storage
+            trainedGroups: new Set(),
+            thresholds: {},       // Per-group thresholds
+            hiddenSeries: {},     // Hidden channels per group
+            anomalyTimestamps: {},  // { groupName: [{ timestamp, confidence }] }
+            timeRangeSeconds: 300,
+            refreshIntervalMs: 2000,
+            updateCount: 0,
+            currentTrainingGroup: null,
+            editMode: false,
+            fullscreenPanel: null,
+            simulationInterval: null,
+            cursorX: null,        // For crosshair sync
+            currentTheme: 'dark', // Theme state
+            minimizedTiles: new Set(), // Track minimized tiles
+            sparklineData: {},    // Store sparkline confidence history
+            // Forensics mode state
+            forensicsMode: {},    // { groupName: { enabled: bool, zoomRange: [min, max] } }
+            liveMode: {},         // { groupName: true/false } - tracks if chart is in live rolling mode
+        };
 
-        // Time Range Control
-        function setTimeRange(seconds) {
-            timeRangeSeconds = parseInt(seconds);
-            // Adjust chart data length based on time range
-            const maxPoints = Math.floor(timeRangeSeconds / (refreshIntervalMs / 1000));
-            Object.keys(charts).forEach(groupName => {
-                const chart = charts[groupName];
-                if (chart) {
-                    // Trim data if needed
-                    while (chart.data.labels.length > maxPoints) {
-                        chart.data.labels.shift();
-                        chart.data.datasets[0].data.shift();
-                    }
-                    chart.update('none');
+        // Grafana-style color palette
+        const COLORS = [
+            '#73bf69', '#f2495c', '#5794f2', '#fade2a', '#ff9830',
+            '#b877d9', '#ff7383', '#8ab8ff', '#e5cd52', '#ffb357'
+        ];
+
+        // ==================== INITIALIZATION ====================
+        document.addEventListener('DOMContentLoaded', () => {
+            loadLayout();
+            loadTheme();
+            loadTileStates();
+            initAllCharts();
+            initSparklines();
+            connectWebSocket();
+            startSimulation();
+
+            setInterval(updateRateDisplay, 5000);
+
+            // Mark initially trained groups
+            document.querySelectorAll('.training-overlay').forEach(el => {
+                if (el.dataset.state === 'trained') {
+                    const groupName = el.id.replace('overlay-', '');
+                    state.trainedGroups.add(groupName);
+                    el.classList.add('hidden');
                 }
             });
-            console.log(`Time range set to ${seconds}s, max points: ${maxPoints}`);
+
+            // Initialize legend colors
+            document.querySelectorAll('.legend-color').forEach(el => {
+                const idx = parseInt(el.id.split('-').pop());
+                el.style.background = COLORS[idx % COLORS.length];
+            });
+
+            // Close menus on outside click
+            document.addEventListener('click', (e) => {
+                if (!e.target.closest('.panel-action-btn') && !e.target.closest('.size-selector')) {
+                    document.querySelectorAll('.size-selector').forEach(m => m.classList.remove('visible'));
+                }
+            });
+
+            // Keyboard shortcuts
+            document.addEventListener('keydown', (e) => {
+                if (e.key === 'Escape' && state.fullscreenPanel) exitFullscreen();
+                // M key to toggle minimize all
+                if (e.key === 'm' && !e.ctrlKey && !e.metaKey && document.activeElement.tagName !== 'INPUT') {
+                    const allMinimized = document.querySelectorAll('.smart-tile.minimized').length ===
+                                        document.querySelectorAll('.smart-tile').length;
+                    allMinimized ? expandAllTiles() : minimizeAllTiles();
+                }
+            });
+        });
+
+        // ==================== THEME SYSTEM ====================
+        function setTheme(themeName) {
+            document.documentElement.setAttribute('data-theme', themeName);
+            state.currentTheme = themeName;
+            localStorage.setItem('miq-theme', themeName);
+
+            // Update theme switcher buttons
+            document.querySelectorAll('.theme-btn').forEach(btn => {
+                btn.classList.toggle('active', btn.dataset.theme === themeName);
+            });
+
+            // Notify user
+            const themeNames = { dark: 'Dark (Kraken)', silver: 'Silver (Bloomberg)', notion: 'Notion (Light)' };
+            showToast('Theme Changed', `Switched to ${themeNames[themeName]}`, 'info');
         }
 
-        // Refresh Interval Control
-        function setRefreshInterval(ms) {
-            refreshIntervalMs = parseInt(ms);
-            stopFallbackSimulation();
-            if (refreshIntervalMs > 0 && !wsConnected) {
-                startFallbackSimulation();
+        function loadTheme() {
+            const saved = localStorage.getItem('miq-theme') || 'dark';
+            state.currentTheme = saved;
+            document.documentElement.setAttribute('data-theme', saved);
+            document.querySelectorAll('.theme-btn').forEach(btn => {
+                btn.classList.toggle('active', btn.dataset.theme === saved);
+            });
+        }
+
+        // ==================== SMART TILE SYSTEM ====================
+        function toggleTile(groupName) {
+            const tile = document.querySelector(`[data-group="${groupName}"]`);
+            if (!tile) return;
+
+            const isMinimized = tile.classList.contains('minimized');
+
+            if (isMinimized) {
+                tile.classList.remove('minimized');
+                tile.classList.add('expanded');
+                state.minimizedTiles.delete(groupName);
+            } else {
+                tile.classList.remove('expanded');
+                tile.classList.add('minimized');
+                state.minimizedTiles.add(groupName);
             }
-            console.log(`Refresh interval set to ${ms}ms`);
+
+            saveTileStates();
+            updateTileControlButtons();
+
+            // Resize charts after transition
+            setTimeout(() => {
+                if (!isMinimized) return; // Only resize when expanding
+                Object.values(state.charts[groupName] || {}).forEach(chart => {
+                    const wrap = chart.root.parentElement;
+                    chart.setSize({ width: wrap.clientWidth, height: wrap.clientHeight });
+                });
+            }, 450);
         }
 
-        // WebSocket connection
+        function minimizeAllTiles() {
+            document.querySelectorAll('.smart-tile').forEach(tile => {
+                const groupName = tile.dataset.group;
+                tile.classList.remove('expanded');
+                tile.classList.add('minimized');
+                state.minimizedTiles.add(groupName);
+            });
+            saveTileStates();
+            updateTileControlButtons();
+            showToast('Tiles Minimized', 'All tiles are now minimized', 'info');
+        }
+
+        function expandAllTiles() {
+            document.querySelectorAll('.smart-tile').forEach(tile => {
+                const groupName = tile.dataset.group;
+                tile.classList.remove('minimized');
+                tile.classList.add('expanded');
+                state.minimizedTiles.delete(groupName);
+            });
+            saveTileStates();
+            updateTileControlButtons();
+
+            // Resize all charts after transition
+            setTimeout(() => {
+                Object.keys(state.charts).forEach(groupName => {
+                    Object.values(state.charts[groupName] || {}).forEach(chart => {
+                        const wrap = chart.root.parentElement;
+                        chart.setSize({ width: wrap.clientWidth, height: wrap.clientHeight });
+                    });
+                });
+            }, 450);
+
+            showToast('Tiles Expanded', 'All tiles are now expanded', 'info');
+        }
+
+        function saveTileStates() {
+            localStorage.setItem('miq-minimized-tiles', JSON.stringify([...state.minimizedTiles]));
+        }
+
+        function loadTileStates() {
+            try {
+                const saved = JSON.parse(localStorage.getItem('miq-minimized-tiles') || '[]');
+                saved.forEach(groupName => {
+                    const tile = document.querySelector(`[data-group="${groupName}"]`);
+                    if (tile) {
+                        tile.classList.remove('expanded');
+                        tile.classList.add('minimized');
+                        state.minimizedTiles.add(groupName);
+                    }
+                });
+                updateTileControlButtons();
+            } catch (e) {}
+        }
+
+        function updateTileControlButtons() {
+            const totalTiles = document.querySelectorAll('.smart-tile').length;
+            const minimizedCount = document.querySelectorAll('.smart-tile.minimized').length;
+
+            const minBtn = document.getElementById('minimize-all-btn');
+            const expBtn = document.getElementById('expand-all-btn');
+
+            if (minBtn) minBtn.classList.toggle('active', minimizedCount === totalTiles);
+            if (expBtn) expBtn.classList.toggle('active', minimizedCount === 0);
+        }
+
+        // ==================== HEALTH BEACON & SPARKLINE ====================
+        function initSparklines() {
+            document.querySelectorAll('.smart-tile[data-group]').forEach(tile => {
+                const groupName = tile.dataset.group;
+                state.sparklineData[groupName] = [];
+            });
+        }
+
+        function updateHealthBeacon(groupName, confidence, isTrained) {
+            const glow = document.getElementById(`beacon-glow-${groupName}`);
+            const status = document.getElementById(`beacon-status-${groupName}`);
+            const value = document.getElementById(`beacon-value-${groupName}`);
+            const sparkline = document.getElementById(`sparkline-${groupName}`);
+
+            if (!glow) return;
+
+            const threshold = state.thresholds[groupName] || 40;
+
+            // Update glow status
+            glow.classList.remove('status-healthy', 'status-warning', 'status-danger', 'status-idle');
+            if (!isTrained) {
+                glow.classList.add('status-idle');
+                if (status) status.textContent = 'Not Trained';
+                if (value) { value.textContent = '--'; value.className = 'health-beacon-value'; }
+            } else if (confidence >= threshold + 30) {
+                glow.classList.add('status-healthy');
+                if (status) status.textContent = 'Healthy';
+                if (value) { value.textContent = `${confidence.toFixed(0)}%`; value.className = 'health-beacon-value'; }
+            } else if (confidence >= threshold) {
+                glow.classList.add('status-warning');
+                if (status) status.textContent = 'Warning';
+                if (value) { value.textContent = `${confidence.toFixed(0)}%`; value.className = 'health-beacon-value warning'; }
+            } else {
+                glow.classList.add('status-danger');
+                if (status) status.textContent = 'Anomaly';
+                if (value) { value.textContent = `${confidence.toFixed(0)}%`; value.className = 'health-beacon-value danger'; }
+            }
+
+            // Update sparkline data
+            if (isTrained && confidence > 0) {
+                if (!state.sparklineData[groupName]) state.sparklineData[groupName] = [];
+                state.sparklineData[groupName].push(confidence);
+                if (state.sparklineData[groupName].length > 30) {
+                    state.sparklineData[groupName].shift();
+                }
+                updateSparkline(groupName);
+            }
+        }
+
+        function updateSparkline(groupName) {
+            const data = state.sparklineData[groupName] || [];
+            if (data.length < 2) return;
+
+            const pathEl = document.getElementById(`sparkline-path-${groupName}`);
+            const fillEl = document.getElementById(`sparkline-fill-${groupName}`);
+            const container = document.getElementById(`sparkline-${groupName}`);
+            if (!pathEl || !fillEl) return;
+
+            const width = 120;
+            const height = 32;
+            const padding = 2;
+
+            const min = Math.min(...data) - 5;
+            const max = Math.max(...data) + 5;
+            const range = max - min || 1;
+
+            const points = data.map((val, idx) => {
+                const x = padding + (idx / (data.length - 1)) * (width - 2 * padding);
+                const y = height - padding - ((val - min) / range) * (height - 2 * padding);
+                return `${x},${y}`;
+            });
+
+            // Line path
+            pathEl.setAttribute('d', `M${points.join(' L')}`);
+
+            // Fill path (area under curve)
+            const fillPath = `M${padding},${height} L${points.join(' L')} L${width - padding},${height} Z`;
+            fillEl.setAttribute('d', fillPath);
+
+            // Update sparkline color based on current status
+            const threshold = state.thresholds[groupName] || 40;
+            const lastValue = data[data.length - 1];
+            container.classList.remove('warning', 'danger');
+            if (lastValue < threshold) {
+                container.classList.add('danger');
+            } else if (lastValue < threshold + 30) {
+                container.classList.add('warning');
+            }
+        }
+
+        // ==================== UPLOT CHARTS ====================
+        function initAllCharts() {
+            document.querySelectorAll('.grid-panel[data-group]').forEach(panel => {
+                const groupName = panel.dataset.group;
+                state.charts[groupName] = {};
+                state.chartData[groupName] = {};
+                state.hiddenSeries[groupName] = new Set();
+                state.thresholds[groupName] = 40;
+                state.anomalyTimestamps[groupName] = [];
+
+                const chartRows = panel.querySelectorAll('.chart-row');
+                chartRows.forEach((row, idx) => {
+                    const channelName = row.dataset.channel;
+                    const wrapper = row.querySelector('.chart-wrapper');
+
+                    state.chartData[groupName][idx] = {
+                        times: [],
+                        values: [],
+                        channelName: channelName
+                    };
+
+                    const chart = createUPlotChart(wrapper, groupName, idx);
+                    state.charts[groupName][idx] = chart;
+                });
+            });
+        }
+
+        function createUPlotChart(container, groupName, channelIdx) {
+            const color = COLORS[channelIdx % COLORS.length];
+
+            // Initialize forensics mode for this group
+            if (!state.forensicsMode[groupName]) {
+                state.forensicsMode[groupName] = { enabled: false, zoomRange: null };
+            }
+            if (state.liveMode[groupName] === undefined) {
+                state.liveMode[groupName] = true;
+            }
+
+            const opts = {
+                width: container.clientWidth || 300,
+                height: container.clientHeight || 40,
+                cursor: {
+                    show: true,
+                    x: true,
+                    y: false,
+                    drag: {
+                        x: true,   // Enable drag-to-zoom on X-axis
+                        y: false,
+                        setScale: false,  // We handle zoom manually
+                    },
+                    sync: {
+                        key: groupName,  // Sync cursor within group
+                        scales: ['x'],
+                    },
+                    points: { show: false }
+                },
+                scales: {
+                    x: {
+                        time: true,
+                        // Dynamic range based on forensics mode
+                        range: (u, dataMin, dataMax) => {
+                            const fm = state.forensicsMode[groupName];
+                            if (fm && fm.enabled && fm.zoomRange) {
+                                return fm.zoomRange;
+                            }
+                            // Live mode: show rolling window
+                            return [dataMin, dataMax];
+                        }
+                    },
+                    y: {
+                        auto: true,
+                        range: (u, min, max) => {
+                            const pad = (max - min) * 0.1 || 0.1;
+                            return [min - pad, max + pad];
+                        }
+                    }
+                },
+                axes: [
+                    { show: false },  // Hide X axis
+                    {
+                        show: true,
+                        size: 40,
+                        side: 1,  // Right side
+                        grid: { show: true, stroke: 'rgba(255,255,255,0.05)', width: 1 },
+                        ticks: { show: false },
+                        values: (u, vals) => vals.map(v => v.toFixed(2)),
+                        font: '9px Inter',
+                        stroke: 'rgba(255,255,255,0.3)',
+                    }
+                ],
+                series: [
+                    {},  // Time series
+                    {
+                        stroke: color,
+                        width: 1.5,
+                        fill: (u, idx) => {
+                            const gradient = u.ctx.createLinearGradient(0, u.bbox.top, 0, u.bbox.top + u.bbox.height);
+                            gradient.addColorStop(0, color.replace(')', ',0.15)').replace('rgb', 'rgba'));
+                            gradient.addColorStop(1, color.replace(')', ',0)').replace('rgb', 'rgba'));
+                            return gradient;
+                        },
+                        points: { show: false },
+                    }
+                ],
+                hooks: {
+                    // Draw anomaly lines after chart renders
+                    draw: [
+                        (u) => {
+                            drawAnomalyLines(u, groupName);
+                        }
+                    ],
+                    setCursor: [
+                        (u) => {
+                            // Sync crosshair across all charts in this group
+                            const left = u.cursor.left;
+                            if (left >= 0) {
+                                syncCrosshairs(groupName, left, u.over.clientWidth);
+                                updateTooltip(groupName, u.cursor.idx);
+                            } else {
+                                hideTooltip();
+                            }
+                        }
+                    ],
+                    setSelect: [
+                        (u) => {
+                            // Handle drag-to-zoom selection
+                            const sel = u.select;
+                            if (sel.width > 10) {  // Minimum selection width
+                                const xMin = u.posToVal(sel.left, 'x');
+                                const xMax = u.posToVal(sel.left + sel.width, 'x');
+
+                                // Apply zoom to all charts in this group
+                                applyForensicsZoom(groupName, xMin, xMax);
+                            }
+                            // Clear the selection
+                            u.setSelect({ left: 0, width: 0, top: 0, height: 0 }, false);
+                        }
+                    ],
+                    ready: [
+                        (u) => {
+                            // Add mouseleave handler
+                            u.over.addEventListener('mouseleave', () => {
+                                hideCrosshairs(groupName);
+                                hideTooltip();
+                            });
+
+                            // Double-click to reset to live mode
+                            u.over.addEventListener('dblclick', () => {
+                                resetToLiveMode(groupName);
+                            });
+                        }
+                    ]
+                }
+            };
+
+            // Initial empty data
+            const data = [[], []];
+
+            const chart = new uPlot(opts, data, container);
+
+            // Handle resize
+            new ResizeObserver(() => {
+                chart.setSize({
+                    width: container.clientWidth,
+                    height: container.clientHeight
+                });
+            }).observe(container);
+
+            return chart;
+        }
+
+        // ==================== ANOMALY LINES ====================
+        function drawAnomalyLines(u, groupName) {
+            const ctx = u.ctx;
+            const anomalies = state.anomalyTimestamps[groupName] || [];
+            if (anomalies.length === 0) return;
+
+            const xScale = u.scales.x;
+            const [xMin, xMax] = [xScale.min, xScale.max];
+
+            // Get chart drawing area
+            const bbox = u.bbox;
+            const plotLeft = bbox.left;
+            const plotTop = bbox.top;
+            const plotHeight = bbox.height;
+
+            ctx.save();
+
+            anomalies.forEach(anomaly => {
+                const ts = anomaly.timestamp;
+
+                // Only draw if timestamp is visible
+                if (ts >= xMin && ts <= xMax) {
+                    const xPos = u.valToPos(ts, 'x', true);
+
+                    // Draw vertical line
+                    ctx.beginPath();
+                    ctx.strokeStyle = 'rgba(242, 73, 92, 0.5)';  // Grafana red with 50% opacity
+                    ctx.lineWidth = 1;
+                    ctx.setLineDash([]);
+
+                    ctx.moveTo(xPos, plotTop);
+                    ctx.lineTo(xPos, plotTop + plotHeight);
+                    ctx.stroke();
+
+                    // Optional: Draw a small marker at top
+                    ctx.fillStyle = 'rgba(242, 73, 92, 0.8)';
+                    ctx.beginPath();
+                    ctx.arc(xPos, plotTop + 4, 3, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+            });
+
+            ctx.restore();
+        }
+
+        // ==================== FORENSICS ZOOM ====================
+        function applyForensicsZoom(groupName, xMin, xMax) {
+            // Enable forensics mode
+            state.forensicsMode[groupName] = {
+                enabled: true,
+                zoomRange: [xMin, xMax]
+            };
+            state.liveMode[groupName] = false;
+
+            // Redraw all charts in this group with new zoom
+            const charts = state.charts[groupName];
+            if (charts) {
+                Object.values(charts).forEach(chart => {
+                    chart.setScale('x', { min: xMin, max: xMax });
+                });
+            }
+
+            // Show forensics mode indicator
+            showForensicsIndicator(groupName, true);
+
+            showToast('Forensics Mode', 'Drag to zoom further, double-click to return to live view', 'info');
+        }
+
+        function resetToLiveMode(groupName) {
+            // Disable forensics mode
+            state.forensicsMode[groupName] = { enabled: false, zoomRange: null };
+            state.liveMode[groupName] = true;
+
+            // Reset all charts to auto-scale (live rolling window)
+            const charts = state.charts[groupName];
+            const chartData = state.chartData[groupName];
+
+            if (charts && chartData) {
+                // Get the data range from first channel
+                const firstChannelData = chartData[0];
+                if (firstChannelData && firstChannelData.times.length > 0) {
+                    const times = firstChannelData.times;
+                    const xMin = times[0];
+                    const xMax = times[times.length - 1];
+
+                    Object.values(charts).forEach(chart => {
+                        chart.setScale('x', { min: xMin, max: xMax });
+                    });
+                }
+            }
+
+            showForensicsIndicator(groupName, false);
+            showToast('Live Mode', 'Returned to live rolling view', 'success');
+        }
+
+        function showForensicsIndicator(groupName, show) {
+            const panel = document.querySelector(`[data-group="${groupName}"]`);
+            if (!panel) return;
+
+            let indicator = panel.querySelector('.forensics-indicator');
+
+            if (show) {
+                if (!indicator) {
+                    indicator = document.createElement('div');
+                    indicator.className = 'forensics-indicator';
+                    indicator.innerHTML = `
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="11" cy="11" r="8"></circle>
+                            <path d="M21 21l-4.35-4.35"></path>
+                        </svg>
+                        <span>FORENSICS</span>
+                        <button onclick="resetToLiveMode('${groupName}')" title="Return to Live">
+                            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M18 6L6 18M6 6l12 12"></path>
+                            </svg>
+                        </button>
+                    `;
+                    const header = panel.querySelector('.panel-header');
+                    if (header) {
+                        header.appendChild(indicator);
+                    }
+                }
+            } else {
+                if (indicator) {
+                    indicator.remove();
+                }
+            }
+        }
+
+        // ==================== CROSSHAIR SYNC ====================
+        function syncCrosshairs(groupName, left, containerWidth) {
+            const charts = state.charts[groupName];
+            if (!charts) return;
+
+            Object.keys(charts).forEach(idx => {
+                const crosshair = document.getElementById(`crosshair-${groupName}-${idx}`);
+                if (crosshair) {
+                    crosshair.style.left = `${left}px`;
+                    crosshair.classList.add('visible');
+                }
+            });
+
+            state.cursorX = left;
+        }
+
+        function hideCrosshairs(groupName) {
+            const charts = state.charts[groupName];
+            if (!charts) return;
+
+            Object.keys(charts).forEach(idx => {
+                const crosshair = document.getElementById(`crosshair-${groupName}-${idx}`);
+                if (crosshair) crosshair.classList.remove('visible');
+            });
+
+            state.cursorX = null;
+        }
+
+        // ==================== TOOLTIP ====================
+        function updateTooltip(groupName, dataIdx) {
+            if (dataIdx === null || dataIdx === undefined) {
+                hideTooltip();
+                return;
+            }
+
+            const tooltip = document.getElementById('shared-tooltip');
+            const timeHeader = document.getElementById('tooltip-time');
+            const content = document.getElementById('tooltip-content');
+
+            const chartData = state.chartData[groupName];
+            if (!chartData) return;
+
+            // Get time from first channel
+            const firstChannel = chartData[0];
+            if (!firstChannel || !firstChannel.times[dataIdx]) {
+                hideTooltip();
+                return;
+            }
+
+            const time = new Date(firstChannel.times[dataIdx] * 1000);
+            timeHeader.textContent = time.toLocaleTimeString();
+
+            // Build tooltip content
+            let html = '';
+            Object.keys(chartData).forEach(idx => {
+                const ch = chartData[idx];
+                const value = ch.values[dataIdx];
+                const color = COLORS[idx % COLORS.length];
+                const hidden = state.hiddenSeries[groupName]?.has(parseInt(idx));
+
+                if (value !== undefined && !hidden) {
+                    html += `
+                        <div class="tooltip-row">
+                            <div class="tooltip-series">
+                                <span class="tooltip-color" style="background:${color}"></span>
+                                <span class="tooltip-label">${ch.channelName}</span>
+                            </div>
+                            <span class="tooltip-value">${value.toFixed(4)}</span>
+                        </div>
+                    `;
+                }
+            });
+
+            content.innerHTML = html;
+            tooltip.classList.add('visible');
+
+            // Position tooltip near cursor
+            const rect = document.querySelector(`[data-group="${groupName}"]`).getBoundingClientRect();
+            tooltip.style.left = `${rect.right + 10}px`;
+            tooltip.style.top = `${rect.top + 50}px`;
+        }
+
+        function hideTooltip() {
+            document.getElementById('shared-tooltip').classList.remove('visible');
+        }
+
+        // ==================== DATA UPDATES ====================
+        function updateGroupData(data) {
+            const group = data.group;
+            const confidence = data.confidence || 0;
+            const channelValues = data.channel_values || {};
+            const isTrained = data.is_trained !== undefined ? data.is_trained : state.trainedGroups.has(group);
+            const timestamp = Date.now() / 1000;
+
+            const maxPoints = Math.max(60, Math.floor(state.timeRangeSeconds / (state.refreshIntervalMs / 1000)));
+            const charts = state.charts[group];
+            const chartData = state.chartData[group];
+
+            if (!charts || !chartData) return;
+
+            // Update each channel
+            Object.entries(channelValues).forEach(([channelName, value], idx) => {
+                if (!chartData[idx]) return;
+
+                chartData[idx].times.push(timestamp);
+                chartData[idx].values.push(value);
+
+                // Trim old data
+                while (chartData[idx].times.length > maxPoints) {
+                    chartData[idx].times.shift();
+                    chartData[idx].values.shift();
+                }
+
+                // Update uPlot chart
+                const chart = charts[idx];
+                if (chart && !state.hiddenSeries[group]?.has(idx)) {
+                    chart.setData([chartData[idx].times, chartData[idx].values]);
+                }
+
+                // Update value display
+                const valueEl = document.getElementById(`value-${group}-${idx}`);
+                if (valueEl) valueEl.textContent = value.toFixed(4);
+
+                // Update legend value
+                const legendVal = document.getElementById(`legend-value-${group}-${idx}`);
+                if (legendVal) legendVal.textContent = value.toFixed(3);
+            });
+
+            // Update confidence gauge
+            updateConfidenceGauge(group, confidence, isTrained);
+
+            // Update health beacon (for minimized view)
+            updateHealthBeacon(group, confidence, isTrained);
+
+            // Track anomalies for vertical line drawing
+            if (isTrained) {
+                const threshold = state.thresholds[group] || 40;
+                if (confidence < threshold) {
+                    // Store anomaly with timestamp (in seconds for uPlot) and confidence
+                    if (!state.anomalyTimestamps[group]) {
+                        state.anomalyTimestamps[group] = [];
+                    }
+                    state.anomalyTimestamps[group].push({
+                        timestamp: timestamp,  // Already in seconds
+                        confidence: confidence
+                    });
+
+                    // Trigger redraw of all charts to show the new anomaly line
+                    Object.values(charts).forEach(chart => {
+                        chart.redraw();
+                    });
+                }
+                // Trim old anomaly records (keep last N minutes based on time range)
+                const cutoffTime = timestamp - state.timeRangeSeconds;
+                state.anomalyTimestamps[group] = state.anomalyTimestamps[group].filter(a => a.timestamp > cutoffTime);
+            }
+
+            // Update heatmap
+            updateHeatmap(group);
+
+            state.updateCount++;
+        }
+
+        function updateConfidenceGauge(group, confidence, isTrained) {
+            const fill = document.getElementById(`gauge-fill-${group}`);
+            const value = document.getElementById(`gauge-value-${group}`);
+            const threshold = state.thresholds[group] || 40;
+
+            if (fill && value) {
+                if (isTrained && confidence > 0) {
+                    fill.style.width = `${confidence}%`;
+
+                    // Color based on threshold
+                    if (confidence >= threshold + 30) {
+                        fill.style.background = 'var(--grafana-green)';
+                        value.style.color = 'var(--grafana-green)';
+                    } else if (confidence >= threshold) {
+                        fill.style.background = 'var(--grafana-yellow)';
+                        value.style.color = 'var(--grafana-yellow)';
+                    } else {
+                        fill.style.background = 'var(--grafana-red)';
+                        value.style.color = 'var(--grafana-red)';
+                    }
+
+                    value.textContent = `${confidence.toFixed(0)}%`;
+                } else {
+                    fill.style.width = '0%';
+                    fill.style.background = 'var(--grafana-text-disabled)';
+                    value.textContent = '--';
+                    value.style.color = 'var(--grafana-text-disabled)';
+                }
+            }
+        }
+
+        function updateHeatmap(groupName) {
+            const heatmap = document.getElementById(`heatmap-${groupName}`);
+            if (!heatmap) return;
+
+            const bars = heatmap.querySelectorAll('.heatmap-bar');
+            const timestamps = state.anomalyTimestamps[groupName] || [];
+            const now = Date.now();
+            const timeWindow = state.timeRangeSeconds * 1000;
+            const bucketCount = bars.length;
+            const bucketSize = timeWindow / bucketCount;
+
+            // Calculate density per bucket
+            const buckets = new Array(bucketCount).fill(0);
+            timestamps.forEach(ts => {
+                const age = now - ts;
+                if (age < timeWindow) {
+                    const bucketIdx = Math.floor((timeWindow - age) / bucketSize);
+                    if (bucketIdx >= 0 && bucketIdx < bucketCount) {
+                        buckets[bucketIdx]++;
+                    }
+                }
+            });
+
+            // Normalize and apply
+            const maxDensity = Math.max(...buckets, 1);
+            bars.forEach((bar, idx) => {
+                const opacity = 0.1 + (buckets[idx] / maxDensity) * 0.8;
+                bar.style.opacity = opacity;
+            });
+        }
+
+        // ==================== LEGEND & SERIES TOGGLE ====================
+        function toggleSeries(groupName, idx) {
+            const hidden = state.hiddenSeries[groupName];
+            const legendItem = document.querySelector(`[data-group="${groupName}"] .legend-item[data-index="${idx}"]`);
+            const chartRow = document.querySelector(`[data-group="${groupName}"] .chart-row[data-index="${idx}"]`);
+
+            if (hidden.has(idx)) {
+                hidden.delete(idx);
+                legendItem?.classList.remove('hidden');
+                chartRow.style.display = 'flex';
+            } else {
+                hidden.add(idx);
+                legendItem?.classList.add('hidden');
+                chartRow.style.display = 'none';
+            }
+        }
+
+        // ==================== THRESHOLD CONTROL ====================
+        function updateThreshold(groupName, value) {
+            state.thresholds[groupName] = parseInt(value);
+
+            // Update display
+            const valueEl = document.getElementById(`threshold-value-${groupName}`);
+            if (valueEl) valueEl.textContent = `${value}%`;
+
+            // Update gauge marker
+            const marker = document.getElementById(`gauge-threshold-${groupName}`);
+            if (marker) marker.style.left = `${value}%`;
+        }
+
+        // ==================== WEBSOCKET ====================
         function connectWebSocket() {
             const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-            ws = new WebSocket(`${protocol}//${window.location.host}/ws`);
+            state.ws = new WebSocket(`${protocol}//${window.location.host}/ws`);
 
-            ws.onopen = () => {
-                console.log('WebSocket connected');
-                wsConnected = true;
+            state.ws.onopen = () => {
+                state.wsConnected = true;
                 updateConnectionStatus(true);
-                stopFallbackSimulation();
-                // Subscribe to all groups
+                stopSimulation();
+
                 document.querySelectorAll('.grid-panel[data-group]').forEach(panel => {
-                    ws.send(JSON.stringify({ type: 'subscribe', group: panel.dataset.group }));
+                    state.ws.send(JSON.stringify({ type: 'subscribe', group: panel.dataset.group }));
                 });
             };
 
-            ws.onclose = () => {
-                console.log('WebSocket disconnected');
-                wsConnected = false;
+            state.ws.onclose = () => {
+                state.wsConnected = false;
                 updateConnectionStatus(false);
-                startFallbackSimulation();
+                startSimulation();
                 setTimeout(connectWebSocket, 3000);
             };
 
-            ws.onerror = (error) => {
-                console.error('WebSocket error:', error);
-            };
-
-            ws.onmessage = (event) => {
+            state.ws.onmessage = (event) => {
                 try {
                     const message = JSON.parse(event.data);
-                    handleWebSocketMessage(message);
+                    handleWSMessage(message);
                 } catch (e) {
-                    console.error('Error parsing message:', e);
+                    console.error('WS message error:', e);
                 }
             };
         }
 
-        function handleWebSocketMessage(message) {
-            switch (message.type) {
+        function handleWSMessage(msg) {
+            switch (msg.type) {
                 case 'data_update':
-                    updateGroupData(message.data);
+                    updateGroupData(msg.data);
                     break;
                 case 'training_started':
-                    updateGroupStatus(message.data.group, 'training');
+                    showTrainingOverlay(msg.data.group);
                     break;
-                case 'training_stopped':
                 case 'training_complete':
-                    updateGroupStatus(message.data.group, 'monitoring');
-                    break;
-                case 'anomaly_detected':
-                    showAnomalyAlert(message.data);
-                    break;
-                case 'pong':
-                    // Keep-alive response
+                    hideTrainingOverlay(msg.data.group);
+                    state.trainedGroups.add(msg.data.group);
+                    showToast('Training Complete', `Model for ${msg.data.group} is ready`, 'success');
                     break;
             }
-        }
-
-        function updateGroupData(data) {
-            const group = data.group;
-            const confidence = data.confidence || data.match_score || 0;
-            const channelValues = data.channel_values || data.values || {};
-
-            // Update chart
-            const chart = charts[group];
-            if (chart) {
-                chart.data.labels.push('');
-                chart.data.datasets[0].data.push(confidence);
-
-                // Limit data points based on time range
-                const maxPoints = Math.max(30, Math.floor(timeRangeSeconds / (refreshIntervalMs / 1000)));
-                while (chart.data.labels.length > maxPoints) {
-                    chart.data.labels.shift();
-                    chart.data.datasets[0].data.shift();
-                }
-                chart.update('none');
-            }
-
-            // Update match score gauge
-            const gauge = document.getElementById(`gauge-${group}`);
-            const score = document.getElementById(`score-${group}`);
-            if (gauge && score) {
-                gauge.style.width = `${confidence}%`;
-                gauge.style.background = confidence > 70 ? 'var(--accent-secondary)' :
-                                        confidence > 40 ? 'var(--accent-warning)' : 'var(--accent-danger)';
-                score.textContent = confidence.toFixed(0) + '%';
-                score.style.color = confidence > 70 ? 'var(--accent-secondary)' :
-                                   confidence > 40 ? 'var(--accent-warning)' : 'var(--accent-danger)';
-            }
-
-            // Update channel values - match by channel name, not index
-            const channelContainer = document.getElementById(`channels-${group}`);
-            if (channelContainer) {
-                const channelRows = channelContainer.querySelectorAll('.channel-row');
-                channelRows.forEach((row, index) => {
-                    const nameEl = row.querySelector('.channel-name');
-                    const valEl = row.querySelector('.channel-value');
-                    if (nameEl && valEl) {
-                        const channelName = nameEl.textContent.trim();
-                        const value = channelValues[channelName];
-                        if (value !== undefined) {
-                            const newText = typeof value === 'number' ? value.toFixed(4) : value;
-                            if (valEl.textContent !== newText) {
-                                valEl.textContent = newText;
-                                // Trigger update animation
-                                valEl.classList.remove('updated');
-                                void valEl.offsetWidth; // Force reflow
-                                valEl.classList.add('updated');
-                            }
-                        }
-                    }
-                });
-            }
-
-            // Track update rate
-            lastDataUpdate[group] = Date.now();
-            updateCount++;
         }
 
         function updateConnectionStatus(connected) {
-            const statusDot = document.getElementById('ws-status');
-            const statusText = document.getElementById('ws-status-text');
+            const dot = document.getElementById('ws-status');
+            const text = document.getElementById('ws-status-text');
             if (connected) {
-                statusDot.classList.add('connected');
-                statusText.textContent = 'Connected';
+                dot?.classList.add('connected');
+                if (text) text.textContent = 'Connected';
             } else {
-                statusDot.classList.remove('connected');
-                statusText.textContent = 'Reconnecting...';
+                dot?.classList.remove('connected');
+                if (text) text.textContent = 'Reconnecting...';
             }
         }
 
-        // Initialize charts with gradient fill and threshold lines
-        function initCharts() {
-            // Threshold annotation plugin
-            const thresholdPlugin = {
-                id: 'thresholdLines',
-                beforeDraw: (chart) => {
-                    const ctx = chart.ctx;
-                    const yAxis = chart.scales.y;
-                    const xAxis = chart.scales.x;
+        // ==================== SIMULATION ====================
+        function simulateData() {
+            document.querySelectorAll('.grid-panel[data-group]').forEach(panel => {
+                const groupName = panel.dataset.group;
+                const overlay = document.getElementById(`overlay-${groupName}`);
 
-                    // Warning threshold at 70%
-                    const warningY = yAxis.getPixelForValue(70);
-                    ctx.save();
-                    ctx.beginPath();
-                    ctx.strokeStyle = 'rgba(255, 193, 7, 0.4)';
-                    ctx.setLineDash([5, 5]);
-                    ctx.lineWidth = 1;
-                    ctx.moveTo(xAxis.left, warningY);
-                    ctx.lineTo(xAxis.right, warningY);
-                    ctx.stroke();
+                if (overlay?.dataset.state === 'training') return;
 
-                    // Danger threshold at 40%
-                    const dangerY = yAxis.getPixelForValue(40);
-                    ctx.beginPath();
-                    ctx.strokeStyle = 'rgba(255, 82, 82, 0.4)';
-                    ctx.moveTo(xAxis.left, dangerY);
-                    ctx.lineTo(xAxis.right, dangerY);
-                    ctx.stroke();
+                const isTrained = state.trainedGroups.has(groupName);
+                const chartRows = panel.querySelectorAll('.chart-row');
+                const channelValues = {};
 
-                    ctx.restore();
-                }
-            };
-
-            document.querySelectorAll('.panel-chart canvas').forEach(canvas => {
-                const groupName = canvas.id.replace('chart-', '');
-                const ctx = canvas.getContext('2d');
-
-                // Create gradient
-                const gradient = ctx.createLinearGradient(0, 0, 0, 200);
-                gradient.addColorStop(0, 'rgba(123, 97, 255, 0.3)');
-                gradient.addColorStop(0.5, 'rgba(123, 97, 255, 0.1)');
-                gradient.addColorStop(1, 'rgba(123, 97, 255, 0)');
-
-                charts[groupName] = new Chart(ctx, {
-                    type: 'line',
-                    plugins: [thresholdPlugin],
-                    data: {
-                        labels: [],
-                        datasets: [{
-                            label: 'Match Score',
-                            data: [],
-                            borderColor: '#7b61ff',
-                            backgroundColor: gradient,
-                            fill: true,
-                            tension: 0.3,
-                            pointRadius: 0,
-                            pointHoverRadius: 4,
-                            pointHoverBackgroundColor: '#7b61ff',
-                            pointHoverBorderColor: '#fff',
-                            pointHoverBorderWidth: 2,
-                            borderWidth: 2
-                        }]
-                    },
-                    options: {
-                        responsive: true,
-                        maintainAspectRatio: false,
-                        animation: false,
-                        interaction: {
-                            mode: 'index',
-                            intersect: false
-                        },
-                        plugins: {
-                            legend: { display: false },
-                            tooltip: {
-                                enabled: true,
-                                backgroundColor: 'rgba(19, 23, 34, 0.95)',
-                                titleColor: '#e8eaed',
-                                bodyColor: '#9aa0a6',
-                                borderColor: '#2a2e39',
-                                borderWidth: 1,
-                                padding: 10,
-                                displayColors: false,
-                                callbacks: {
-                                    title: () => 'Match Score',
-                                    label: (context) => {
-                                        const value = context.parsed.y;
-                                        let status = 'Normal';
-                                        if (value < 40) status = 'Anomaly';
-                                        else if (value < 70) status = 'Warning';
-                                        return `${value.toFixed(1)}% - ${status}`;
-                                    }
-                                }
-                            }
-                        },
-                        scales: {
-                            x: {
-                                display: false
-                            },
-                            y: {
-                                min: 0,
-                                max: 100,
-                                grid: {
-                                    color: 'rgba(255,255,255,0.03)',
-                                    drawBorder: false
-                                },
-                                ticks: {
-                                    color: 'rgba(255,255,255,0.3)',
-                                    font: { size: 10 },
-                                    callback: (v) => v + '%',
-                                    stepSize: 25
-                                }
-                            }
-                        }
-                    }
+                chartRows.forEach(row => {
+                    const name = row.dataset.channel;
+                    channelValues[name] = (Math.random() * 2 - 1) * 0.8;
                 });
 
-                // Initialize with demo data
-                for (let i = 0; i < 30; i++) {
-                    charts[groupName].data.labels.push('');
-                    charts[groupName].data.datasets[0].data.push(70 + Math.random() * 25);
+                let confidence = 0;
+                if (isTrained) {
+                    const isAnomaly = Math.random() < 0.05;
+                    confidence = isAnomaly ? 15 + Math.random() * 25 : 65 + Math.random() * 30;
                 }
-                charts[groupName].update('none');
+
+                updateGroupData({
+                    group: groupName,
+                    confidence: confidence,
+                    channel_values: channelValues,
+                    is_trained: isTrained
+                });
             });
         }
 
-        // Panel resizing
-        function resizePanel(btn) {
-            const panel = btn.closest('.grid-panel');
-            const groupName = panel.dataset.group;
-            const selector = document.getElementById(`size-${groupName}`);
-            selector.classList.toggle('visible');
-        }
-
-        function setPanelSize(groupName, size) {
-            const panel = document.querySelector(`[data-group="${groupName}"]`);
-            if (panel) {
-                // Remove old size class
-                panel.className = panel.className.replace(/panel-\dx\d/g, '');
-                panel.classList.add(`panel-${size}`);
-                panel.dataset.size = size;
-
-                // Hide selector
-                document.getElementById(`size-${groupName}`).classList.remove('visible');
-
-                // Save layout
-                saveLayout();
-
-                // Resize chart
-                setTimeout(() => {
-                    if (charts[groupName]) {
-                        charts[groupName].resize();
-                    }
-                }, 100);
+        function startSimulation() {
+            if (!state.simulationInterval && state.refreshIntervalMs > 0) {
+                state.simulationInterval = setInterval(simulateData, state.refreshIntervalMs);
             }
         }
 
-        // Edit mode
-        function toggleEditMode() {
-            editMode = !editMode;
-            const grid = document.getElementById('dashboard-grid');
-            const btn = document.getElementById('edit-mode-btn');
-
-            grid.classList.toggle('edit-mode', editMode);
-            btn.innerHTML = editMode ?
-                '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg> Done' :
-                '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg> Edit Layout';
-
-            if (!editMode) {
-                saveLayout();
+        function stopSimulation() {
+            if (state.simulationInterval) {
+                clearInterval(state.simulationInterval);
+                state.simulationInterval = null;
             }
         }
 
-        // Layout persistence
-        function saveLayout() {
-            const layout = {};
-            document.querySelectorAll('.grid-panel[data-group]').forEach(panel => {
-                layout[panel.dataset.group] = {
-                    size: panel.dataset.size,
-                    order: Array.from(panel.parentElement.children).indexOf(panel)
-                };
-            });
-            localStorage.setItem('dashboardLayout', JSON.stringify(layout));
-        }
-
-        function loadLayout() {
-            const saved = localStorage.getItem('dashboardLayout');
-            if (saved) {
-                try {
-                    const layout = JSON.parse(saved);
-                    Object.keys(layout).forEach(groupName => {
-                        const panel = document.querySelector(`[data-group="${groupName}"]`);
-                        if (panel && layout[groupName].size) {
-                            panel.className = panel.className.replace(/panel-\dx\d/g, '');
-                            panel.classList.add(`panel-${layout[groupName].size}`);
-                            panel.dataset.size = layout[groupName].size;
-                        }
-                    });
-                } catch (e) {
-                    console.error('Error loading layout:', e);
-                }
-            }
-        }
-
-        function resetLayout() {
-            localStorage.removeItem('dashboardLayout');
-            location.reload();
-        }
-
-        // Training
+        // ==================== TRAINING ====================
         function startTraining(groupName, trainedStates) {
-            currentTrainingGroup = groupName;
-            isRetraining = trainedStates > 0;
-
-            const title = document.getElementById('training-modal-title');
-            const desc = document.getElementById('training-modal-desc');
-            const btn = document.getElementById('confirm-training-btn');
-
-            if (isRetraining) {
-                title.textContent = 'Re-Train Model?';
-                desc.innerHTML = '<strong style="color: var(--accent-warning);">Warning:</strong> This will replace the existing model.';
-                btn.textContent = 'Re-Train';
-            } else {
-                title.textContent = 'Start Training';
-                desc.textContent = 'Select training duration:';
-                btn.textContent = 'Start';
-            }
-
+            state.currentTrainingGroup = groupName;
             document.getElementById('training-modal').style.display = 'flex';
         }
 
@@ -1278,256 +2047,378 @@
 
         function confirmTraining() {
             const duration = parseInt(document.getElementById('training-duration').value);
+            const group = state.currentTrainingGroup;
+
             fetch('/api/training/start', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ group_name: currentTrainingGroup, duration })
+                body: JSON.stringify({ group_name: group, duration })
             }).then(() => {
                 closeModal();
-                updateGroupStatus(currentTrainingGroup, 'training');
+                showTrainingOverlay(group);
+                simulateTrainingProgress(group, duration);
             });
         }
 
-        function updateGroupStatus(groupName, status) {
-            const panel = document.querySelector(`[data-group="${groupName}"]`);
-            if (panel) {
-                const badge = panel.querySelector('.status-badge');
-                if (badge) {
-                    badge.className = `status-badge ${status}`;
-                    badge.textContent = status;
-                    badge.style.fontSize = '10px';
-                    badge.style.padding = '2px 6px';
+        function showTrainingOverlay(groupName) {
+            const overlay = document.getElementById(`overlay-${groupName}`);
+            if (overlay) {
+                overlay.classList.remove('hidden');
+                overlay.dataset.state = 'training';
+                overlay.querySelector('.overlay-untrained').style.display = 'none';
+                overlay.querySelector('.overlay-training').style.display = 'block';
+            }
+
+            const indicator = document.getElementById(`status-${groupName}`);
+            if (indicator) indicator.classList.add('training');
+        }
+
+        function hideTrainingOverlay(groupName) {
+            const overlay = document.getElementById(`overlay-${groupName}`);
+            if (overlay) {
+                overlay.classList.add('hidden');
+                overlay.dataset.state = 'trained';
+            }
+
+            const indicator = document.getElementById(`status-${groupName}`);
+            if (indicator) indicator.classList.remove('training');
+        }
+
+        function simulateTrainingProgress(groupName, duration) {
+            let progress = 0;
+            const interval = setInterval(() => {
+                progress += 100 / (duration / 0.5);
+                if (progress >= 100) {
+                    progress = 100;
+                    clearInterval(interval);
+                    setTimeout(() => {
+                        hideTrainingOverlay(groupName);
+                        state.trainedGroups.add(groupName);
+                        showToast('Training Complete', `Model for ${groupName} is ready`, 'success');
+                    }, 500);
                 }
-            }
+                const el = document.getElementById(`progress-${groupName}`);
+                if (el) el.textContent = `${Math.round(progress)}%`;
+            }, 500);
         }
 
-        // Details
-        function showGroupDetails(groupName) {
-            document.getElementById('details-modal-title').textContent = groupName + ' - Details';
-
-            fetch('/api/groups')
-                .then(res => res.json())
-                .then(groups => {
-                    const group = groups.find(g => g.name === groupName);
-                    if (group) {
-                        document.getElementById('details-content').innerHTML = `
-                            <div class="config-grid" style="margin-top: 16px;">
-                                <div class="config-card">
-                                    <h4 style="margin-bottom: 8px;">Channels</h4>
-                                    <div style="display: flex; flex-wrap: wrap; gap: 8px;">
-                                        ${(group.channels || []).map(ch => `<span class="badge">${ch}</span>`).join('')}
-                                    </div>
-                                </div>
-                                <div class="config-card">
-                                    <h4 style="margin-bottom: 8px;">Status</h4>
-                                    <div class="group-stats">
-                                        <div class="stat-row"><span>Status:</span><span>${group.status}</span></div>
-                                        <div class="stat-row"><span>Preprocessing:</span><span>${group.preprocessing || 'basic'}</span></div>
-                                        <div class="stat-row"><span>Trained States:</span><span>${group.trained_states || 0}</span></div>
-                                    </div>
-                                </div>
-                            </div>
-                        `;
-                    }
-                });
-
-            document.getElementById('details-modal').style.display = 'flex';
+        // ==================== UI CONTROLS ====================
+        function setTimeRange(seconds) {
+            state.timeRangeSeconds = parseInt(seconds);
         }
 
-        function closeDetailsModal() {
-            document.getElementById('details-modal').style.display = 'none';
+        function setRefreshInterval(ms) {
+            state.refreshIntervalMs = parseInt(ms);
+            stopSimulation();
+            if (!state.wsConnected) startSimulation();
         }
 
-        // Utilities
-        function downloadCSVTemplate() {
-            window.location.href = '/api/csv-template';
+        function toggleEditMode() {
+            state.editMode = !state.editMode;
+            document.getElementById('dashboard-grid').classList.toggle('edit-mode', state.editMode);
+            document.getElementById('edit-mode-btn').textContent = state.editMode ? 'Done' : 'Edit Layout';
         }
 
-        // Toast Notification System
-        function showToast(title, message, type = 'info', duration = 5000) {
-            const container = document.getElementById('toast-container');
-            const toast = document.createElement('div');
-            toast.className = `toast ${type}`;
-
-            const iconSvg = {
-                anomaly: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>',
-                warning: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>',
-                success: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>',
-                info: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>'
-            };
-
-            toast.innerHTML = `
-                <div class="toast-icon">${iconSvg[type] || iconSvg.info}</div>
-                <div class="toast-content">
-                    <div class="toast-title">${title}</div>
-                    <div class="toast-message">${message}</div>
-                </div>
-                <button class="toast-close" onclick="dismissToast(this.parentElement)">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <line x1="18" y1="6" x2="6" y2="18"></line>
-                        <line x1="6" y1="6" x2="18" y2="18"></line>
-                    </svg>
-                </button>
-            `;
-
-            container.appendChild(toast);
-
-            if (duration > 0) {
-                setTimeout(() => dismissToast(toast), duration);
-            }
-
-            return toast;
+        function showSizeMenu(groupName) {
+            const menu = document.getElementById(`size-menu-${groupName}`);
+            document.querySelectorAll('.size-selector').forEach(m => {
+                if (m !== menu) m.classList.remove('visible');
+            });
+            menu.classList.toggle('visible');
         }
 
-        function dismissToast(toast) {
-            if (!toast || toast.classList.contains('hiding')) return;
-            toast.classList.add('hiding');
-            setTimeout(() => toast.remove(), 300);
-        }
-
-        function showAnomalyAlert(data) {
-            const group = data.group || 'Unknown';
-            const score = data.anomaly_score ? (data.anomaly_score * 100).toFixed(1) : '--';
-            const contributors = data.top_contributors || [];
-
-            let message = `Anomaly score: ${score}%`;
-            if (contributors.length > 0) {
-                message += `. Top contributor: ${contributors[0]}`;
-            }
-
-            showToast(`Anomaly Detected - ${group}`, message, 'anomaly', 8000);
-
-            // Also update the panel visually
-            const panel = document.querySelector(`[data-group="${group}"]`);
-            if (panel) {
-                panel.style.borderColor = 'var(--accent-danger)';
-                setTimeout(() => {
-                    panel.style.borderColor = '';
-                }, 3000);
-            }
-        }
-
-        // Fullscreen controls
-        let fullscreenPanel = null;
-
-        function togglePanelFullscreen(groupName) {
+        function setPanelSize(groupName, size) {
             const panel = document.querySelector(`[data-group="${groupName}"]`);
-            if (!panel) return;
+            if (panel) {
+                panel.className = `grid-panel panel-${size}`;
+                panel.dataset.size = size;
+                saveLayout();
 
+                // Resize charts
+                setTimeout(() => {
+                    Object.values(state.charts[groupName] || {}).forEach(chart => {
+                        const wrap = chart.root.parentElement;
+                        chart.setSize({ width: wrap.clientWidth, height: wrap.clientHeight });
+                    });
+                }, 100);
+            }
+            document.getElementById(`size-menu-${groupName}`).classList.remove('visible');
+        }
+
+        function toggleFullscreen(groupName) {
+            const panel = document.querySelector(`[data-group="${groupName}"]`);
             if (panel.classList.contains('fullscreen')) {
                 exitFullscreen();
             } else {
-                enterFullscreen(panel);
-            }
-        }
+                panel.classList.add('fullscreen');
+                state.fullscreenPanel = panel;
+                document.getElementById('fullscreen-exit-btn').classList.add('visible');
+                document.body.style.overflow = 'hidden';
 
-        function enterFullscreen(panel) {
-            fullscreenPanel = panel;
-            panel.classList.add('fullscreen');
-            document.getElementById('fullscreen-exit-btn').classList.add('visible');
-            document.body.style.overflow = 'hidden';
-
-            // Resize chart
-            const groupName = panel.dataset.group;
-            if (charts[groupName]) {
-                setTimeout(() => charts[groupName].resize(), 100);
+                setTimeout(() => {
+                    Object.values(state.charts[groupName] || {}).forEach(chart => {
+                        const wrap = chart.root.parentElement;
+                        chart.setSize({ width: wrap.clientWidth, height: wrap.clientHeight });
+                    });
+                }, 100);
             }
         }
 
         function exitFullscreen() {
-            if (fullscreenPanel) {
-                fullscreenPanel.classList.remove('fullscreen');
-                const groupName = fullscreenPanel.dataset.group;
-                if (charts[groupName]) {
-                    setTimeout(() => charts[groupName].resize(), 100);
-                }
-                fullscreenPanel = null;
+            if (state.fullscreenPanel) {
+                const groupName = state.fullscreenPanel.dataset.group;
+                state.fullscreenPanel.classList.remove('fullscreen');
+                document.getElementById('fullscreen-exit-btn').classList.remove('visible');
+                document.body.style.overflow = '';
+
+                setTimeout(() => {
+                    Object.values(state.charts[groupName] || {}).forEach(chart => {
+                        const wrap = chart.root.parentElement;
+                        chart.setSize({ width: wrap.clientWidth, height: wrap.clientHeight });
+                    });
+                }, 100);
+
+                state.fullscreenPanel = null;
             }
-            document.getElementById('fullscreen-exit-btn').classList.remove('visible');
-            document.body.style.overflow = '';
         }
 
-        // Keyboard shortcuts
-        document.addEventListener('keydown', (e) => {
-            if (e.key === 'Escape' && fullscreenPanel) {
-                exitFullscreen();
-            }
-        });
-
-        // Update rate display
-        function updateRateDisplay() {
-            const rate = document.getElementById('update-rate');
-            if (updateCount > 0) {
-                rate.textContent = `${updateCount} updates/5s`;
-            }
-            updateCount = 0;
-        }
-
-        // Simulate data for demo (fallback when WebSocket disconnected)
-        function simulateData() {
+        // ==================== LAYOUT PERSISTENCE ====================
+        function saveLayout() {
+            const layout = {};
             document.querySelectorAll('.grid-panel[data-group]').forEach(panel => {
-                const groupName = panel.dataset.group;
-                const confidence = 60 + Math.random() * 35;
-
-                // Simulate channel values
-                const channelRows = panel.querySelectorAll('.channel-row');
-                const channelValues = {};
-                channelRows.forEach((row, i) => {
-                    const name = row.querySelector('.channel-name').textContent;
-                    channelValues[name] = (Math.random() * 2 - 1).toFixed(4);
-                });
-
-                updateGroupData({
-                    group: groupName,
-                    confidence: confidence,
-                    channel_values: channelValues
-                });
+                layout[panel.dataset.group] = { size: panel.dataset.size };
             });
+            localStorage.setItem('dashboardLayout', JSON.stringify(layout));
         }
 
-        function startFallbackSimulation() {
-            if (!fallbackSimulationInterval && refreshIntervalMs > 0) {
-                console.log(`Starting fallback simulation at ${refreshIntervalMs}ms interval`);
-                fallbackSimulationInterval = setInterval(simulateData, refreshIntervalMs);
-            }
-        }
-
-        function stopFallbackSimulation() {
-            if (fallbackSimulationInterval) {
-                console.log('Stopping fallback simulation');
-                clearInterval(fallbackSimulationInterval);
-                fallbackSimulationInterval = null;
-            }
-        }
-
-        // Initialize
-        document.addEventListener('DOMContentLoaded', () => {
-            loadLayout();
-            initCharts();
-            connectWebSocket();
-
-            // Update rate display
-            setInterval(updateRateDisplay, 5000);
-
-            // Start fallback simulation initially (will be stopped when WS connects)
-            startFallbackSimulation();
-
-            // Close modals on outside click
-            document.querySelectorAll('.modal').forEach(modal => {
-                modal.addEventListener('click', (e) => {
-                    if (e.target === modal) {
-                        modal.style.display = 'none';
+        function loadLayout() {
+            try {
+                const layout = JSON.parse(localStorage.getItem('dashboardLayout') || '{}');
+                Object.entries(layout).forEach(([group, config]) => {
+                    const panel = document.querySelector(`[data-group="${group}"]`);
+                    if (panel && config.size) {
+                        panel.className = `grid-panel panel-${config.size}`;
+                        panel.dataset.size = config.size;
                     }
                 });
+            } catch (e) {}
+        }
+
+        function resetLayout() {
+            localStorage.removeItem('dashboardLayout');
+            location.reload();
+        }
+
+        // ==================== TOAST NOTIFICATIONS ====================
+        function showToast(title, message, type = 'info') {
+            const container = document.getElementById('toast-container');
+            const toast = document.createElement('div');
+            toast.className = `toast ${type}`;
+            toast.innerHTML = `
+                <div class="toast-title">${title}</div>
+                <div class="toast-message">${message}</div>
+            `;
+            container.appendChild(toast);
+            setTimeout(() => toast.remove(), 5000);
+        }
+
+        // ==================== FORENSICS CONTROLLER ====================
+        // Global time range state (for minimized sparklines)
+        state.globalTimeRange = 3600;  // Default 1 hour
+        state.localTimeRanges = {};    // Per-tile time range overrides
+        state.focusMode = {};          // { groupName: channelIdx or null }
+        state.anomalyCounts = {};      // Per-group anomaly counts
+
+        function setGlobalTimeRange(seconds) {
+            state.globalTimeRange = parseInt(seconds);
+
+            // Update sparkline data fetch/display for all minimized tiles
+            document.querySelectorAll('.smart-tile.minimized').forEach(tile => {
+                const groupName = tile.dataset.group;
+                // Sparklines will use this range when updating
+                updateSparklineTimeRange(groupName);
             });
 
-            // Close size selectors on outside click
-            document.addEventListener('click', (e) => {
-                if (!e.target.closest('.panel-action-btn') && !e.target.closest('.size-selector')) {
-                    document.querySelectorAll('.size-selector').forEach(s => s.classList.remove('visible'));
+            const labels = { 3600: '1 hour', 86400: '24 hours', 604800: '7 days' };
+            showToast('Overview Range', `Sparklines showing ${labels[seconds]}`, 'info');
+        }
+
+        function updateSparklineTimeRange(groupName) {
+            // Trim sparkline data to match global time range
+            // This affects the density of points shown in the mini sparkline
+            const maxPoints = Math.min(60, Math.floor(state.globalTimeRange / 60));
+            if (state.sparklineData[groupName]) {
+                while (state.sparklineData[groupName].length > maxPoints) {
+                    state.sparklineData[groupName].shift();
+                }
+                updateSparkline(groupName);
+            }
+        }
+
+        function setLocalTimeRange(groupName, value) {
+            const statusEl = document.getElementById(`local-time-status-${groupName}`);
+            const selectEl = document.querySelector(`#local-time-${groupName} .local-time-select`);
+
+            if (value === 'live') {
+                // Resume live mode
+                state.localTimeRanges[groupName] = null;
+                state.liveMode[groupName] = true;
+                state.forensicsMode[groupName] = { enabled: false, zoomRange: null };
+
+                if (statusEl) {
+                    statusEl.innerHTML = '<span class="live-indicator"></span>';
+                    statusEl.classList.remove('paused');
+                }
+
+                // Reset charts to live view
+                resetToLiveMode(groupName);
+            } else {
+                // Pause live scrolling, show fixed time range
+                const seconds = parseInt(value);
+                state.localTimeRanges[groupName] = seconds;
+                state.liveMode[groupName] = false;
+
+                if (statusEl) {
+                    statusEl.innerHTML = '<span class="paused-indicator"></span>';
+                    statusEl.classList.add('paused');
+                }
+
+                // Calculate time range based on current data
+                const chartData = state.chartData[groupName];
+                if (chartData && chartData[0] && chartData[0].times.length > 0) {
+                    const times = chartData[0].times;
+                    const now = times[times.length - 1];
+                    const xMin = now - seconds;
+                    const xMax = now;
+
+                    applyForensicsZoom(groupName, xMin, xMax);
+                }
+
+                const labels = { 60: '1 min', 300: '5 min', 600: '10 min', 1800: '30 min', 3600: '1 hour' };
+                showToast('Local View', `${groupName}: Showing last ${labels[seconds]}`, 'info');
+            }
+        }
+
+        function toggleFocusMode(groupName, channelIdx) {
+            const chartsStack = document.getElementById(`charts-${groupName}`);
+            const chartRows = chartsStack.querySelectorAll('.chart-row');
+            const exitBtn = document.getElementById(`exit-focus-${groupName}`);
+
+            if (state.focusMode[groupName] === channelIdx) {
+                // Already focused on this channel - exit focus
+                exitFocusMode(groupName);
+                return;
+            }
+
+            // Enter focus mode
+            state.focusMode[groupName] = channelIdx;
+
+            chartRows.forEach((row, idx) => {
+                if (idx === channelIdx) {
+                    row.classList.add('focused');
+                    row.classList.remove('hidden-focus');
+                } else {
+                    row.classList.add('hidden-focus');
+                    row.classList.remove('focused');
                 }
             });
-        });
+
+            // Show exit button
+            if (exitBtn) {
+                exitBtn.style.display = 'flex';
+            }
+
+            // Hide legend
+            const legend = document.getElementById(`legend-${groupName}`);
+            if (legend) legend.classList.add('focus-hidden');
+
+            // Resize the focused chart after transition
+            setTimeout(() => {
+                const chart = state.charts[groupName]?.[channelIdx];
+                if (chart) {
+                    const wrap = chart.root.parentElement;
+                    chart.setSize({ width: wrap.clientWidth, height: wrap.clientHeight });
+                }
+            }, 350);
+
+            const channelName = chartRows[channelIdx]?.dataset.channel || `Channel ${channelIdx + 1}`;
+            showToast('Focus Mode', `Isolating: ${channelName}`, 'info');
+        }
+
+        function exitFocusMode(groupName) {
+            const chartsStack = document.getElementById(`charts-${groupName}`);
+            const chartRows = chartsStack.querySelectorAll('.chart-row');
+            const exitBtn = document.getElementById(`exit-focus-${groupName}`);
+            const legend = document.getElementById(`legend-${groupName}`);
+
+            state.focusMode[groupName] = null;
+
+            // Restore all rows
+            chartRows.forEach(row => {
+                row.classList.remove('focused', 'hidden-focus');
+            });
+
+            // Hide exit button
+            if (exitBtn) {
+                exitBtn.style.display = 'none';
+            }
+
+            // Show legend
+            if (legend) legend.classList.remove('focus-hidden');
+
+            // Resize all charts after transition
+            setTimeout(() => {
+                Object.values(state.charts[groupName] || {}).forEach(chart => {
+                    const wrap = chart.root.parentElement;
+                    chart.setSize({ width: wrap.clientWidth, height: wrap.clientHeight });
+                });
+            }, 350);
+
+            showToast('Focus Mode', 'Returned to multi-channel view', 'info');
+        }
+
+        function updateAnomalyCount(groupName) {
+            const countEl = document.getElementById(`anomaly-count-value-${groupName}`);
+            const counterEl = document.getElementById(`anomaly-count-${groupName}`);
+            if (!countEl || !counterEl) return;
+
+            // Count anomalies within the current time range (based on local or global setting)
+            const timeRange = state.localTimeRanges[groupName] || state.timeRangeSeconds;
+            const now = Date.now() / 1000;
+            const cutoff = now - timeRange;
+
+            const anomalies = state.anomalyTimestamps[groupName] || [];
+            const recentCount = anomalies.filter(a => a.timestamp > cutoff).length;
+
+            countEl.textContent = recentCount;
+            state.anomalyCounts[groupName] = recentCount;
+
+            // Update visual state based on count
+            counterEl.classList.remove('no-anomalies', 'few-anomalies', 'many-anomalies');
+            if (recentCount === 0) {
+                counterEl.classList.add('no-anomalies');
+            } else if (recentCount < 5) {
+                counterEl.classList.add('few-anomalies');
+            } else {
+                counterEl.classList.add('many-anomalies');
+            }
+        }
+
+        // Update anomaly counts periodically
+        setInterval(() => {
+            document.querySelectorAll('.grid-panel[data-group]').forEach(panel => {
+                updateAnomalyCount(panel.dataset.group);
+            });
+        }, 2000);
+
+        // ==================== UTILS ====================
+        function updateRateDisplay() {
+            const el = document.getElementById('update-rate');
+            if (el && state.updateCount > 0) {
+                el.textContent = `${state.updateCount} updates/5s`;
+            }
+            state.updateCount = 0;
+        }
     </script>
 </body>
 </html>
