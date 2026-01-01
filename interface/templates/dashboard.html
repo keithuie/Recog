@@ -789,8 +789,32 @@
                             <option value="2000" selected>2s</option>
                             <option value="5000">5s</option>
                         </select>
+
+                        <!-- Global Tile Controls -->
+                        <div class="tile-global-controls">
+                            <button class="tile-control-btn" onclick="minimizeAllTiles()" id="minimize-all-btn" title="Minimize All Tiles">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <polyline points="4 14 10 14 10 20"></polyline>
+                                    <polyline points="20 10 14 10 14 4"></polyline>
+                                </svg>
+                                Minimize All
+                            </button>
+                            <button class="tile-control-btn" onclick="expandAllTiles()" id="expand-all-btn" title="Expand All Tiles">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <polyline points="15 3 21 3 21 9"></polyline>
+                                    <polyline points="9 21 3 21 3 15"></polyline>
+                                </svg>
+                                Expand All
+                            </button>
+                        </div>
                     </div>
                     <div class="toolbar-actions">
+                        <!-- Theme Switcher -->
+                        <div class="theme-switcher">
+                            <button class="theme-btn active" data-theme="dark" data-tooltip="Dark (Kraken)" onclick="setTheme('dark')"></button>
+                            <button class="theme-btn" data-theme="silver" data-tooltip="Silver (Bloomberg)" onclick="setTheme('silver')"></button>
+                            <button class="theme-btn" data-theme="notion" data-tooltip="Notion (Light)" onclick="setTheme('notion')"></button>
+                        </div>
                         <button class="btn btn-secondary btn-sm" onclick="toggleEditMode()" id="edit-mode-btn">Edit Layout</button>
                         <button class="btn btn-secondary btn-sm" onclick="resetLayout()">Reset</button>
                     </div>
@@ -800,13 +824,19 @@
                 <div class="dashboard-grid" id="dashboard-grid">
                     {% if groups %}
                         {% for group in groups %}
-                        <div class="grid-panel panel-2x3" data-group="{{ group.name }}" data-size="2x3">
+                        <div class="grid-panel smart-tile expanded panel-2x3" data-group="{{ group.name }}" data-size="2x3">
                             <div class="panel-header">
                                 <div class="panel-title">
                                     <span class="status-indicator" id="status-{{ group.name }}"></span>
                                     {{ group.name }}
                                 </div>
                                 <div class="panel-actions">
+                                    <!-- Minimize/Expand Toggle -->
+                                    <button class="tile-toggle-btn" onclick="toggleTile('{{ group.name }}')" title="Minimize/Expand">
+                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                            <polyline points="18 15 12 9 6 15"></polyline>
+                                        </svg>
+                                    </button>
                                     <button class="panel-action-btn" onclick="toggleFullscreen('{{ group.name }}')">
                                         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                             <polyline points="15 3 21 3 21 9"></polyline>
@@ -827,7 +857,30 @@
                                     </div>
                                 </div>
                             </div>
-                            <div class="panel-content" id="content-{{ group.name }}">
+
+                            <!-- Health Beacon (visible when minimized) -->
+                            <div class="health-beacon" id="beacon-{{ group.name }}">
+                                <div class="health-beacon-glow status-idle" id="beacon-glow-{{ group.name }}"></div>
+                                <div class="health-beacon-info">
+                                    <div class="health-beacon-title">{{ group.name }}</div>
+                                    <div class="health-beacon-status" id="beacon-status-{{ group.name }}">Idle</div>
+                                </div>
+                                <div class="mini-sparkline" id="sparkline-{{ group.name }}">
+                                    <svg viewBox="0 0 120 32" preserveAspectRatio="none">
+                                        <defs>
+                                            <linearGradient id="sparkline-grad-{{ group.name }}" x1="0" y1="0" x2="0" y2="1">
+                                                <stop offset="0%" stop-color="var(--accent-secondary)" stop-opacity="0.4"/>
+                                                <stop offset="100%" stop-color="var(--accent-secondary)" stop-opacity="0"/>
+                                            </linearGradient>
+                                        </defs>
+                                        <path class="mini-sparkline-fill" id="sparkline-fill-{{ group.name }}" d="" fill="url(#sparkline-grad-{{ group.name }})"/>
+                                        <path class="mini-sparkline-path" id="sparkline-path-{{ group.name }}" d=""/>
+                                    </svg>
+                                </div>
+                                <div class="health-beacon-value" id="beacon-value-{{ group.name }}">--</div>
+                            </div>
+
+                            <div class="panel-content panel-content-expanded" id="content-{{ group.name }}">
                                 <!-- Training overlay -->
                                 <div class="training-overlay" id="overlay-{{ group.name }}" data-state="{% if group.trained_states > 0 %}trained{% else %}untrained{% endif %}">
                                     <div class="overlay-untrained" {% if group.trained_states > 0 %}style="display:none"{% endif %}>
@@ -1006,6 +1059,9 @@
             fullscreenPanel: null,
             simulationInterval: null,
             cursorX: null,        // For crosshair sync
+            currentTheme: 'dark', // Theme state
+            minimizedTiles: new Set(), // Track minimized tiles
+            sparklineData: {},    // Store sparkline confidence history
         };
 
         // Grafana-style color palette
@@ -1017,7 +1073,10 @@
         // ==================== INITIALIZATION ====================
         document.addEventListener('DOMContentLoaded', () => {
             loadLayout();
+            loadTheme();
+            loadTileStates();
             initAllCharts();
+            initSparklines();
             connectWebSocket();
             startSimulation();
 
@@ -1048,8 +1107,224 @@
             // Keyboard shortcuts
             document.addEventListener('keydown', (e) => {
                 if (e.key === 'Escape' && state.fullscreenPanel) exitFullscreen();
+                // M key to toggle minimize all
+                if (e.key === 'm' && !e.ctrlKey && !e.metaKey && document.activeElement.tagName !== 'INPUT') {
+                    const allMinimized = document.querySelectorAll('.smart-tile.minimized').length ===
+                                        document.querySelectorAll('.smart-tile').length;
+                    allMinimized ? expandAllTiles() : minimizeAllTiles();
+                }
             });
         });
+
+        // ==================== THEME SYSTEM ====================
+        function setTheme(themeName) {
+            document.documentElement.setAttribute('data-theme', themeName);
+            state.currentTheme = themeName;
+            localStorage.setItem('miq-theme', themeName);
+
+            // Update theme switcher buttons
+            document.querySelectorAll('.theme-btn').forEach(btn => {
+                btn.classList.toggle('active', btn.dataset.theme === themeName);
+            });
+
+            // Notify user
+            const themeNames = { dark: 'Dark (Kraken)', silver: 'Silver (Bloomberg)', notion: 'Notion (Light)' };
+            showToast('Theme Changed', `Switched to ${themeNames[themeName]}`, 'info');
+        }
+
+        function loadTheme() {
+            const saved = localStorage.getItem('miq-theme') || 'dark';
+            state.currentTheme = saved;
+            document.documentElement.setAttribute('data-theme', saved);
+            document.querySelectorAll('.theme-btn').forEach(btn => {
+                btn.classList.toggle('active', btn.dataset.theme === saved);
+            });
+        }
+
+        // ==================== SMART TILE SYSTEM ====================
+        function toggleTile(groupName) {
+            const tile = document.querySelector(`[data-group="${groupName}"]`);
+            if (!tile) return;
+
+            const isMinimized = tile.classList.contains('minimized');
+
+            if (isMinimized) {
+                tile.classList.remove('minimized');
+                tile.classList.add('expanded');
+                state.minimizedTiles.delete(groupName);
+            } else {
+                tile.classList.remove('expanded');
+                tile.classList.add('minimized');
+                state.minimizedTiles.add(groupName);
+            }
+
+            saveTileStates();
+            updateTileControlButtons();
+
+            // Resize charts after transition
+            setTimeout(() => {
+                if (!isMinimized) return; // Only resize when expanding
+                Object.values(state.charts[groupName] || {}).forEach(chart => {
+                    const wrap = chart.root.parentElement;
+                    chart.setSize({ width: wrap.clientWidth, height: wrap.clientHeight });
+                });
+            }, 450);
+        }
+
+        function minimizeAllTiles() {
+            document.querySelectorAll('.smart-tile').forEach(tile => {
+                const groupName = tile.dataset.group;
+                tile.classList.remove('expanded');
+                tile.classList.add('minimized');
+                state.minimizedTiles.add(groupName);
+            });
+            saveTileStates();
+            updateTileControlButtons();
+            showToast('Tiles Minimized', 'All tiles are now minimized', 'info');
+        }
+
+        function expandAllTiles() {
+            document.querySelectorAll('.smart-tile').forEach(tile => {
+                const groupName = tile.dataset.group;
+                tile.classList.remove('minimized');
+                tile.classList.add('expanded');
+                state.minimizedTiles.delete(groupName);
+            });
+            saveTileStates();
+            updateTileControlButtons();
+
+            // Resize all charts after transition
+            setTimeout(() => {
+                Object.keys(state.charts).forEach(groupName => {
+                    Object.values(state.charts[groupName] || {}).forEach(chart => {
+                        const wrap = chart.root.parentElement;
+                        chart.setSize({ width: wrap.clientWidth, height: wrap.clientHeight });
+                    });
+                });
+            }, 450);
+
+            showToast('Tiles Expanded', 'All tiles are now expanded', 'info');
+        }
+
+        function saveTileStates() {
+            localStorage.setItem('miq-minimized-tiles', JSON.stringify([...state.minimizedTiles]));
+        }
+
+        function loadTileStates() {
+            try {
+                const saved = JSON.parse(localStorage.getItem('miq-minimized-tiles') || '[]');
+                saved.forEach(groupName => {
+                    const tile = document.querySelector(`[data-group="${groupName}"]`);
+                    if (tile) {
+                        tile.classList.remove('expanded');
+                        tile.classList.add('minimized');
+                        state.minimizedTiles.add(groupName);
+                    }
+                });
+                updateTileControlButtons();
+            } catch (e) {}
+        }
+
+        function updateTileControlButtons() {
+            const totalTiles = document.querySelectorAll('.smart-tile').length;
+            const minimizedCount = document.querySelectorAll('.smart-tile.minimized').length;
+
+            const minBtn = document.getElementById('minimize-all-btn');
+            const expBtn = document.getElementById('expand-all-btn');
+
+            if (minBtn) minBtn.classList.toggle('active', minimizedCount === totalTiles);
+            if (expBtn) expBtn.classList.toggle('active', minimizedCount === 0);
+        }
+
+        // ==================== HEALTH BEACON & SPARKLINE ====================
+        function initSparklines() {
+            document.querySelectorAll('.smart-tile[data-group]').forEach(tile => {
+                const groupName = tile.dataset.group;
+                state.sparklineData[groupName] = [];
+            });
+        }
+
+        function updateHealthBeacon(groupName, confidence, isTrained) {
+            const glow = document.getElementById(`beacon-glow-${groupName}`);
+            const status = document.getElementById(`beacon-status-${groupName}`);
+            const value = document.getElementById(`beacon-value-${groupName}`);
+            const sparkline = document.getElementById(`sparkline-${groupName}`);
+
+            if (!glow) return;
+
+            const threshold = state.thresholds[groupName] || 40;
+
+            // Update glow status
+            glow.classList.remove('status-healthy', 'status-warning', 'status-danger', 'status-idle');
+            if (!isTrained) {
+                glow.classList.add('status-idle');
+                if (status) status.textContent = 'Not Trained';
+                if (value) { value.textContent = '--'; value.className = 'health-beacon-value'; }
+            } else if (confidence >= threshold + 30) {
+                glow.classList.add('status-healthy');
+                if (status) status.textContent = 'Healthy';
+                if (value) { value.textContent = `${confidence.toFixed(0)}%`; value.className = 'health-beacon-value'; }
+            } else if (confidence >= threshold) {
+                glow.classList.add('status-warning');
+                if (status) status.textContent = 'Warning';
+                if (value) { value.textContent = `${confidence.toFixed(0)}%`; value.className = 'health-beacon-value warning'; }
+            } else {
+                glow.classList.add('status-danger');
+                if (status) status.textContent = 'Anomaly';
+                if (value) { value.textContent = `${confidence.toFixed(0)}%`; value.className = 'health-beacon-value danger'; }
+            }
+
+            // Update sparkline data
+            if (isTrained && confidence > 0) {
+                if (!state.sparklineData[groupName]) state.sparklineData[groupName] = [];
+                state.sparklineData[groupName].push(confidence);
+                if (state.sparklineData[groupName].length > 30) {
+                    state.sparklineData[groupName].shift();
+                }
+                updateSparkline(groupName);
+            }
+        }
+
+        function updateSparkline(groupName) {
+            const data = state.sparklineData[groupName] || [];
+            if (data.length < 2) return;
+
+            const pathEl = document.getElementById(`sparkline-path-${groupName}`);
+            const fillEl = document.getElementById(`sparkline-fill-${groupName}`);
+            const container = document.getElementById(`sparkline-${groupName}`);
+            if (!pathEl || !fillEl) return;
+
+            const width = 120;
+            const height = 32;
+            const padding = 2;
+
+            const min = Math.min(...data) - 5;
+            const max = Math.max(...data) + 5;
+            const range = max - min || 1;
+
+            const points = data.map((val, idx) => {
+                const x = padding + (idx / (data.length - 1)) * (width - 2 * padding);
+                const y = height - padding - ((val - min) / range) * (height - 2 * padding);
+                return `${x},${y}`;
+            });
+
+            // Line path
+            pathEl.setAttribute('d', `M${points.join(' L')}`);
+
+            // Fill path (area under curve)
+            const fillPath = `M${padding},${height} L${points.join(' L')} L${width - padding},${height} Z`;
+            fillEl.setAttribute('d', fillPath);
+
+            // Update sparkline color based on current status
+            const threshold = state.thresholds[groupName] || 40;
+            const lastValue = data[data.length - 1];
+            container.classList.remove('warning', 'danger');
+            if (lastValue < threshold) {
+                container.classList.add('danger');
+            } else if (lastValue < threshold + 30) {
+                container.classList.add('warning');
+            }
+        }
 
         // ==================== UPLOT CHARTS ====================
         function initAllCharts() {
@@ -1300,6 +1575,9 @@
 
             // Update confidence gauge
             updateConfidenceGauge(group, confidence, isTrained);
+
+            // Update health beacon (for minimized view)
+            updateHealthBeacon(group, confidence, isTrained);
 
             // Track anomalies
             if (isTrained) {

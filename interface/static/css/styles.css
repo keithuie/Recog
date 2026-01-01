@@ -1,11 +1,20 @@
-/* MachineIQ - Kraken-inspired Dark Theme */
-:root {
-    /* Kraken-style colors */
+/* MachineIQ - Multi-Theme System */
+
+/* ============================================
+   THEME ENGINE - CSS Custom Properties
+   ============================================ */
+
+/* Theme: Dark (Kraken-style) - Default */
+:root,
+[data-theme="dark"] {
+    /* Core backgrounds */
     --bg-primary: #0b0e11;
     --bg-secondary: #131722;
     --bg-tertiary: #1e222d;
     --bg-elevated: #252a34;
     --bg-hover: #2a2e39;
+    --bg-glass: rgba(19, 23, 34, 0.85);
+    --bg-glass-hover: rgba(30, 34, 45, 0.9);
 
     /* Accent colors */
     --accent-primary: #7b61ff;
@@ -23,6 +32,16 @@
     /* Border colors */
     --border-primary: #2a2e39;
     --border-secondary: #363a45;
+    --border-glass: rgba(255, 255, 255, 0.08);
+
+    /* Health beacon glow */
+    --glow-healthy: rgba(0, 200, 83, 0.4);
+    --glow-warning: rgba(255, 193, 7, 0.4);
+    --glow-danger: rgba(255, 82, 82, 0.4);
+
+    /* Glassmorphism */
+    --glass-blur: 12px;
+    --glass-opacity: 0.85;
 
     /* Spacing */
     --spacing-xs: 4px;
@@ -35,10 +54,120 @@
     --radius-sm: 4px;
     --radius-md: 8px;
     --radius-lg: 12px;
+    --radius-xl: 16px;
 
     /* Transitions */
     --transition-fast: 150ms ease;
     --transition-normal: 250ms ease;
+    --transition-slow: 400ms cubic-bezier(0.4, 0, 0.2, 1);
+
+    /* Shadows */
+    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
+    --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.4);
+    --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.5);
+    --shadow-glow: 0 0 20px var(--glow-healthy);
+}
+
+/* Theme: Silver (Bloomberg-style) */
+[data-theme="silver"] {
+    /* Core backgrounds */
+    --bg-primary: #1a1a1a;
+    --bg-secondary: #242424;
+    --bg-tertiary: #2e2e2e;
+    --bg-elevated: #383838;
+    --bg-hover: #424242;
+    --bg-glass: rgba(36, 36, 36, 0.92);
+    --bg-glass-hover: rgba(46, 46, 46, 0.95);
+
+    /* Accent colors - Bloomberg orange/amber */
+    --accent-primary: #ff6b00;
+    --accent-primary-hover: #ff8533;
+    --accent-secondary: #00d4aa;
+    --accent-warning: #ffb800;
+    --accent-danger: #ff3b3b;
+
+    /* Text colors */
+    --text-primary: #f0f0f0;
+    --text-secondary: #a0a0a0;
+    --text-tertiary: #707070;
+    --text-muted: #505050;
+
+    /* Border colors */
+    --border-primary: #3a3a3a;
+    --border-secondary: #4a4a4a;
+    --border-glass: rgba(255, 255, 255, 0.1);
+
+    /* Health beacon glow */
+    --glow-healthy: rgba(0, 212, 170, 0.5);
+    --glow-warning: rgba(255, 184, 0, 0.5);
+    --glow-danger: rgba(255, 59, 59, 0.5);
+
+    /* Glassmorphism */
+    --glass-blur: 16px;
+    --glass-opacity: 0.92;
+
+    /* Shadows */
+    --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.4);
+    --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.5);
+    --shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.6);
+    --shadow-glow: 0 0 24px var(--glow-healthy);
+}
+
+/* Theme: Notion (Clean light/dark hybrid with serif headers) */
+[data-theme="notion"] {
+    /* Core backgrounds - warm off-white */
+    --bg-primary: #ffffff;
+    --bg-secondary: #f7f6f3;
+    --bg-tertiary: #efeee9;
+    --bg-elevated: #ffffff;
+    --bg-hover: #e8e7e4;
+    --bg-glass: rgba(255, 255, 255, 0.95);
+    --bg-glass-hover: rgba(247, 246, 243, 0.98);
+
+    /* Accent colors - Notion's subtle palette */
+    --accent-primary: #2eaadc;
+    --accent-primary-hover: #4ab8e5;
+    --accent-secondary: #0f9d58;
+    --accent-warning: #f9ab00;
+    --accent-danger: #eb4034;
+
+    /* Text colors */
+    --text-primary: #37352f;
+    --text-secondary: #6b6b6b;
+    --text-tertiary: #9b9a97;
+    --text-muted: #c7c6c4;
+
+    /* Border colors */
+    --border-primary: #e3e2de;
+    --border-secondary: #d3d2ce;
+    --border-glass: rgba(55, 53, 47, 0.08);
+
+    /* Health beacon glow */
+    --glow-healthy: rgba(15, 157, 88, 0.3);
+    --glow-warning: rgba(249, 171, 0, 0.3);
+    --glow-danger: rgba(235, 64, 52, 0.3);
+
+    /* Glassmorphism - subtler for light theme */
+    --glass-blur: 8px;
+    --glass-opacity: 0.95;
+
+    /* Shadows - softer for light theme */
+    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.06);
+    --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.08);
+    --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.12);
+    --shadow-glow: 0 0 16px var(--glow-healthy);
+}
+
+/* Notion theme - serif font for headings */
+[data-theme="notion"] h1,
+[data-theme="notion"] h2,
+[data-theme="notion"] h3,
+[data-theme="notion"] h4,
+[data-theme="notion"] .panel-title,
+[data-theme="notion"] .toolbar-title {
+    font-family: 'Georgia', 'Times New Roman', serif;
+    font-weight: 600;
+    letter-spacing: -0.01em;
 }
 
 /* Reset & Base */
@@ -1628,4 +1757,426 @@ body {
     .duration-btn {
         flex: 0 0 calc(33% - var(--spacing-sm));
     }
+}
+
+
+/* ============================================
+   SMART TILE SYSTEM
+   Minimized/Expanded states with transitions
+   ============================================ */
+
+/* Smart Tile Base */
+.smart-tile {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-primary);
+    border-radius: var(--radius-md);
+    overflow: hidden;
+    transition:
+        height var(--transition-slow),
+        min-height var(--transition-slow),
+        grid-row var(--transition-slow),
+        box-shadow var(--transition-normal);
+}
+
+.smart-tile:hover {
+    border-color: var(--border-secondary);
+    box-shadow: var(--shadow-md);
+}
+
+/* Expanded state (default) */
+.smart-tile.expanded {
+    min-height: 350px;
+}
+
+.smart-tile.expanded .panel-content-expanded {
+    opacity: 1;
+    visibility: visible;
+    height: auto;
+    transition: opacity var(--transition-normal) 0.1s, visibility 0s 0s;
+}
+
+.smart-tile.expanded .health-beacon {
+    opacity: 0;
+    visibility: hidden;
+    height: 0;
+    overflow: hidden;
+    transition: opacity var(--transition-normal), visibility 0s 0.3s, height var(--transition-slow);
+}
+
+/* Minimized state */
+.smart-tile.minimized {
+    min-height: 80px;
+    max-height: 80px;
+    grid-row: span 1 !important;
+}
+
+.smart-tile.minimized .panel-content-expanded {
+    opacity: 0;
+    visibility: hidden;
+    height: 0;
+    overflow: hidden;
+    transition: opacity var(--transition-fast), visibility 0s 0.2s, height var(--transition-slow);
+}
+
+.smart-tile.minimized .health-beacon {
+    opacity: 1;
+    visibility: visible;
+    height: auto;
+    transition: opacity var(--transition-normal) 0.2s, visibility 0s 0s, height var(--transition-slow);
+}
+
+/* ============================================
+   HEALTH BEACON - Glassmorphism status display
+   ============================================ */
+
+.health-beacon {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-md);
+    padding: var(--spacing-md);
+    height: 0;
+    opacity: 0;
+    visibility: hidden;
+    overflow: hidden;
+}
+
+.health-beacon-glow {
+    position: relative;
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+
+    /* Glassmorphism effect */
+    background: var(--bg-glass);
+    backdrop-filter: blur(var(--glass-blur));
+    -webkit-backdrop-filter: blur(var(--glass-blur));
+    border: 1px solid var(--border-glass);
+
+    /* Dynamic glow */
+    box-shadow:
+        0 0 20px var(--beacon-glow, var(--glow-healthy)),
+        inset 0 0 20px rgba(255, 255, 255, 0.05);
+
+    transition: box-shadow var(--transition-normal), background var(--transition-normal);
+}
+
+.health-beacon-glow::before {
+    content: '';
+    position: absolute;
+    inset: 4px;
+    border-radius: 50%;
+    background: var(--beacon-color, var(--accent-secondary));
+    opacity: 0.9;
+    transition: background var(--transition-normal);
+}
+
+.health-beacon-glow::after {
+    content: '';
+    position: absolute;
+    inset: 8px;
+    border-radius: 50%;
+    background: radial-gradient(circle at 30% 30%, rgba(255,255,255,0.4), transparent 60%);
+}
+
+/* Beacon status colors */
+.health-beacon-glow.status-healthy {
+    --beacon-color: var(--accent-secondary);
+    --beacon-glow: var(--glow-healthy);
+}
+
+.health-beacon-glow.status-warning {
+    --beacon-color: var(--accent-warning);
+    --beacon-glow: var(--glow-warning);
+    animation: beacon-pulse 2s ease-in-out infinite;
+}
+
+.health-beacon-glow.status-danger {
+    --beacon-color: var(--accent-danger);
+    --beacon-glow: var(--glow-danger);
+    animation: beacon-pulse 1s ease-in-out infinite;
+}
+
+.health-beacon-glow.status-idle {
+    --beacon-color: var(--text-tertiary);
+    --beacon-glow: rgba(128, 128, 128, 0.2);
+}
+
+@keyframes beacon-pulse {
+    0%, 100% {
+        box-shadow:
+            0 0 20px var(--beacon-glow),
+            inset 0 0 20px rgba(255, 255, 255, 0.05);
+    }
+    50% {
+        box-shadow:
+            0 0 40px var(--beacon-glow),
+            0 0 60px var(--beacon-glow),
+            inset 0 0 20px rgba(255, 255, 255, 0.1);
+    }
+}
+
+/* Health Beacon Info */
+.health-beacon-info {
+    flex: 1;
+    min-width: 0;
+}
+
+.health-beacon-title {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: 2px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.health-beacon-status {
+    font-size: 12px;
+    color: var(--text-secondary);
+}
+
+.health-beacon-value {
+    font-family: 'Roboto Mono', 'SF Mono', monospace;
+    font-size: 18px;
+    font-weight: 600;
+    color: var(--accent-secondary);
+    margin-left: auto;
+    flex-shrink: 0;
+}
+
+.health-beacon-value.warning {
+    color: var(--accent-warning);
+}
+
+.health-beacon-value.danger {
+    color: var(--accent-danger);
+}
+
+/* ============================================
+   MINI SPARKLINE - SVG-based trend line
+   ============================================ */
+
+.mini-sparkline {
+    width: 120px;
+    height: 32px;
+    flex-shrink: 0;
+    background: var(--bg-tertiary);
+    border-radius: var(--radius-sm);
+    overflow: hidden;
+    position: relative;
+}
+
+.mini-sparkline svg {
+    width: 100%;
+    height: 100%;
+    display: block;
+}
+
+.mini-sparkline-path {
+    fill: none;
+    stroke: var(--accent-secondary);
+    stroke-width: 1.5;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
+.mini-sparkline-fill {
+    fill: url(#sparkline-gradient);
+    opacity: 0.3;
+}
+
+.mini-sparkline.warning .mini-sparkline-path {
+    stroke: var(--accent-warning);
+}
+
+.mini-sparkline.danger .mini-sparkline-path {
+    stroke: var(--accent-danger);
+}
+
+/* ============================================
+   TILE TOGGLE BUTTON
+   ============================================ */
+
+.tile-toggle-btn {
+    background: transparent;
+    border: none;
+    color: var(--text-secondary);
+    cursor: pointer;
+    padding: 4px;
+    border-radius: var(--radius-sm);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: var(--transition-fast);
+}
+
+.tile-toggle-btn:hover {
+    background: var(--bg-hover);
+    color: var(--text-primary);
+}
+
+.tile-toggle-btn svg {
+    transition: transform var(--transition-normal);
+}
+
+.smart-tile.minimized .tile-toggle-btn svg {
+    transform: rotate(180deg);
+}
+
+/* ============================================
+   GLOBAL TILE CONTROLS
+   ============================================ */
+
+.tile-global-controls {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+    padding: 0 var(--spacing-sm);
+    border-left: 1px solid var(--border-primary);
+    margin-left: var(--spacing-sm);
+}
+
+.tile-control-btn {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-primary);
+    border-radius: var(--radius-sm);
+    color: var(--text-secondary);
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: var(--transition-fast);
+    white-space: nowrap;
+}
+
+.tile-control-btn:hover {
+    background: var(--bg-hover);
+    border-color: var(--border-secondary);
+    color: var(--text-primary);
+}
+
+.tile-control-btn.active {
+    background: var(--accent-primary);
+    border-color: var(--accent-primary);
+    color: white;
+}
+
+.tile-control-btn svg {
+    width: 14px;
+    height: 14px;
+}
+
+/* ============================================
+   THEME SWITCHER
+   ============================================ */
+
+.theme-switcher {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-xs);
+    padding: 4px;
+    background: var(--bg-tertiary);
+    border-radius: var(--radius-md);
+    border: 1px solid var(--border-primary);
+}
+
+.theme-btn {
+    width: 28px;
+    height: 28px;
+    border-radius: var(--radius-sm);
+    border: 2px solid transparent;
+    cursor: pointer;
+    transition: var(--transition-fast);
+    position: relative;
+    overflow: hidden;
+}
+
+.theme-btn:hover {
+    transform: scale(1.1);
+}
+
+.theme-btn.active {
+    border-color: var(--accent-primary);
+    box-shadow: 0 0 8px var(--accent-primary);
+}
+
+.theme-btn[data-theme="dark"] {
+    background: linear-gradient(135deg, #0b0e11 50%, #131722 50%);
+}
+
+.theme-btn[data-theme="silver"] {
+    background: linear-gradient(135deg, #1a1a1a 50%, #ff6b00 50%);
+}
+
+.theme-btn[data-theme="notion"] {
+    background: linear-gradient(135deg, #ffffff 50%, #f7f6f3 50%);
+    border: 1px solid #e3e2de;
+}
+
+.theme-btn::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: transparent;
+    transition: background var(--transition-fast);
+}
+
+.theme-btn:hover::after {
+    background: rgba(255, 255, 255, 0.1);
+}
+
+/* Theme label tooltip */
+.theme-btn[data-tooltip]::before {
+    content: attr(data-tooltip);
+    position: absolute;
+    bottom: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    padding: 4px 8px;
+    background: var(--bg-elevated);
+    color: var(--text-primary);
+    font-size: 11px;
+    border-radius: var(--radius-sm);
+    white-space: nowrap;
+    opacity: 0;
+    visibility: hidden;
+    transition: var(--transition-fast);
+    margin-bottom: 4px;
+    box-shadow: var(--shadow-md);
+}
+
+.theme-btn:hover[data-tooltip]::before {
+    opacity: 1;
+    visibility: visible;
+}
+
+/* ============================================
+   SMOOTH GRID TRANSITIONS
+   ============================================ */
+
+.dashboard-grid {
+    transition: gap var(--transition-normal);
+}
+
+.dashboard-grid.compact-mode {
+    gap: 4px;
+}
+
+/* Panel content fade transitions */
+.panel-content-expanded {
+    transition:
+        opacity var(--transition-normal),
+        visibility 0s,
+        height var(--transition-slow);
 }
