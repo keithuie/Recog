@@ -1050,7 +1050,7 @@
             trainedGroups: new Set(),
             thresholds: {},       // Per-group thresholds
             hiddenSeries: {},     // Hidden channels per group
-            anomalyTimestamps: {},
+            anomalyTimestamps: {},  // { groupName: [{ timestamp, confidence }] }
             timeRangeSeconds: 300,
             refreshIntervalMs: 2000,
             updateCount: 0,
@@ -1062,6 +1062,9 @@
             currentTheme: 'dark', // Theme state
             minimizedTiles: new Set(), // Track minimized tiles
             sparklineData: {},    // Store sparkline confidence history
+            // Forensics mode state
+            forensicsMode: {},    // { groupName: { enabled: bool, zoomRange: [min, max] } }
+            liveMode: {},         // { groupName: true/false } - tracks if chart is in live rolling mode
         };
 
         // Grafana-style color palette
@@ -1356,6 +1359,14 @@
         function createUPlotChart(container, groupName, channelIdx) {
             const color = COLORS[channelIdx % COLORS.length];
 
+            // Initialize forensics mode for this group
+            if (!state.forensicsMode[groupName]) {
+                state.forensicsMode[groupName] = { enabled: false, zoomRange: null };
+            }
+            if (state.liveMode[groupName] === undefined) {
+                state.liveMode[groupName] = true;
+            }
+
             const opts = {
                 width: container.clientWidth || 300,
                 height: container.clientHeight || 40,
@@ -1363,19 +1374,37 @@
                     show: true,
                     x: true,
                     y: false,
-                    drag: { x: false, y: false },
+                    drag: {
+                        x: true,   // Enable drag-to-zoom on X-axis
+                        y: false,
+                        setScale: false,  // We handle zoom manually
+                    },
                     sync: {
-                        key: groupName,  // Sync within group
+                        key: groupName,  // Sync cursor within group
                         scales: ['x'],
                     },
                     points: { show: false }
                 },
                 scales: {
-                    x: { time: true },
-                    y: { auto: true, range: (u, min, max) => {
-                        const pad = (max - min) * 0.1 || 0.1;
-                        return [min - pad, max + pad];
-                    }}
+                    x: {
+                        time: true,
+                        // Dynamic range based on forensics mode
+                        range: (u, dataMin, dataMax) => {
+                            const fm = state.forensicsMode[groupName];
+                            if (fm && fm.enabled && fm.zoomRange) {
+                                return fm.zoomRange;
+                            }
+                            // Live mode: show rolling window
+                            return [dataMin, dataMax];
+                        }
+                    },
+                    y: {
+                        auto: true,
+                        range: (u, min, max) => {
+                            const pad = (max - min) * 0.1 || 0.1;
+                            return [min - pad, max + pad];
+                        }
+                    }
                 },
                 axes: [
                     { show: false },  // Hide X axis
@@ -1405,6 +1434,12 @@
                     }
                 ],
                 hooks: {
+                    // Draw anomaly lines after chart renders
+                    draw: [
+                        (u) => {
+                            drawAnomalyLines(u, groupName);
+                        }
+                    ],
                     setCursor: [
                         (u) => {
                             // Sync crosshair across all charts in this group
@@ -1417,12 +1452,32 @@
                             }
                         }
                     ],
+                    setSelect: [
+                        (u) => {
+                            // Handle drag-to-zoom selection
+                            const sel = u.select;
+                            if (sel.width > 10) {  // Minimum selection width
+                                const xMin = u.posToVal(sel.left, 'x');
+                                const xMax = u.posToVal(sel.left + sel.width, 'x');
+
+                                // Apply zoom to all charts in this group
+                                applyForensicsZoom(groupName, xMin, xMax);
+                            }
+                            // Clear the selection
+                            u.setSelect({ left: 0, width: 0, top: 0, height: 0 }, false);
+                        }
+                    ],
                     ready: [
                         (u) => {
                             // Add mouseleave handler
                             u.over.addEventListener('mouseleave', () => {
                                 hideCrosshairs(groupName);
                                 hideTooltip();
+                            });
+
+                            // Double-click to reset to live mode
+                            u.over.addEventListener('dblclick', () => {
+                                resetToLiveMode(groupName);
                             });
                         }
                     ]
@@ -1443,6 +1498,135 @@
             }).observe(container);
 
             return chart;
+        }
+
+        // ==================== ANOMALY LINES ====================
+        function drawAnomalyLines(u, groupName) {
+            const ctx = u.ctx;
+            const anomalies = state.anomalyTimestamps[groupName] || [];
+            if (anomalies.length === 0) return;
+
+            const xScale = u.scales.x;
+            const [xMin, xMax] = [xScale.min, xScale.max];
+
+            // Get chart drawing area
+            const bbox = u.bbox;
+            const plotLeft = bbox.left;
+            const plotTop = bbox.top;
+            const plotHeight = bbox.height;
+
+            ctx.save();
+
+            anomalies.forEach(anomaly => {
+                const ts = anomaly.timestamp;
+
+                // Only draw if timestamp is visible
+                if (ts >= xMin && ts <= xMax) {
+                    const xPos = u.valToPos(ts, 'x', true);
+
+                    // Draw vertical line
+                    ctx.beginPath();
+                    ctx.strokeStyle = 'rgba(242, 73, 92, 0.5)';  // Grafana red with 50% opacity
+                    ctx.lineWidth = 1;
+                    ctx.setLineDash([]);
+
+                    ctx.moveTo(xPos, plotTop);
+                    ctx.lineTo(xPos, plotTop + plotHeight);
+                    ctx.stroke();
+
+                    // Optional: Draw a small marker at top
+                    ctx.fillStyle = 'rgba(242, 73, 92, 0.8)';
+                    ctx.beginPath();
+                    ctx.arc(xPos, plotTop + 4, 3, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+            });
+
+            ctx.restore();
+        }
+
+        // ==================== FORENSICS ZOOM ====================
+        function applyForensicsZoom(groupName, xMin, xMax) {
+            // Enable forensics mode
+            state.forensicsMode[groupName] = {
+                enabled: true,
+                zoomRange: [xMin, xMax]
+            };
+            state.liveMode[groupName] = false;
+
+            // Redraw all charts in this group with new zoom
+            const charts = state.charts[groupName];
+            if (charts) {
+                Object.values(charts).forEach(chart => {
+                    chart.setScale('x', { min: xMin, max: xMax });
+                });
+            }
+
+            // Show forensics mode indicator
+            showForensicsIndicator(groupName, true);
+
+            showToast('Forensics Mode', 'Drag to zoom further, double-click to return to live view', 'info');
+        }
+
+        function resetToLiveMode(groupName) {
+            // Disable forensics mode
+            state.forensicsMode[groupName] = { enabled: false, zoomRange: null };
+            state.liveMode[groupName] = true;
+
+            // Reset all charts to auto-scale (live rolling window)
+            const charts = state.charts[groupName];
+            const chartData = state.chartData[groupName];
+
+            if (charts && chartData) {
+                // Get the data range from first channel
+                const firstChannelData = chartData[0];
+                if (firstChannelData && firstChannelData.times.length > 0) {
+                    const times = firstChannelData.times;
+                    const xMin = times[0];
+                    const xMax = times[times.length - 1];
+
+                    Object.values(charts).forEach(chart => {
+                        chart.setScale('x', { min: xMin, max: xMax });
+                    });
+                }
+            }
+
+            showForensicsIndicator(groupName, false);
+            showToast('Live Mode', 'Returned to live rolling view', 'success');
+        }
+
+        function showForensicsIndicator(groupName, show) {
+            const panel = document.querySelector(`[data-group="${groupName}"]`);
+            if (!panel) return;
+
+            let indicator = panel.querySelector('.forensics-indicator');
+
+            if (show) {
+                if (!indicator) {
+                    indicator = document.createElement('div');
+                    indicator.className = 'forensics-indicator';
+                    indicator.innerHTML = `
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="11" cy="11" r="8"></circle>
+                            <path d="M21 21l-4.35-4.35"></path>
+                        </svg>
+                        <span>FORENSICS</span>
+                        <button onclick="resetToLiveMode('${groupName}')" title="Return to Live">
+                            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M18 6L6 18M6 6l12 12"></path>
+                            </svg>
+                        </button>
+                    `;
+                    const header = panel.querySelector('.panel-header');
+                    if (header) {
+                        header.appendChild(indicator);
+                    }
+                }
+            } else {
+                if (indicator) {
+                    indicator.remove();
+                }
+            }
         }
 
         // ==================== CROSSHAIR SYNC ====================
@@ -1579,15 +1763,27 @@
             // Update health beacon (for minimized view)
             updateHealthBeacon(group, confidence, isTrained);
 
-            // Track anomalies
+            // Track anomalies for vertical line drawing
             if (isTrained) {
                 const threshold = state.thresholds[group] || 40;
                 if (confidence < threshold) {
-                    state.anomalyTimestamps[group].push(Date.now());
+                    // Store anomaly with timestamp (in seconds for uPlot) and confidence
+                    if (!state.anomalyTimestamps[group]) {
+                        state.anomalyTimestamps[group] = [];
+                    }
+                    state.anomalyTimestamps[group].push({
+                        timestamp: timestamp,  // Already in seconds
+                        confidence: confidence
+                    });
+
+                    // Trigger redraw of all charts to show the new anomaly line
+                    Object.values(charts).forEach(chart => {
+                        chart.redraw();
+                    });
                 }
-                // Trim old timestamps
-                const cutoff = Date.now() - state.timeRangeSeconds * 1000;
-                state.anomalyTimestamps[group] = state.anomalyTimestamps[group].filter(t => t > cutoff);
+                // Trim old anomaly records (keep last N minutes based on time range)
+                const cutoffTime = timestamp - state.timeRangeSeconds;
+                state.anomalyTimestamps[group] = state.anomalyTimestamps[group].filter(a => a.timestamp > cutoffTime);
             }
 
             // Update heatmap

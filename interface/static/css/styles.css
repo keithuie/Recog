@@ -2180,3 +2180,138 @@ body {
         visibility 0s,
         height var(--transition-slow);
 }
+
+
+/* ============================================
+   FORENSICS MODE & UPLOT ENHANCEMENTS
+   ============================================ */
+
+/* Forensics Mode Indicator */
+.forensics-indicator {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 10px;
+    background: rgba(242, 73, 92, 0.15);
+    border: 1px solid rgba(242, 73, 92, 0.4);
+    border-radius: var(--radius-sm);
+    margin-left: auto;
+    animation: forensics-pulse 2s ease-in-out infinite;
+}
+
+.forensics-indicator svg {
+    color: var(--accent-danger);
+}
+
+.forensics-indicator span {
+    font-size: 10px;
+    font-weight: 600;
+    color: var(--accent-danger);
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+}
+
+.forensics-indicator button {
+    background: transparent;
+    border: none;
+    color: var(--accent-danger);
+    cursor: pointer;
+    padding: 2px;
+    border-radius: 2px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0.7;
+    transition: var(--transition-fast);
+}
+
+.forensics-indicator button:hover {
+    opacity: 1;
+    background: rgba(242, 73, 92, 0.2);
+}
+
+@keyframes forensics-pulse {
+    0%, 100% { border-color: rgba(242, 73, 92, 0.4); }
+    50% { border-color: rgba(242, 73, 92, 0.8); }
+}
+
+/* uPlot Selection Overlay (drag-to-zoom) */
+.u-select {
+    background: rgba(87, 148, 242, 0.2) !important;
+    border: 1px solid rgba(87, 148, 242, 0.5) !important;
+    border-radius: 2px;
+}
+
+/* uPlot Cursor Crosshair */
+.u-cursor-x,
+.u-cursor-y {
+    border-color: rgba(255, 255, 255, 0.3) !important;
+}
+
+/* Anomaly line marker tooltip */
+.anomaly-marker {
+    position: absolute;
+    background: var(--accent-danger);
+    color: white;
+    font-size: 10px;
+    padding: 2px 6px;
+    border-radius: 3px;
+    white-space: nowrap;
+    pointer-events: none;
+    z-index: 100;
+    transform: translateX(-50%);
+}
+
+/* Chart wrapper cursor styles */
+.chart-wrapper {
+    cursor: crosshair;
+}
+
+.chart-wrapper.dragging {
+    cursor: col-resize;
+}
+
+/* Zoom hint tooltip */
+.zoom-hint {
+    position: absolute;
+    bottom: 8px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--bg-elevated);
+    color: var(--text-secondary);
+    font-size: 10px;
+    padding: 4px 8px;
+    border-radius: var(--radius-sm);
+    opacity: 0;
+    transition: opacity var(--transition-fast);
+    pointer-events: none;
+    white-space: nowrap;
+}
+
+.chart-wrapper:hover .zoom-hint {
+    opacity: 0.8;
+}
+
+/* Live mode indicator dot */
+.live-indicator {
+    width: 6px;
+    height: 6px;
+    background: var(--accent-secondary);
+    border-radius: 50%;
+    animation: live-blink 1.5s ease-in-out infinite;
+    margin-right: 4px;
+}
+
+@keyframes live-blink {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.4; }
+}
+
+/* Paused mode indicator */
+.paused-indicator {
+    width: 6px;
+    height: 6px;
+    background: var(--accent-warning);
+    border-radius: 2px;
+    margin-right: 4px;
+}
