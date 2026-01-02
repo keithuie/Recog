@@ -70,7 +70,7 @@ class HoverablePlotWidget(pg.PlotWidget):
                 dt = datetime.fromtimestamp(ts)
                 time_str = dt.strftime("%H:%M:%S.%f")[:-3]
                 date_str = dt.strftime("%Y-%m-%d")
-            except:
+            except (ValueError, OSError, OverflowError):
                 time_str = f"{ts:.2f}"
                 date_str = ""
 

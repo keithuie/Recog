@@ -534,6 +534,242 @@ class APIDataSource(DataSource):
             self._stop_event.wait(self.poll_interval)
 
 
+class SampleDataSource(DataSource):
+    """
+    Sample data source for testing with local JSON files.
+
+    Serves local sample data files as if they were a REST API.
+    Supports the same data formats as APIDataSource (GeoJSON, flat JSON, arrays).
+    """
+
+    # Available sample datasets
+    SAMPLE_DATASETS = {
+        "NASA Space Weather": {
+            "file": "nasa_sample.json",
+            "description": "Solar and geomagnetic activity data",
+            "poll_interval": 5.0
+        }
+    }
+
+    def __init__(self, name: str, sample_name: str = None, poll_interval: float = 5.0):
+        super().__init__(name)
+        self.sample_name = sample_name
+        self.poll_interval = poll_interval
+        self._connected = False
+        self._polling_thread: Optional[threading.Thread] = None
+        self._stop_event = threading.Event()
+        self._data: Optional[Any] = None
+        self._current_index: int = 0
+        self._data_path: Optional[str] = None
+        self._channel_map: Dict[str, str] = {}
+        self._on_status_callback: Optional[Callable[[str], None]] = None
+
+    @classmethod
+    def get_sample_data_path(cls) -> Path:
+        """Get the path to the sample data directory"""
+        return Path(__file__).parent.parent / "data"
+
+    @classmethod
+    def get_available_samples(cls) -> Dict[str, dict]:
+        """Get available sample datasets"""
+        return cls.SAMPLE_DATASETS.copy()
+
+    def set_status_callback(self, callback: Callable[[str], None]):
+        """Set callback for status updates"""
+        self._on_status_callback = callback
+
+    def _emit_status(self, status: str):
+        """Emit status to callback"""
+        if self._on_status_callback:
+            self._on_status_callback(status)
+
+    def _load_sample_data(self) -> Optional[Any]:
+        """Load sample data from local JSON file"""
+        if not self.sample_name or self.sample_name not in self.SAMPLE_DATASETS:
+            return None
+
+        sample_info = self.SAMPLE_DATASETS[self.sample_name]
+        file_path = self.get_sample_data_path() / sample_info["file"]
+
+        if not file_path.exists():
+            return None
+
+        with open(file_path, 'r') as f:
+            return json.load(f)
+
+    def _extract_channels_from_response(self, data: Any) -> List[str]:
+        """Extract channel names from sample data (same logic as APIDataSource)"""
+        channels = []
+
+        # Handle GeoJSON
+        if isinstance(data, dict) and data.get('type') == 'FeatureCollection':
+            features = data.get('features', [])
+            if features and isinstance(features[0], dict):
+                props = features[0].get('properties', {})
+                for key, value in props.items():
+                    if isinstance(value, (int, float)) and key not in ('time', 'updated', 'tz'):
+                        channels.append(key)
+                self._data_path = 'features'
+                self._channel_map = {ch: f'properties.{ch}' for ch in channels}
+            return channels
+
+        # Handle array of objects
+        if isinstance(data, list) and len(data) > 0:
+            item = data[0]
+            if isinstance(item, dict):
+                for key, value in item.items():
+                    if isinstance(value, (int, float)) and key not in ('timestamp', 'time'):
+                        channels.append(key)
+            return channels
+
+        # Handle flat dict
+        if isinstance(data, dict):
+            for key, value in data.items():
+                if isinstance(value, (int, float)) and key not in ('timestamp', 'time'):
+                    channels.append(key)
+            return channels
+
+        return channels
+
+    def _parse_data_point(self, feature_index: int = 0) -> Optional[DataPoint]:
+        """Parse a data point from sample data at given index"""
+        if not self._data:
+            return None
+
+        timestamp = datetime.now()
+        values = {}
+
+        # Handle GeoJSON
+        if isinstance(self._data, dict) and self._data.get('type') == 'FeatureCollection':
+            features = self._data.get('features', [])
+            if not features or feature_index >= len(features):
+                return None
+
+            feature = features[feature_index]
+            props = feature.get('properties', {})
+
+            # Try to get timestamp
+            if 'time' in props:
+                try:
+                    ts_val = props['time']
+                    if isinstance(ts_val, (int, float)) and ts_val > 1e10:
+                        timestamp = datetime.fromtimestamp(ts_val / 1000)
+                    elif isinstance(ts_val, (int, float)):
+                        timestamp = datetime.fromtimestamp(ts_val)
+                except (ValueError, OSError):
+                    pass
+
+            # Extract channel values
+            for channel in self._channels:
+                path = self._channel_map.get(channel, channel)
+                try:
+                    if '.' in path:
+                        parts = path.split('.')
+                        val = props
+                        for part in parts[1:]:
+                            val = val.get(part, 0)
+                    else:
+                        val = props.get(channel, 0)
+                    values[channel] = float(val) if val is not None else 0.0
+                except (ValueError, TypeError, AttributeError):
+                    values[channel] = 0.0
+
+            return DataPoint(timestamp=timestamp, values=values)
+
+        return None
+
+    def test_connection(self) -> tuple:
+        """
+        Test connection and discover channels.
+
+        Returns:
+            (success: bool, channels: List[str], message: str)
+        """
+        if not self.sample_name:
+            return False, [], "No sample dataset selected"
+
+        try:
+            data = self._load_sample_data()
+            if data is None:
+                return False, [], "Sample data file not found"
+
+            self._data = data
+            channels = self._extract_channels_from_response(data)
+            self._channels = channels
+
+            if channels:
+                return True, channels, f"Found {len(channels)} channels"
+            else:
+                return True, [], "Connected but no numeric channels found"
+
+        except Exception as e:
+            return False, [], f"Load failed: {str(e)}"
+
+    def connect(self) -> bool:
+        """Start serving sample data"""
+        try:
+            self._emit_status("Loading sample data...")
+
+            success, channels, message = self.test_connection()
+            if not success:
+                self._emit_status(f"Failed: {message}")
+                return False
+
+            self._channels = channels
+            self._connected = True
+            self._current_index = 0
+            self._stop_event.clear()
+
+            self._emit_status(f"Connected: {len(channels)} channels")
+
+            self._polling_thread = threading.Thread(target=self._poll_loop, daemon=True)
+            self._polling_thread.start()
+            return True
+
+        except Exception as e:
+            self._emit_status(f"Error: {e}")
+            return False
+
+    def disconnect(self):
+        """Stop serving data"""
+        self._stop_event.set()
+        if self._polling_thread:
+            self._polling_thread.join(timeout=2.0)
+        self._connected = False
+        self._emit_status("Disconnected")
+
+    def is_connected(self) -> bool:
+        return self._connected
+
+    def _poll_loop(self):
+        """Background loop to serve sample data"""
+        poll_count = 0
+
+        # Get total features count
+        total_features = 0
+        if isinstance(self._data, dict) and self._data.get('type') == 'FeatureCollection':
+            total_features = len(self._data.get('features', []))
+
+        while not self._stop_event.is_set():
+            try:
+                # Cycle through sample data
+                if total_features > 0:
+                    point = self._parse_data_point(self._current_index % total_features)
+                    self._current_index += 1
+
+                    if point:
+                        # Update timestamp to now for real-time feel
+                        point = DataPoint(timestamp=datetime.now(), values=point.values)
+                        self._emit_data(point)
+                        poll_count += 1
+                        self._emit_status(f"Streaming: {poll_count} samples")
+
+            except Exception as e:
+                self._emit_status(f"Error: {str(e)[:50]}")
+
+            self._stop_event.wait(self.poll_interval)
+
+
 class DataPlayer:
     """
     High-level data player managing multiple sources.

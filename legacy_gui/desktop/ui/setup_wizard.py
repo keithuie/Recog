@@ -84,6 +84,16 @@ class DataSourceStep(WizardStep):
         "USGS Earthquake Data (GeoJSON)": "https://earthquake.usgs.gov/fdsnws/event/1/query?format=geojson&limit=10",
     }
 
+    # Available sample datasets (NASA, etc.)
+    SAMPLE_DATASETS = {
+        "NASA Space Weather": {
+            "description": "Solar flux, plasma density, magnetic field, and geomagnetic indices",
+            "channels": ["solar_flux", "proton_density", "plasma_speed", "plasma_temp",
+                        "mag_field_bt", "mag_field_bz", "kp_index", "dst_index"],
+            "poll_interval": 5
+        }
+    }
+
     def __init__(self, parent=None):
         super().__init__(
             "Connect Your Data",
@@ -101,6 +111,7 @@ class DataSourceStep(WizardStep):
 
         self.source_type = QComboBox()
         self.source_type.addItems([
+            "NASA Sample Data",
             "CSV File Upload",
             "REST API",
             "MQTT Broker",
@@ -132,6 +143,7 @@ class DataSourceStep(WizardStep):
         self.timestamp_col.setEnabled(False)
         csv_layout.addRow("Timestamp Column:", self.timestamp_col)
 
+        self.csv_group.hide()  # Hidden by default since NASA Sample Data is first option
         self.content_layout.addWidget(self.csv_group)
 
         # API configuration
@@ -237,11 +249,145 @@ class DataSourceStep(WizardStep):
         self.opcua_group.hide()
         self.content_layout.addWidget(self.opcua_group)
 
+        # NASA Sample Data configuration
+        self.sample_group = QGroupBox("NASA Sample Data")
+        sample_layout = QVBoxLayout(self.sample_group)
+
+        # Dataset selection dropdown
+        dataset_row = QHBoxLayout()
+        dataset_row.addWidget(QLabel("Select Dataset:"))
+        self.sample_dataset_combo = QComboBox()
+        self.sample_dataset_combo.addItems(["-- Select dataset --"] + list(self.SAMPLE_DATASETS.keys()))
+        self.sample_dataset_combo.currentTextChanged.connect(self._on_sample_dataset_selected)
+        dataset_row.addWidget(self.sample_dataset_combo)
+        sample_layout.addLayout(dataset_row)
+
+        # Dataset info
+        self.sample_info_label = QLabel("")
+        self.sample_info_label.setStyleSheet(f"""
+            color: {COLORS['text_secondary']};
+            font-size: 12px;
+            padding: 8px;
+            background-color: {COLORS['surface_secondary']};
+            border-radius: 4px;
+        """)
+        self.sample_info_label.setWordWrap(True)
+        self.sample_info_label.hide()
+        sample_layout.addWidget(self.sample_info_label)
+
+        # Source name input
+        name_form = QFormLayout()
+        self.sample_name = QLineEdit()
+        self.sample_name.setPlaceholderText("NASA Space Weather Monitor")
+        self.sample_name.setText("NASA Space Weather")
+        name_form.addRow("Source Name:", self.sample_name)
+
+        self.sample_interval = QSpinBox()
+        self.sample_interval.setRange(1, 3600)
+        self.sample_interval.setValue(5)
+        self.sample_interval.setSuffix(" seconds")
+        name_form.addRow("Poll Interval:", self.sample_interval)
+        sample_layout.addLayout(name_form)
+
+        # Test connection button
+        test_sample_row = QHBoxLayout()
+        self.test_sample_btn = QPushButton("Test Connection")
+        self.test_sample_btn.clicked.connect(self._test_sample_connection)
+        test_sample_row.addWidget(self.test_sample_btn)
+
+        self.test_sample_status = QLabel("")
+        self.test_sample_status.setStyleSheet(f"color: {COLORS['text_secondary']};")
+        test_sample_row.addWidget(self.test_sample_status)
+        test_sample_row.addStretch()
+        sample_layout.addLayout(test_sample_row)
+
+        # Discovered channels
+        self.sample_channels_label = QLabel("")
+        self.sample_channels_label.setStyleSheet(f"""
+            color: {COLORS['text_secondary']};
+            font-size: 12px;
+            padding: 8px;
+            background-color: {COLORS['surface_secondary']};
+            border-radius: 4px;
+        """)
+        self.sample_channels_label.setWordWrap(True)
+        self.sample_channels_label.hide()
+        sample_layout.addWidget(self.sample_channels_label)
+
+        # Help text
+        sample_help = QLabel(
+            "NASA sample data provides simulated space weather telemetry for testing "
+            "anomaly detection without needing a live data connection."
+        )
+        sample_help.setStyleSheet(f"color: {COLORS['text_tertiary']}; font-size: 11px;")
+        sample_help.setWordWrap(True)
+        sample_layout.addWidget(sample_help)
+
+        self.content_layout.addWidget(self.sample_group)
+
+    def _on_sample_dataset_selected(self, dataset_name: str):
+        """Handle sample dataset selection"""
+        if dataset_name in self.SAMPLE_DATASETS:
+            info = self.SAMPLE_DATASETS[dataset_name]
+            self.sample_info_label.setText(f"{info['description']}")
+            self.sample_info_label.show()
+            self.sample_name.setText(dataset_name)
+            self.sample_interval.setValue(info.get('poll_interval', 5))
+        else:
+            self.sample_info_label.hide()
+        self.completed.emit(self.is_valid())
+
+    def _test_sample_connection(self):
+        """Test sample data connection and discover channels"""
+        dataset_name = self.sample_dataset_combo.currentText()
+        if dataset_name == "-- Select dataset --":
+            self.test_sample_status.setText("Select a dataset first")
+            self.test_sample_status.setStyleSheet(f"color: {COLORS['warning']};")
+            return
+
+        self.test_sample_status.setText("Testing...")
+        self.test_sample_status.setStyleSheet(f"color: {COLORS['text_secondary']};")
+        self.test_sample_btn.setEnabled(False)
+
+        # Force UI update
+        from PyQt6.QtWidgets import QApplication
+        QApplication.processEvents()
+
+        try:
+            from ..core import SampleDataSource
+            source = SampleDataSource("test", dataset_name)
+            success, channels, message = source.test_connection()
+
+            if success and channels:
+                self._discovered_channels = channels
+                self.test_sample_status.setText(f"Connected - {len(channels)} channels found")
+                self.test_sample_status.setStyleSheet(f"color: {COLORS['success']};")
+                self.sample_channels_label.setText(f"Channels: {', '.join(channels[:10])}" +
+                    (f" (+{len(channels)-10} more)" if len(channels) > 10 else ""))
+                self.sample_channels_label.show()
+            elif success:
+                self.test_sample_status.setText("Connected but no numeric data found")
+                self.test_sample_status.setStyleSheet(f"color: {COLORS['warning']};")
+                self.sample_channels_label.hide()
+            else:
+                self.test_sample_status.setText(f"Failed: {message[:50]}")
+                self.test_sample_status.setStyleSheet(f"color: {COLORS['danger']};")
+                self.sample_channels_label.hide()
+
+        except Exception as e:
+            self.test_sample_status.setText(f"Error: {str(e)[:50]}")
+            self.test_sample_status.setStyleSheet(f"color: {COLORS['danger']};")
+            self.sample_channels_label.hide()
+
+        self.test_sample_btn.setEnabled(True)
+        self.completed.emit(self.is_valid())
+
     def _on_type_changed(self, type_text: str):
         self.csv_group.setVisible("CSV" in type_text)
         self.api_group.setVisible("REST" in type_text)
         self.mqtt_group.setVisible("MQTT" in type_text)
         self.opcua_group.setVisible("OPC" in type_text)
+        self.sample_group.setVisible("NASA" in type_text)
         self.completed.emit(self.is_valid())
 
     def _on_sample_selected(self, sample_name: str):
@@ -321,7 +467,9 @@ class DataSourceStep(WizardStep):
 
     def is_valid(self) -> bool:
         source_type = self.source_type.currentText()
-        if "CSV" in source_type:
+        if "NASA" in source_type:
+            return self.sample_dataset_combo.currentText() != "-- Select dataset --"
+        elif "CSV" in source_type:
             return bool(self.file_path.text().strip())
         elif "REST" in source_type:
             return bool(self.api_url.text().strip())
@@ -335,7 +483,11 @@ class DataSourceStep(WizardStep):
         source_type = self.source_type.currentText()
         data = {'source_type': source_type}
 
-        if "CSV" in source_type:
+        if "NASA" in source_type:
+            data['name'] = self.sample_name.text().strip() or "NASA Sample Data"
+            data['sample_dataset'] = self.sample_dataset_combo.currentText()
+            data['interval'] = self.sample_interval.value()
+        elif "CSV" in source_type:
             data['file_path'] = self.file_path.text()
             data['timestamp_column'] = self.timestamp_col.currentText()
         elif "REST" in source_type:
@@ -1310,8 +1462,12 @@ class SetupWizard(QDialog):
         source_type = data_source.get('source_type', '')
         channels = []
 
+        # Try to get channels from NASA Sample Data
+        if 'NASA' in source_type:
+            channels = self.data_step.get_discovered_channels()
+
         # Try to get channels from CSV file
-        if 'CSV' in source_type:
+        elif 'CSV' in source_type:
             file_path = data_source.get('file_path')
             if file_path:
                 try:
