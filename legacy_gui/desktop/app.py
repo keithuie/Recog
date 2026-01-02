@@ -27,7 +27,8 @@ from .core import (
     ChannelGroupManager,
     DataPlayer,
     AlarmManager,
-    AlarmCondition
+    AlarmCondition,
+    SampleDataSource
 )
 from .core.alarm_manager import AlarmConditionType, AlarmSeverity
 
@@ -184,6 +185,14 @@ class MachineIQApp:
                 self._setup_api_source(url, interval, api_name)
                 # Add to Dataflow page
                 self._add_to_dataflow('api', url, None, interval, api_name)
+
+        elif source_type == 'NASA Sample Data':
+            sample_dataset = data_source.get('sample_dataset', 'NASA Space Weather')
+            interval = data_source.get('interval', 5)
+            source_name = data_source.get('name', 'NASA Space Weather')
+            self._setup_sample_source(sample_dataset, interval, source_name)
+            # Add to Dataflow page
+            self._add_to_dataflow('sample', sample_dataset, None, interval, source_name)
 
         # Apply model config
         model = config.get('model', {})
@@ -348,6 +357,46 @@ class MachineIQApp:
             logger.error("Failed to connect to API")
             self.main_window.header.set_status("Connection failed", connected=False)
 
+    def _setup_sample_source(self, sample_name: str, interval: int = 5, source_name: str = None):
+        """Set up sample data source (NASA, etc.) - behaves like API but uses local data"""
+        from .core import SampleDataSource, DataPlayer
+
+        name = source_name or sample_name
+        logger.info(f"Setting up sample data source '{name}': {sample_name}")
+
+        # Create data player if needed
+        if not self.data_player:
+            self.data_player = DataPlayer()
+            self.data_player.add_data_callback(self._on_data_received)
+
+        # Create sample data source - mimics API behavior
+        source = SampleDataSource(name, sample_name, poll_interval=float(interval))
+        source.set_status_callback(self._on_sample_status)
+
+        self.data_player.add_source(source)
+        self.data_player.set_active_source(name)
+
+        # Connect (this will test and discover channels, just like API)
+        if self.data_player.connect():
+            channels = self.data_player.channels
+            logger.info(f"Sample data connected with channels: {channels}")
+
+            # Update dashboard with channels
+            self.dashboard.set_channels(channels)
+
+            # Update model config with available channels
+            self.model_config.set_available_channels(channels)
+
+            self.main_window.header.set_status("Streaming Sample Data", connected=True, monitoring=True)
+            self.main_window.header.set_playback_enabled(True)
+        else:
+            logger.error("Failed to load sample data")
+            self.main_window.header.set_status("Load failed", connected=False)
+
+    def _on_sample_status(self, status: str):
+        """Handle sample data status updates"""
+        self.main_window.header.set_status(status, connected=True, monitoring=True)
+
     def _on_api_status(self, status: str):
         """Handle API status updates"""
         self.main_window.header.set_status(status, connected=True, monitoring=True)
@@ -470,7 +519,12 @@ class MachineIQApp:
         if config.get('type') == 'api':
             self._setup_api_source(config.get('url', ''), config.get('interval', 5))
             self.dataflow.set_source_status(name, "Monitoring")
-        elif config.get('type') in ['csv', 'sample']:
+        elif config.get('type') == 'sample':
+            # NASA or other sample data sources
+            sample_dataset = config.get('sample_dataset', 'NASA Space Weather')
+            self._setup_sample_source(sample_dataset, config.get('interval', 5), name)
+            self.dataflow.set_source_status(name, "Streaming")
+        elif config.get('type') == 'csv':
             self._setup_csv_source(config.get('path', ''), config.get('timestamp_column', 'timestamp'), name)
             self.dataflow.set_source_status(name, "Connected")
 
@@ -498,20 +552,24 @@ class MachineIQApp:
             file_name = Path(filepath).name
             self.dataflow.set_source_status(file_name, "Connected")
 
-            if hasattr(source, 'data') and source.data is not None:
-                df = source.data
-                columns = list(df.columns)
-                rows = len(df)
-                start_time = str(df.iloc[0]['timestamp']) if 'timestamp' in df.columns else None
-                end_time = str(df.iloc[-1]['timestamp']) if 'timestamp' in df.columns else None
+            # Get data from source using proper accessors
+            if hasattr(source, 'get_all_data'):
+                data_points = source.get_all_data()
+                if data_points:
+                    channels = source.channels
+                    rows = len(data_points)
+                    start_time = str(data_points[0].timestamp) if data_points else None
+                    end_time = str(data_points[-1].timestamp) if data_points else None
 
-                self.dataflow.set_file_info(rows, columns, start_time, end_time)
+                    self.dataflow.set_file_info(rows, channels, start_time, end_time)
 
-                # Set preview data (first 10 rows)
-                preview_rows = []
-                for i in range(min(10, len(df))):
-                    preview_rows.append([str(df.iloc[i][col]) for col in columns])
-                self.dataflow.set_preview_data(preview_rows)
+                    # Set preview data (first 10 rows)
+                    preview_rows = []
+                    for i in range(min(10, len(data_points))):
+                        point = data_points[i]
+                        row = [str(point.timestamp)] + [str(point.values.get(ch, '')) for ch in channels]
+                        preview_rows.append(row)
+                    self.dataflow.set_preview_data(preview_rows)
 
     def _on_training_started(self):
         """Handle training started signal"""

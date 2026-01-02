@@ -167,8 +167,6 @@ def get_stylesheet():
         padding: 10px 20px;
         font-weight: 600;
         font-size: 13px;
-        font-weight: 600;
-        font-size: 13px;
     }}
 
     QPushButton:hover {{

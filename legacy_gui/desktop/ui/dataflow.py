@@ -976,8 +976,12 @@ class DataflowPage(QWidget):
 
         # Determine config based on type
         config = {'name': name}
-        if source_type == "CSV File" or source_type == "Sample Data":
+        if source_type == "CSV File":
             config['type'] = 'csv'
+            config['path'] = details
+        elif source_type == "Sample Data" or source_type == "NASA Sample Data":
+            config['type'] = 'sample'
+            config['sample_dataset'] = details
             config['path'] = details
         elif source_type == "REST API":
             config['type'] = 'api'
