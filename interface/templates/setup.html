@@ -394,13 +394,19 @@
         let selectedColor = '#7b61ff';
         let preprocessingInfo = null;
         let detectedChannels = [];
+        let channelInfo = {};  // Detailed channel metadata
         let uploadedCSVData = null;
+        let numSamples = 0;  // Track number of data samples
 
-        // Load preprocessing info
+        // Load preprocessing info and channel metadata
         async function loadConfigInfo() {
             try {
-                const res = await fetch('/api/preprocessing-info');
-                preprocessingInfo = await res.json();
+                const [prepRes, channelRes] = await Promise.all([
+                    fetch('/api/preprocessing-info'),
+                    fetch('/api/channel-info')
+                ]);
+                preprocessingInfo = await prepRes.json();
+                channelInfo = await channelRes.json();
                 renderPreprocessingOptions();
             } catch (e) {
                 console.error('Failed to load config info:', e);
@@ -523,6 +529,7 @@
 
                 if (response.ok && data.success) {
                     detectedChannels = data.channels || [];
+                    numSamples = data.num_samples || 0;
 
                     resultDiv.innerHTML = `
                         <div style="color: var(--accent-secondary); margin-bottom: 8px;">
@@ -532,8 +539,9 @@
                             </svg>
                             Sample data loaded successfully!
                         </div>
-                        <div style="color: var(--text-secondary);">
-                            Found ${data.num_samples} data points with ${detectedChannels.length} channels: ${detectedChannels.slice(0, 5).join(', ')}${detectedChannels.length > 5 ? '...' : ''}
+                        <div style="color: var(--text-secondary); font-size: 13px; line-height: 1.6;">
+                            <strong>${numSamples} time-series samples</strong> (data points over time)<br>
+                            <strong>${detectedChannels.length} sensor channels</strong> (individual measurements per sample)
                         </div>
                     `;
                     updateChannelList();
@@ -566,12 +574,32 @@
                 return;
             }
 
-            container.innerHTML = detectedChannels.map((ch, i) => `
-                <div class="channel-item">
-                    <input type="checkbox" id="ch-${i}" ${i < 2 ? 'checked' : ''} data-channel="${ch}">
-                    <label for="ch-${i}">${ch}</label>
+            container.innerHTML = `
+                <div class="channel-grid">
+                    ${detectedChannels.map((ch, i) => {
+                        const info = channelInfo[ch] || { name: ch, unit: '', description: '' };
+                        return `
+                            <div class="channel-card ${i < 4 ? 'selected' : ''}" data-channel="${ch}" onclick="toggleChannel(this)">
+                                <div class="channel-card-header">
+                                    <input type="checkbox" id="ch-${i}" ${i < 4 ? 'checked' : ''} data-channel="${ch}" onclick="event.stopPropagation()">
+                                    <span class="channel-id">${ch}</span>
+                                    ${info.unit ? `<span class="channel-unit">${info.unit}</span>` : ''}
+                                </div>
+                                <div class="channel-card-body">
+                                    <div class="channel-name">${info.name || ch}</div>
+                                    <div class="channel-desc">${info.description || 'Sensor measurement'}</div>
+                                </div>
+                            </div>
+                        `;
+                    }).join('')}
                 </div>
-            `).join('');
+            `;
+        }
+
+        function toggleChannel(card) {
+            const checkbox = card.querySelector('input[type="checkbox"]');
+            checkbox.checked = !checkbox.checked;
+            card.classList.toggle('selected', checkbox.checked);
         }
 
         // CSV File Handling
@@ -874,7 +902,7 @@
         }
 
         function collectGroupConfig() {
-            const channels = Array.from(document.querySelectorAll('.channel-item input:checked'))
+            const channels = Array.from(document.querySelectorAll('.channel-card input:checked, .channel-item input:checked'))
                 .map(cb => cb.dataset.channel);
 
             // Get source name to link group to source

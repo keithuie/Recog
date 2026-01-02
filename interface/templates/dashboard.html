@@ -575,6 +575,224 @@
             color: var(--text-secondary);
             margin-bottom: 24px;
         }
+
+        /* Panel separator */
+        .panel-separator {
+            width: 1px;
+            height: 16px;
+            background: var(--border-secondary);
+            margin: 0 4px;
+        }
+
+        /* View toggle buttons */
+        .view-toggle.active {
+            background: var(--accent-primary);
+            color: white;
+        }
+
+        /* Stacked Charts Layout */
+        .stacked-charts-view {
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+            overflow: hidden;
+        }
+
+        .stacked-charts-container {
+            flex: 1;
+            overflow-y: auto;
+            overflow-x: hidden;
+            padding-right: 8px;
+        }
+
+        .channel-chart-row {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 6px 0;
+            border-bottom: 1px solid var(--border-primary);
+            min-height: 50px;
+        }
+
+        .channel-chart-row:last-child {
+            border-bottom: none;
+        }
+
+        .channel-label {
+            width: 100px;
+            flex-shrink: 0;
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+        }
+
+        .channel-label .channel-name {
+            font-size: 11px;
+            font-weight: 600;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+        }
+
+        .channel-current-value {
+            font-family: 'SF Mono', monospace;
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        .channel-sparkline {
+            flex: 1;
+            height: 40px;
+            position: relative;
+        }
+
+        .channel-sparkline canvas {
+            width: 100% !important;
+            height: 100% !important;
+        }
+
+        /* Shared time axis */
+        .shared-time-axis {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 112px 8px 112px;
+            border-top: 1px solid var(--border-primary);
+            font-size: 10px;
+            color: var(--text-tertiary);
+        }
+
+        /* Heat map view */
+        .heatmap-view {
+            flex: 1;
+            padding: 12px;
+            overflow: hidden;
+        }
+
+        .heatmap-view canvas {
+            width: 100%;
+            height: 100%;
+        }
+
+        /* Match summary at bottom */
+        .match-summary {
+            padding: 12px;
+            background: var(--bg-tertiary);
+            border-top: 1px solid var(--border-primary);
+            display: flex;
+            align-items: center;
+            gap: 24px;
+        }
+
+        .match-summary .match-gauge {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .match-summary .gauge-label {
+            font-size: 11px;
+            font-weight: 600;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            white-space: nowrap;
+        }
+
+        .match-summary .gauge-bar {
+            flex: 1;
+            height: 8px;
+            background: var(--bg-primary);
+            border-radius: 4px;
+            overflow: hidden;
+        }
+
+        .match-summary .gauge-value {
+            font-size: 18px;
+            font-weight: 700;
+            min-width: 50px;
+            text-align: right;
+        }
+
+        .match-summary .threshold-legend {
+            display: flex;
+            gap: 16px;
+            font-size: 10px;
+        }
+
+        .threshold-legend .threshold-item {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .threshold-item .dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+        }
+
+        .threshold-item.normal .dot { background: var(--accent-secondary); }
+        .threshold-item.warning .dot { background: var(--accent-warning); }
+        .threshold-item.danger .dot { background: var(--accent-danger); }
+
+        /* Improved panel content */
+        .panel-content {
+            padding: 0;
+            height: calc(100% - 48px);
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* Resize improvements */
+        .resize-handle {
+            position: absolute;
+            bottom: 0;
+            right: 0;
+            width: 20px;
+            height: 20px;
+            cursor: se-resize;
+            opacity: 0;
+            transition: opacity 0.2s ease;
+            z-index: 10;
+        }
+
+        .grid-panel:hover .resize-handle {
+            opacity: 1;
+        }
+
+        .resize-handle::after {
+            content: '';
+            position: absolute;
+            bottom: 4px;
+            right: 4px;
+            width: 10px;
+            height: 10px;
+            border-right: 2px solid var(--accent-primary);
+            border-bottom: 2px solid var(--accent-primary);
+        }
+
+        /* Tooltip for data points */
+        .chart-tooltip {
+            position: absolute;
+            background: var(--bg-elevated);
+            border: 1px solid var(--border-secondary);
+            border-radius: var(--radius-sm);
+            padding: 8px 12px;
+            font-size: 12px;
+            pointer-events: none;
+            z-index: 1000;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+        }
+
+        .chart-tooltip .tooltip-value {
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        .chart-tooltip .tooltip-time {
+            font-size: 10px;
+            color: var(--text-tertiary);
+        }
     </style>
 </head>
 <body>
@@ -706,7 +924,7 @@
                 <div class="dashboard-grid" id="dashboard-grid">
                     {% if groups %}
                         {% for group in groups %}
-                        <div class="grid-panel panel-2x2" data-group="{{ group.name }}" data-size="2x2">
+                        <div class="grid-panel panel-4x2" data-group="{{ group.name }}" data-size="4x2" data-channels="{{ group.channels | join(',') }}">
                             <div class="panel-header">
                                 <div class="panel-title">
                                     <span class="color-dot" style="background: {{ group.color }};"></span>
@@ -716,6 +934,42 @@
                                     </span>
                                 </div>
                                 <div class="panel-actions">
+                                    <button class="panel-action-btn view-toggle active" data-view="charts" onclick="toggleView('{{ group.name }}', 'charts')" title="Stacked Charts">
+                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                            <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>
+                                        </svg>
+                                    </button>
+                                    <button class="panel-action-btn view-toggle" data-view="heatmap" onclick="toggleView('{{ group.name }}', 'heatmap')" title="Heat Map">
+                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                            <rect x="3" y="3" width="7" height="7"></rect>
+                                            <rect x="14" y="3" width="7" height="7"></rect>
+                                            <rect x="14" y="14" width="7" height="7"></rect>
+                                            <rect x="3" y="14" width="7" height="7"></rect>
+                                        </svg>
+                                    </button>
+                                    <span class="panel-separator"></span>
+                                    <button class="panel-action-btn" onclick="zoomIn('{{ group.name }}')" title="Zoom In">
+                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                            <circle cx="11" cy="11" r="8"></circle>
+                                            <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                                            <line x1="11" y1="8" x2="11" y2="14"></line>
+                                            <line x1="8" y1="11" x2="14" y2="11"></line>
+                                        </svg>
+                                    </button>
+                                    <button class="panel-action-btn" onclick="zoomOut('{{ group.name }}')" title="Zoom Out">
+                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                            <circle cx="11" cy="11" r="8"></circle>
+                                            <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                                            <line x1="8" y1="11" x2="14" y2="11"></line>
+                                        </svg>
+                                    </button>
+                                    <button class="panel-action-btn" onclick="resetZoom('{{ group.name }}')" title="Reset Zoom">
+                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                            <polyline points="1 4 1 10 7 10"></polyline>
+                                            <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"></path>
+                                        </svg>
+                                    </button>
+                                    <span class="panel-separator"></span>
                                     <button class="panel-action-btn" onclick="togglePanelFullscreen('{{ group.name }}')" title="Fullscreen">
                                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                             <polyline points="15 3 21 3 21 9"></polyline>
@@ -724,56 +978,59 @@
                                             <line x1="3" y1="21" x2="10" y2="14"></line>
                                         </svg>
                                     </button>
-                                    <button class="panel-action-btn" onclick="showGroupDetails('{{ group.name }}')" title="Details">
-                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                            <circle cx="12" cy="12" r="10"></circle>
-                                            <line x1="12" y1="16" x2="12" y2="12"></line>
-                                            <line x1="12" y1="8" x2="12.01" y2="8"></line>
-                                        </svg>
-                                    </button>
-                                    <button class="panel-action-btn" onclick="startTraining('{{ group.name }}', {{ group.trained_states }})" title="Train">
+                                    <button class="panel-action-btn" onclick="startTraining('{{ group.name }}', {{ group.trained_states }})" title="Train Model">
                                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                             <polygon points="5 3 19 12 5 21 5 3"></polygon>
                                         </svg>
                                     </button>
                                 </div>
-                                <div class="size-selector" id="size-{{ group.name }}">
-                                    <div class="size-grid">
-                                        <div class="size-cell" onclick="setPanelSize('{{ group.name }}', '1x1')"></div>
-                                        <div class="size-cell" onclick="setPanelSize('{{ group.name }}', '2x1')"></div>
-                                        <div class="size-cell" onclick="setPanelSize('{{ group.name }}', '3x1')"></div>
-                                        <div class="size-cell" onclick="setPanelSize('{{ group.name }}', '4x1')"></div>
-                                        <div class="size-cell" onclick="setPanelSize('{{ group.name }}', '1x2')"></div>
-                                        <div class="size-cell selected" onclick="setPanelSize('{{ group.name }}', '2x2')"></div>
-                                        <div class="size-cell" onclick="setPanelSize('{{ group.name }}', '3x2')"></div>
-                                        <div class="size-cell" onclick="setPanelSize('{{ group.name }}', '4x2')"></div>
-                                    </div>
-                                </div>
                             </div>
                             <div class="panel-content">
-                                <div class="panel-chart">
-                                    <canvas id="chart-{{ group.name }}"></canvas>
-                                </div>
-                                <div class="match-gauge">
-                                    <div class="gauge-bar">
-                                        <div class="gauge-fill" id="gauge-{{ group.name }}" style="width: 0%; background: var(--accent-secondary);"></div>
+                                <!-- Stacked Charts View -->
+                                <div class="stacked-charts-view" id="charts-view-{{ group.name }}">
+                                    <div class="stacked-charts-container" id="stacked-charts-{{ group.name }}">
+                                        {% for channel in group.channels %}
+                                        <div class="channel-chart-row" data-channel="{{ channel }}">
+                                            <div class="channel-label">
+                                                <span class="channel-name">{{ channel }}</span>
+                                                <span class="channel-current-value" id="val-{{ group.name }}-{{ channel }}">--</span>
+                                            </div>
+                                            <div class="channel-sparkline">
+                                                <canvas id="spark-{{ group.name }}-{{ channel }}" height="40"></canvas>
+                                            </div>
+                                        </div>
+                                        {% endfor %}
                                     </div>
-                                    <div class="gauge-value" id="score-{{ group.name }}">--</div>
-                                </div>
-                                <div class="threshold-legend">
-                                    <span class="threshold-item warning"><span class="line"></span> Warning 70%</span>
-                                    <span class="threshold-item danger"><span class="line"></span> Anomaly 40%</span>
-                                </div>
-                                <div class="channel-data" id="channels-{{ group.name }}">
-                                    {% for channel in group.channels %}
-                                    <div class="channel-row">
-                                        <span class="channel-name">{{ channel }}</span>
-                                        <span class="channel-value" id="val-{{ group.name }}-{{ loop.index0 }}">--</span>
+                                    <!-- Shared X-Axis -->
+                                    <div class="shared-time-axis" id="time-axis-{{ group.name }}">
+                                        <span class="time-label start">-5m</span>
+                                        <span class="time-label mid">-2.5m</span>
+                                        <span class="time-label end">Now</span>
                                     </div>
-                                    {% endfor %}
+                                </div>
+
+                                <!-- Heat Map View (hidden by default) -->
+                                <div class="heatmap-view" id="heatmap-view-{{ group.name }}" style="display: none;">
+                                    <canvas id="heatmap-{{ group.name }}"></canvas>
+                                </div>
+
+                                <!-- Match Score Summary -->
+                                <div class="match-summary">
+                                    <div class="match-gauge">
+                                        <span class="gauge-label">Match Score</span>
+                                        <div class="gauge-bar">
+                                            <div class="gauge-fill" id="gauge-{{ group.name }}" style="width: 0%; background: var(--accent-secondary);"></div>
+                                        </div>
+                                        <div class="gauge-value" id="score-{{ group.name }}">--</div>
+                                    </div>
+                                    <div class="threshold-legend">
+                                        <span class="threshold-item normal"><span class="dot"></span> Normal &gt;70%</span>
+                                        <span class="threshold-item warning"><span class="dot"></span> Warning 40-70%</span>
+                                        <span class="threshold-item danger"><span class="dot"></span> Anomaly &lt;40%</span>
+                                    </div>
                                 </div>
                             </div>
-                            <div class="resize-handle"></div>
+                            <div class="resize-handle" onmousedown="startResize(event, '{{ group.name }}')"></div>
                         </div>
                         {% endfor %}
                     {% else %}
@@ -870,7 +1127,9 @@
     <script>
         // State
         let ws;
-        let charts = {};
+        let charts = {};  // Main charts (unused now, kept for compatibility)
+        let sparklineCharts = {};  // Channel sparkline charts: {groupName: {channelName: chart}}
+        let channelData = {};  // Historical data: {groupName: {channelName: []}}
         let editMode = false;
         let currentTrainingGroup = null;
         let isRetraining = false;
@@ -880,6 +1139,11 @@
         let fallbackSimulationInterval = null;
         let timeRangeSeconds = 300;  // Default 5 minutes
         let refreshIntervalMs = 2000;  // Default 2 seconds
+        let resizingPanel = null;
+        let resizeStartX = 0;
+        let resizeStartY = 0;
+        let resizeStartW = 0;
+        let resizeStartH = 0;
 
         // Time Range Control
         function setTimeRange(seconds) {
@@ -973,21 +1237,41 @@
             const group = data.group;
             const confidence = data.confidence || data.match_score || 0;
             const channelValues = data.channel_values || data.values || {};
+            const maxPoints = Math.max(30, Math.floor(timeRangeSeconds / (refreshIntervalMs / 1000)));
 
-            // Update chart
-            const chart = charts[group];
-            if (chart) {
-                chart.data.labels.push('');
-                chart.data.datasets[0].data.push(confidence);
-
-                // Limit data points based on time range
-                const maxPoints = Math.max(30, Math.floor(timeRangeSeconds / (refreshIntervalMs / 1000)));
-                while (chart.data.labels.length > maxPoints) {
-                    chart.data.labels.shift();
-                    chart.data.datasets[0].data.shift();
-                }
-                chart.update('none');
+            // Initialize channel data storage if needed
+            if (!channelData[group]) {
+                channelData[group] = {};
             }
+
+            // Update sparkline charts for each channel
+            Object.keys(channelValues).forEach(channelName => {
+                const value = channelValues[channelName];
+                if (typeof value !== 'number') return;
+
+                // Store data
+                if (!channelData[group][channelName]) {
+                    channelData[group][channelName] = [];
+                }
+                channelData[group][channelName].push(value);
+                while (channelData[group][channelName].length > maxPoints) {
+                    channelData[group][channelName].shift();
+                }
+
+                // Update current value display
+                const valEl = document.getElementById(`val-${group}-${channelName}`);
+                if (valEl) {
+                    valEl.textContent = value.toFixed(2);
+                }
+
+                // Update sparkline chart
+                if (sparklineCharts[group] && sparklineCharts[group][channelName]) {
+                    const chart = sparklineCharts[group][channelName];
+                    chart.data.labels = channelData[group][channelName].map(() => '');
+                    chart.data.datasets[0].data = channelData[group][channelName];
+                    chart.update('none');
+                }
+            });
 
             // Update match score gauge
             const gauge = document.getElementById(`gauge-${group}`);
@@ -999,30 +1283,6 @@
                 score.textContent = confidence.toFixed(0) + '%';
                 score.style.color = confidence > 70 ? 'var(--accent-secondary)' :
                                    confidence > 40 ? 'var(--accent-warning)' : 'var(--accent-danger)';
-            }
-
-            // Update channel values - match by channel name, not index
-            const channelContainer = document.getElementById(`channels-${group}`);
-            if (channelContainer) {
-                const channelRows = channelContainer.querySelectorAll('.channel-row');
-                channelRows.forEach((row, index) => {
-                    const nameEl = row.querySelector('.channel-name');
-                    const valEl = row.querySelector('.channel-value');
-                    if (nameEl && valEl) {
-                        const channelName = nameEl.textContent.trim();
-                        const value = channelValues[channelName];
-                        if (value !== undefined) {
-                            const newText = typeof value === 'number' ? value.toFixed(4) : value;
-                            if (valEl.textContent !== newText) {
-                                valEl.textContent = newText;
-                                // Trigger update animation
-                                valEl.classList.remove('updated');
-                                void valEl.offsetWidth; // Force reflow
-                                valEl.classList.add('updated');
-                            }
-                        }
-                    }
-                });
             }
 
             // Track update rate
@@ -1044,155 +1304,232 @@
 
         // Initialize charts with gradient fill and threshold lines
         function initCharts() {
-            // Threshold annotation plugin
-            const thresholdPlugin = {
-                id: 'thresholdLines',
-                beforeDraw: (chart) => {
-                    const ctx = chart.ctx;
-                    const yAxis = chart.scales.y;
-                    const xAxis = chart.scales.x;
+            // Initialize sparkline charts for each channel in each group
+            document.querySelectorAll('.grid-panel[data-group]').forEach(panel => {
+                const groupName = panel.dataset.group;
+                const channelsAttr = panel.dataset.channels;
+                if (!channelsAttr) return;
 
-                    // Warning threshold at 70%
-                    const warningY = yAxis.getPixelForValue(70);
-                    ctx.save();
-                    ctx.beginPath();
-                    ctx.strokeStyle = 'rgba(255, 193, 7, 0.4)';
-                    ctx.setLineDash([5, 5]);
-                    ctx.lineWidth = 1;
-                    ctx.moveTo(xAxis.left, warningY);
-                    ctx.lineTo(xAxis.right, warningY);
-                    ctx.stroke();
+                const channels = channelsAttr.split(',').filter(c => c);
+                sparklineCharts[groupName] = {};
+                channelData[groupName] = {};
 
-                    // Danger threshold at 40%
-                    const dangerY = yAxis.getPixelForValue(40);
-                    ctx.beginPath();
-                    ctx.strokeStyle = 'rgba(255, 82, 82, 0.4)';
-                    ctx.moveTo(xAxis.left, dangerY);
-                    ctx.lineTo(xAxis.right, dangerY);
-                    ctx.stroke();
+                channels.forEach(channel => {
+                    const canvas = document.getElementById(`spark-${groupName}-${channel}`);
+                    if (!canvas) return;
 
-                    ctx.restore();
-                }
-            };
+                    const ctx = canvas.getContext('2d');
 
-            document.querySelectorAll('.panel-chart canvas').forEach(canvas => {
-                const groupName = canvas.id.replace('chart-', '');
-                const ctx = canvas.getContext('2d');
+                    // Create gradient
+                    const gradient = ctx.createLinearGradient(0, 0, 0, 40);
+                    gradient.addColorStop(0, 'rgba(123, 97, 255, 0.4)');
+                    gradient.addColorStop(1, 'rgba(123, 97, 255, 0)');
 
-                // Create gradient
-                const gradient = ctx.createLinearGradient(0, 0, 0, 200);
-                gradient.addColorStop(0, 'rgba(123, 97, 255, 0.3)');
-                gradient.addColorStop(0.5, 'rgba(123, 97, 255, 0.1)');
-                gradient.addColorStop(1, 'rgba(123, 97, 255, 0)');
+                    // Initialize data storage
+                    channelData[groupName][channel] = [];
 
-                charts[groupName] = new Chart(ctx, {
-                    type: 'line',
-                    plugins: [thresholdPlugin],
-                    data: {
-                        labels: [],
-                        datasets: [{
-                            label: 'Match Score',
-                            data: [],
-                            borderColor: '#7b61ff',
-                            backgroundColor: gradient,
-                            fill: true,
-                            tension: 0.3,
-                            pointRadius: 0,
-                            pointHoverRadius: 4,
-                            pointHoverBackgroundColor: '#7b61ff',
-                            pointHoverBorderColor: '#fff',
-                            pointHoverBorderWidth: 2,
-                            borderWidth: 2
-                        }]
-                    },
-                    options: {
-                        responsive: true,
-                        maintainAspectRatio: false,
-                        animation: false,
-                        interaction: {
-                            mode: 'index',
-                            intersect: false
+                    sparklineCharts[groupName][channel] = new Chart(ctx, {
+                        type: 'line',
+                        data: {
+                            labels: [],
+                            datasets: [{
+                                data: [],
+                                borderColor: '#7b61ff',
+                                backgroundColor: gradient,
+                                fill: true,
+                                tension: 0.4,
+                                pointRadius: 0,
+                                pointHoverRadius: 3,
+                                pointHoverBackgroundColor: '#7b61ff',
+                                pointHoverBorderColor: '#fff',
+                                pointHoverBorderWidth: 1,
+                                borderWidth: 1.5
+                            }]
                         },
-                        plugins: {
-                            legend: { display: false },
-                            tooltip: {
-                                enabled: true,
-                                backgroundColor: 'rgba(19, 23, 34, 0.95)',
-                                titleColor: '#e8eaed',
-                                bodyColor: '#9aa0a6',
-                                borderColor: '#2a2e39',
-                                borderWidth: 1,
-                                padding: 10,
-                                displayColors: false,
-                                callbacks: {
-                                    title: () => 'Match Score',
-                                    label: (context) => {
-                                        const value = context.parsed.y;
-                                        let status = 'Normal';
-                                        if (value < 40) status = 'Anomaly';
-                                        else if (value < 70) status = 'Warning';
-                                        return `${value.toFixed(1)}% - ${status}`;
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            animation: false,
+                            interaction: {
+                                mode: 'index',
+                                intersect: false
+                            },
+                            plugins: {
+                                legend: { display: false },
+                                tooltip: {
+                                    enabled: true,
+                                    backgroundColor: 'rgba(19, 23, 34, 0.95)',
+                                    titleColor: '#e8eaed',
+                                    bodyColor: '#9aa0a6',
+                                    borderColor: '#2a2e39',
+                                    borderWidth: 1,
+                                    padding: 8,
+                                    displayColors: false,
+                                    callbacks: {
+                                        title: () => channel,
+                                        label: (context) => context.parsed.y.toFixed(4)
                                     }
                                 }
-                            }
-                        },
-                        scales: {
-                            x: {
-                                display: false
                             },
-                            y: {
-                                min: 0,
-                                max: 100,
-                                grid: {
-                                    color: 'rgba(255,255,255,0.03)',
-                                    drawBorder: false
-                                },
-                                ticks: {
-                                    color: 'rgba(255,255,255,0.3)',
-                                    font: { size: 10 },
-                                    callback: (v) => v + '%',
-                                    stepSize: 25
+                            scales: {
+                                x: { display: false },
+                                y: {
+                                    display: false,
+                                    beginAtZero: false
                                 }
                             }
                         }
-                    }
+                    });
                 });
-
-                // Initialize with demo data
-                for (let i = 0; i < 30; i++) {
-                    charts[groupName].data.labels.push('');
-                    charts[groupName].data.datasets[0].data.push(70 + Math.random() * 25);
-                }
-                charts[groupName].update('none');
             });
         }
 
-        // Panel resizing
+        // View toggle (charts vs heatmap)
+        function toggleView(groupName, viewType) {
+            const chartsView = document.getElementById(`charts-view-${groupName}`);
+            const heatmapView = document.getElementById(`heatmap-view-${groupName}`);
+            const panel = document.querySelector(`[data-group="${groupName}"]`);
+
+            // Update button states
+            panel.querySelectorAll('.view-toggle').forEach(btn => {
+                btn.classList.toggle('active', btn.dataset.view === viewType);
+            });
+
+            if (viewType === 'charts') {
+                chartsView.style.display = 'flex';
+                heatmapView.style.display = 'none';
+            } else {
+                chartsView.style.display = 'none';
+                heatmapView.style.display = 'flex';
+            }
+        }
+
+        // Zoom functions
+        let zoomLevels = {};  // {groupName: zoomFactor}
+
+        function zoomIn(groupName) {
+            if (!zoomLevels[groupName]) zoomLevels[groupName] = 1;
+            zoomLevels[groupName] = Math.min(3, zoomLevels[groupName] + 0.25);
+            applyZoom(groupName);
+        }
+
+        function zoomOut(groupName) {
+            if (!zoomLevels[groupName]) zoomLevels[groupName] = 1;
+            zoomLevels[groupName] = Math.max(0.5, zoomLevels[groupName] - 0.25);
+            applyZoom(groupName);
+        }
+
+        function resetZoom(groupName) {
+            zoomLevels[groupName] = 1;
+            applyZoom(groupName);
+        }
+
+        function applyZoom(groupName) {
+            const container = document.getElementById(`stacked-charts-${groupName}`);
+            if (!container) return;
+
+            const zoom = zoomLevels[groupName] || 1;
+            const rows = container.querySelectorAll('.channel-chart-row');
+            rows.forEach(row => {
+                row.style.minHeight = (50 * zoom) + 'px';
+                const canvas = row.querySelector('canvas');
+                if (canvas) {
+                    canvas.style.height = (40 * zoom) + 'px';
+                }
+            });
+
+            // Resize charts after zoom
+            setTimeout(() => {
+                if (sparklineCharts[groupName]) {
+                    Object.values(sparklineCharts[groupName]).forEach(chart => {
+                        chart.resize();
+                    });
+                }
+            }, 50);
+        }
+
+        // Drag resize functionality
+        function startResize(event, groupName) {
+            event.preventDefault();
+            resizingPanel = document.querySelector(`[data-group="${groupName}"]`);
+            resizeStartX = event.clientX;
+            resizeStartY = event.clientY;
+            resizeStartW = resizingPanel.offsetWidth;
+            resizeStartH = resizingPanel.offsetHeight;
+
+            document.addEventListener('mousemove', doResize);
+            document.addEventListener('mouseup', stopResize);
+            document.body.style.cursor = 'se-resize';
+            document.body.style.userSelect = 'none';
+        }
+
+        function doResize(event) {
+            if (!resizingPanel) return;
+
+            const dx = event.clientX - resizeStartX;
+            const dy = event.clientY - resizeStartY;
+
+            const newWidth = Math.max(300, resizeStartW + dx);
+            const newHeight = Math.max(200, resizeStartH + dy);
+
+            resizingPanel.style.width = newWidth + 'px';
+            resizingPanel.style.height = newHeight + 'px';
+            resizingPanel.style.gridColumn = 'span 1';
+            resizingPanel.style.gridRow = 'span 1';
+        }
+
+        function stopResize() {
+            if (resizingPanel) {
+                const groupName = resizingPanel.dataset.group;
+                // Resize charts after panel resize
+                setTimeout(() => {
+                    if (sparklineCharts[groupName]) {
+                        Object.values(sparklineCharts[groupName]).forEach(chart => {
+                            chart.resize();
+                        });
+                    }
+                }, 50);
+            }
+            resizingPanel = null;
+            document.removeEventListener('mousemove', doResize);
+            document.removeEventListener('mouseup', stopResize);
+            document.body.style.cursor = '';
+            document.body.style.userSelect = '';
+        }
+
+        // Panel resizing (button-based)
         function resizePanel(btn) {
             const panel = btn.closest('.grid-panel');
             const groupName = panel.dataset.group;
             const selector = document.getElementById(`size-${groupName}`);
-            selector.classList.toggle('visible');
+            if (selector) selector.classList.toggle('visible');
         }
 
         function setPanelSize(groupName, size) {
             const panel = document.querySelector(`[data-group="${groupName}"]`);
             if (panel) {
-                // Remove old size class
+                // Remove old size class and inline styles
                 panel.className = panel.className.replace(/panel-\dx\d/g, '');
                 panel.classList.add(`panel-${size}`);
                 panel.dataset.size = size;
+                panel.style.width = '';
+                panel.style.height = '';
+                panel.style.gridColumn = '';
+                panel.style.gridRow = '';
 
                 // Hide selector
-                document.getElementById(`size-${groupName}`).classList.remove('visible');
+                const selector = document.getElementById(`size-${groupName}`);
+                if (selector) selector.classList.remove('visible');
 
                 // Save layout
                 saveLayout();
 
-                // Resize chart
+                // Resize charts
                 setTimeout(() => {
-                    if (charts[groupName]) {
-                        charts[groupName].resize();
+                    if (sparklineCharts[groupName]) {
+                        Object.values(sparklineCharts[groupName]).forEach(chart => {
+                            chart.resize();
+                        });
                     }
                 }, 100);
             }

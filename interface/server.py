@@ -737,18 +737,51 @@ async def health_check():
 # Sample Data Support
 # =============================================================================
 
-# Available sample datasets
+# Available sample datasets with detailed channel information
+CHANNEL_INFO = {
+    "cycle": {"name": "Cycle", "unit": "count", "description": "Operating cycle number"},
+    "T2": {"name": "Fan Inlet Temp", "unit": "°R", "description": "Total temperature at fan inlet"},
+    "T24": {"name": "LPC Outlet Temp", "unit": "°R", "description": "Total temperature at LPC outlet"},
+    "T30": {"name": "HPC Outlet Temp", "unit": "°R", "description": "Total temperature at HPC outlet"},
+    "T50": {"name": "LPT Outlet Temp", "unit": "°R", "description": "Total temperature at LPT outlet"},
+    "P2": {"name": "Fan Inlet Pressure", "unit": "psia", "description": "Pressure at fan inlet"},
+    "P15": {"name": "Bypass Duct Pressure", "unit": "psia", "description": "Total pressure in bypass-duct"},
+    "P30": {"name": "HPC Outlet Pressure", "unit": "psia", "description": "Total pressure at HPC outlet"},
+    "Nf": {"name": "Fan Speed", "unit": "rpm", "description": "Physical fan speed"},
+    "Nc": {"name": "Core Speed", "unit": "rpm", "description": "Physical core speed"},
+    "epr": {"name": "Engine Pressure Ratio", "unit": "ratio", "description": "Engine pressure ratio (P50/P2)"},
+    "Ps30": {"name": "HPC Static Pressure", "unit": "psia", "description": "Static pressure at HPC outlet"},
+    "phi": {"name": "Fuel Flow Ratio", "unit": "pps/psi", "description": "Ratio of fuel flow to Ps30"},
+    "NRf": {"name": "Corrected Fan Speed", "unit": "rpm", "description": "Corrected fan speed"},
+    "NRc": {"name": "Corrected Core Speed", "unit": "rpm", "description": "Corrected core speed"},
+    "BPR": {"name": "Bypass Ratio", "unit": "ratio", "description": "Bypass ratio"},
+    "farB": {"name": "Fuel-Air Ratio", "unit": "ratio", "description": "Burner fuel-air ratio"},
+    "htBleed": {"name": "Bleed Enthalpy", "unit": "BTU/lb", "description": "Bleed enthalpy"},
+    "Nf_dmd": {"name": "Demanded Fan Speed", "unit": "rpm", "description": "Demanded fan speed"},
+    "W31": {"name": "HPT Coolant Bleed", "unit": "lbm/s", "description": "HPT coolant bleed flow"},
+    "W32": {"name": "LPT Coolant Bleed", "unit": "lbm/s", "description": "LPT coolant bleed flow"},
+    "RUL": {"name": "Remaining Life", "unit": "cycles", "description": "Remaining Useful Life until failure"}
+}
+
 SAMPLE_DATASETS = {
     "NASA Turbofan Engine": {
         "file": "turbofan_sample.json",
-        "description": "NASA C-MAPSS turbofan engine degradation data with 21 sensor channels. Shows engine run-to-failure with RUL (Remaining Useful Life) countdown.",
-        "channels": ["T2", "T24", "T30", "T50", "P2", "P15", "P30", "Nf", "Nc", "epr",
+        "description": "NASA C-MAPSS FD001 - Single operating condition, HPC degradation fault. 10 run-to-failure sequences.",
+        "channels": ["cycle", "T2", "T24", "T30", "T50", "P2", "P15", "P30", "Nf", "Nc", "epr",
                     "Ps30", "phi", "NRf", "NRc", "BPR", "farB", "htBleed", "Nf_dmd",
                     "W31", "W32", "RUL"],
-        "poll_interval": 5,
-        "failure_cycles": [175, 185, 190, 191]
+        "poll_interval": 2,
+        "failure_cycles": [175, 185, 190, 191],
+        "operating_conditions": 1,
+        "fault_modes": 1
     }
 }
+
+# API endpoint for channel metadata
+@app.get("/api/channel-info")
+async def get_channel_info():
+    """Get detailed information about all available channels."""
+    return CHANNEL_INFO
 
 # Track sample data state for streaming
 sample_data_state: Dict[str, dict] = {}

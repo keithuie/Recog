@@ -1355,6 +1355,85 @@ body {
     accent-color: var(--accent-primary);
 }
 
+/* Channel Card Grid (detailed view) */
+.channel-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: var(--spacing-md);
+    max-height: 400px;
+    overflow-y: auto;
+    padding-right: var(--spacing-sm);
+}
+
+.channel-card {
+    background: var(--bg-tertiary);
+    border: 2px solid var(--border-secondary);
+    border-radius: var(--radius-md);
+    padding: var(--spacing-md);
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.channel-card:hover {
+    border-color: var(--accent-primary);
+    background: var(--bg-hover);
+}
+
+.channel-card.selected {
+    border-color: var(--accent-primary);
+    background: rgba(123, 97, 255, 0.1);
+}
+
+.channel-card-header {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+    margin-bottom: var(--spacing-sm);
+}
+
+.channel-card-header input[type="checkbox"] {
+    width: 18px;
+    height: 18px;
+    accent-color: var(--accent-primary);
+    cursor: pointer;
+}
+
+.channel-id {
+    font-family: 'SF Mono', 'Monaco', monospace;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--accent-primary);
+    background: rgba(123, 97, 255, 0.2);
+    padding: 2px 8px;
+    border-radius: var(--radius-sm);
+}
+
+.channel-unit {
+    margin-left: auto;
+    font-size: 11px;
+    color: var(--text-tertiary);
+    background: var(--bg-secondary);
+    padding: 2px 6px;
+    border-radius: var(--radius-sm);
+}
+
+.channel-card-body {
+    padding-left: 26px;
+}
+
+.channel-name {
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text-primary);
+    margin-bottom: 4px;
+}
+
+.channel-desc {
+    font-size: 11px;
+    color: var(--text-tertiary);
+    line-height: 1.4;
+}
+
 /* Color Picker */
 .color-picker {
     display: flex;
