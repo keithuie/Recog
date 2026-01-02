@@ -542,6 +542,7 @@ body {
 .type-badge.mqtt { background: rgba(0, 200, 83, 0.2); color: #4dff91; }
 .type-badge.sql { background: rgba(255, 193, 7, 0.2); color: #ffd54f; }
 .type-badge.csv { background: rgba(255, 82, 82, 0.2); color: #ff8a80; }
+.type-badge.sample { background: rgba(0, 188, 212, 0.2); color: #4dd0e1; }
 
 /* Group Cards */
 .groups-grid {

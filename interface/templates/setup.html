@@ -104,6 +104,18 @@
                         <p class="step-description">Choose how to connect your data to MachineIQ</p>
 
                         <div class="source-options">
+                            <div class="source-option" data-type="sample" onclick="selectSourceType('sample')">
+                                <div class="option-icon">
+                                    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                                        <circle cx="12" cy="12" r="10"></circle>
+                                        <path d="M12 16v-4"></path>
+                                        <path d="M12 8h.01"></path>
+                                        <path d="M8 12h8"></path>
+                                    </svg>
+                                </div>
+                                <h4>NASA Sample Data</h4>
+                                <p>Turbofan engine degradation</p>
+                            </div>
                             <div class="source-option" data-type="api" onclick="selectSourceType('api')">
                                 <div class="option-icon">
                                     <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
@@ -236,6 +248,39 @@
                                     <a href="/api/csv-template" class="link">Download template</a> to see expected format
                                 </div>
                                 <div id="csv-preview" style="margin-top: 16px; display: none;"></div>
+                            </div>
+                        </div>
+
+                        <!-- NASA Sample Data Config -->
+                        <div id="config-sample" class="source-config" style="display: none;">
+                            <div class="form-group">
+                                <label>Source Name</label>
+                                <input type="text" id="sample-name" class="form-input" value="NASA Turbofan" placeholder="NASA Turbofan">
+                            </div>
+                            <div class="form-group">
+                                <label>Dataset</label>
+                                <select id="sample-dataset" class="form-select" onchange="updateDatasetInfo()">
+                                    <option value="NASA Turbofan Engine">NASA Turbofan Engine Degradation</option>
+                                </select>
+                            </div>
+                            <div class="info-box" style="margin-top: 16px;">
+                                <div class="info-icon">
+                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <circle cx="12" cy="12" r="10"></circle>
+                                        <line x1="12" y1="16" x2="12" y2="12"></line>
+                                        <line x1="12" y1="8" x2="12.01" y2="8"></line>
+                                    </svg>
+                                </div>
+                                <div class="info-content" id="sample-dataset-info">
+                                    <strong>NASA C-MAPSS Turbofan Engine Degradation</strong>
+                                    <p>Simulated run-to-failure sensor data from turbofan engines. Includes 21 sensor channels with RUL (Remaining Useful Life) countdown.</p>
+                                </div>
+                            </div>
+                            <div class="form-group" style="margin-top: 16px;">
+                                <button type="button" class="btn btn-secondary" onclick="testSampleConnection()" id="test-sample-btn">
+                                    Test Connection & Detect Channels
+                                </button>
+                                <div id="sample-test-result" style="margin-top: 12px;"></div>
                             </div>
                         </div>
                     </div>
@@ -458,6 +503,61 @@
             btn.disabled = false;
         }
 
+        // Sample Data Connection Test
+        async function testSampleConnection() {
+            const dataset = document.getElementById('sample-dataset').value;
+            const resultDiv = document.getElementById('sample-test-result');
+            const btn = document.getElementById('test-sample-btn');
+
+            btn.textContent = 'Testing...';
+            btn.disabled = true;
+
+            try {
+                const response = await fetch('/api/sample-data/test', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ dataset: dataset })
+                });
+
+                const data = await response.json();
+
+                if (response.ok && data.success) {
+                    detectedChannels = data.channels || [];
+
+                    resultDiv.innerHTML = `
+                        <div style="color: var(--accent-secondary); margin-bottom: 8px;">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align: middle; margin-right: 4px;">
+                                <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+                                <polyline points="22 4 12 14.01 9 11.01"></polyline>
+                            </svg>
+                            Sample data loaded successfully!
+                        </div>
+                        <div style="color: var(--text-secondary);">
+                            Found ${data.num_samples} data points with ${detectedChannels.length} channels: ${detectedChannels.slice(0, 5).join(', ')}${detectedChannels.length > 5 ? '...' : ''}
+                        </div>
+                    `;
+                    updateChannelList();
+                } else {
+                    const errorMsg = data.error || 'Failed to load sample data';
+                    resultDiv.innerHTML = `<span style="color: var(--accent-danger);">${errorMsg}</span>`;
+                }
+            } catch (e) {
+                resultDiv.innerHTML = `<span style="color: var(--accent-danger);">Error: ${e.message}</span>`;
+            }
+
+            btn.textContent = 'Test Connection & Detect Channels';
+            btn.disabled = false;
+        }
+
+        function updateDatasetInfo() {
+            // Can be expanded for multiple datasets
+            const info = document.getElementById('sample-dataset-info');
+            info.innerHTML = `
+                <strong>NASA C-MAPSS Turbofan Engine Degradation</strong>
+                <p>Simulated run-to-failure sensor data from turbofan engines. Includes 21 sensor channels with RUL (Remaining Useful Life) countdown.</p>
+            `;
+        }
+
         function updateChannelList() {
             const container = document.getElementById('channel-list');
 
@@ -635,6 +735,12 @@
                             <span>${uploadedCSVData.rowCount}</span>
                         </div>
                         ` : ''}
+                        ${selectedSourceType === 'sample' ? `
+                        <div class="stat-row">
+                            <span>Dataset:</span>
+                            <span>${document.getElementById('sample-dataset').value}</span>
+                        </div>
+                        ` : ''}
                     </div>
                 </div>
                 <div class="config-card">
@@ -700,16 +806,30 @@
             }
 
             try {
-                // Add data source
-                const sourceRes = await fetch('/api/sources', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(sourceConfig)
-                });
+                let sourceRes;
+
+                // Handle sample data sources differently
+                if (selectedSourceType === 'sample') {
+                    sourceRes = await fetch('/api/sources/sample', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            name: sourceConfig.name,
+                            dataset: document.getElementById('sample-dataset').value
+                        })
+                    });
+                } else {
+                    // Add regular data source
+                    sourceRes = await fetch('/api/sources', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(sourceConfig)
+                    });
+                }
 
                 if (!sourceRes.ok) {
                     const err = await sourceRes.json();
-                    throw new Error(err.detail || 'Failed to create data source');
+                    throw new Error(err.detail || err.error || 'Failed to create data source');
                 }
 
                 // Add channel group (linked to source)
@@ -746,6 +866,8 @@
             } else if (selectedSourceType === 'sql') {
                 config.sql_connection = document.getElementById('sql-connection').value;
                 config.sql_query = document.getElementById('sql-query').value;
+            } else if (selectedSourceType === 'sample') {
+                config.dataset = document.getElementById('sample-dataset').value;
             }
 
             return config;
