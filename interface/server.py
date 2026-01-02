@@ -532,36 +532,51 @@ async def data_polling_loop():
     """Background task to poll data from sources and stream to dashboard."""
     while True:
         try:
-            # Poll each API source
+            # Poll each data source (API or sample)
             for source_name, source in data_sources.items():
+                data = None
+
+                # Handle API sources
                 if source.get('type') == 'api' and source.get('url'):
                     data = await poll_api_source(source)
-                    if data:
-                        # Process data for each group using this source
-                        for group_name, group in channel_groups.items():
-                            if group.get('source') == source_name:
-                                channel_values = {}
-                                values_list = []
 
-                                for channel in group.get('channels', []):
-                                    # Try to find channel value in response
-                                    value = data.get(channel, data.get('values', {}).get(channel))
-                                    if value is not None:
-                                        channel_values[channel] = float(value)
-                                        values_list.append(float(value))
+                # Handle sample data sources
+                elif source.get('type') == 'sample':
+                    data = await poll_sample_source(source_name, source)
 
-                                if channel_values:
-                                    # Try to get ML analysis
-                                    ml_result = await analyze_with_ml_service(group_name, values_list)
-                                    confidence = ml_result.get('confidence', 85) if ml_result else 70 + random.random() * 25
+                if data:
+                    # Process data for each group using this source
+                    for group_name, group in channel_groups.items():
+                        if group.get('source') == source_name:
+                            channel_values = {}
+                            values_list = []
 
-                                    # Broadcast to dashboard
-                                    await broadcast_update("data_update", {
-                                        "group": group_name,
-                                        "confidence": confidence,
-                                        "channel_values": channel_values,
-                                        "timestamp": datetime.now().isoformat()
-                                    })
+                            for channel in group.get('channels', []):
+                                # Try to find channel value in response
+                                value = data.get(channel, data.get('values', {}).get(channel))
+                                if value is not None:
+                                    channel_values[channel] = float(value)
+                                    values_list.append(float(value))
+
+                            if channel_values:
+                                # Try to get ML analysis
+                                ml_result = await analyze_with_ml_service(group_name, values_list)
+                                confidence = ml_result.get('confidence', 85) if ml_result else 70 + random.random() * 25
+
+                                # Check for RUL in sample data (turbofan specific)
+                                rul = data.get('RUL')
+                                if rul is not None and rul <= 20:
+                                    # Simulate lower confidence as failure approaches
+                                    confidence = max(20, 30 + rul * 2)
+
+                                # Broadcast to dashboard
+                                await broadcast_update("data_update", {
+                                    "group": group_name,
+                                    "confidence": confidence,
+                                    "channel_values": channel_values,
+                                    "timestamp": datetime.now().isoformat(),
+                                    "rul": rul  # Include RUL if available
+                                })
 
             # Poll interval (auto-managed based on number of sources)
             poll_interval = max(0.5, min(2.0, 1.0 / max(1, len(data_sources))))
@@ -716,6 +731,138 @@ async def health_check():
         "sources": len(data_sources),
         "websockets": len(active_websockets)
     }
+
+
+# =============================================================================
+# Sample Data Support
+# =============================================================================
+
+# Available sample datasets
+SAMPLE_DATASETS = {
+    "NASA Turbofan Engine": {
+        "file": "turbofan_sample.json",
+        "description": "NASA C-MAPSS turbofan engine degradation data with 21 sensor channels. Shows engine run-to-failure with RUL (Remaining Useful Life) countdown.",
+        "channels": ["T2", "T24", "T30", "T50", "P2", "P15", "P30", "Nf", "Nc", "epr",
+                    "Ps30", "phi", "NRf", "NRc", "BPR", "farB", "htBleed", "Nf_dmd",
+                    "W31", "W32", "RUL"],
+        "poll_interval": 5,
+        "failure_cycles": [175, 185, 190, 191]
+    }
+}
+
+# Track sample data state for streaming
+sample_data_state: Dict[str, dict] = {}
+
+
+@app.get("/api/sample-datasets")
+async def list_sample_datasets():
+    """List available sample datasets."""
+    datasets = []
+    for name, info in SAMPLE_DATASETS.items():
+        datasets.append({
+            "name": name,
+            "description": info["description"],
+            "channels": info["channels"],
+            "poll_interval": info["poll_interval"]
+        })
+    return {"datasets": datasets}
+
+
+@app.post("/api/sample-data/test")
+async def test_sample_data(request: Request):
+    """Test sample data connection and return channels."""
+    body = await request.json()
+    dataset_name = body.get('dataset')
+
+    if not dataset_name or dataset_name not in SAMPLE_DATASETS:
+        return JSONResponse({"success": False, "error": "Unknown dataset"}, status_code=400)
+
+    dataset_info = SAMPLE_DATASETS[dataset_name]
+    data_path = os.path.join(BASE_DIR, "data", dataset_info["file"])
+
+    try:
+        with open(data_path, 'r') as f:
+            data = json.load(f)
+
+        # Extract channels from the data
+        channels = []
+        if data.get('type') == 'FeatureCollection':
+            features = data.get('features', [])
+            if features:
+                props = features[0].get('properties', {})
+                for key, value in props.items():
+                    if isinstance(value, (int, float)) and key not in ('time',):
+                        channels.append(key)
+
+        return {
+            "success": True,
+            "channels": channels,
+            "num_samples": len(data.get('features', [])),
+            "description": dataset_info["description"]
+        }
+    except FileNotFoundError:
+        return JSONResponse({"success": False, "error": "Sample data file not found"}, status_code=404)
+    except Exception as e:
+        return JSONResponse({"success": False, "error": str(e)}, status_code=500)
+
+
+@app.post("/api/sources/sample")
+async def add_sample_data_source(request: Request):
+    """Add a sample data source."""
+    body = await request.json()
+    dataset_name = body.get('dataset')
+    source_name = body.get('name', dataset_name)
+
+    if not dataset_name or dataset_name not in SAMPLE_DATASETS:
+        return JSONResponse({"success": False, "error": "Unknown dataset"}, status_code=400)
+
+    dataset_info = SAMPLE_DATASETS[dataset_name]
+
+    # Add to data sources
+    data_sources[source_name] = {
+        "name": source_name,
+        "type": "sample",
+        "dataset": dataset_name,
+        "poll_interval": dataset_info["poll_interval"],
+        "status": "connected",
+        "created_at": datetime.now().isoformat()
+    }
+
+    # Initialize sample data state for streaming
+    data_path = os.path.join(BASE_DIR, "data", dataset_info["file"])
+    try:
+        with open(data_path, 'r') as f:
+            data = json.load(f)
+        sample_data_state[source_name] = {
+            "data": data,
+            "current_index": 0,
+            "features": data.get('features', [])
+        }
+    except Exception as e:
+        print(f"[Sample Data] Error loading {dataset_name}: {e}")
+
+    await broadcast_update("source_added", data_sources[source_name])
+    return {"status": "success", "source": data_sources[source_name]}
+
+
+async def poll_sample_source(source_name: str, source: dict) -> Optional[dict]:
+    """Get next data point from sample data source."""
+    if source_name not in sample_data_state:
+        return None
+
+    state = sample_data_state[source_name]
+    features = state.get('features', [])
+    if not features:
+        return None
+
+    # Get current feature and advance index (cycling through)
+    current_index = state['current_index']
+    feature = features[current_index % len(features)]
+    state['current_index'] = (current_index + 1) % len(features)
+
+    # Extract properties
+    props = feature.get('properties', {})
+    return props
 
 
 def start():
