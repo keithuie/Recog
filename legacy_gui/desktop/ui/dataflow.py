@@ -36,6 +36,16 @@ SAMPLE_APIS = {
     },
 }
 
+# Sample datasets available (local data, no network required)
+SAMPLE_DATASETS = {
+    'NASA Space Weather': {
+        'description': 'Solar flux, plasma density, magnetic field, and geomagnetic indices',
+        'channels': ['solar_flux', 'proton_density', 'plasma_speed', 'plasma_temp',
+                    'mag_field_bt', 'mag_field_bz', 'kp_index', 'dst_index'],
+        'interval': 5
+    }
+}
+
 
 class DataSourceCard(QFrame):
     """Card displaying a data source"""

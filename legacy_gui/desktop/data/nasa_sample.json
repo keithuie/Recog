@@ -1,0 +1,161 @@
+{
+  "metadata": {
+    "source": "NASA Sample Data",
+    "description": "Sample telemetry data for MachineIQ anomaly detection testing",
+    "version": "1.0",
+    "generated": "2024-01-01T00:00:00Z"
+  },
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {
+        "time": 1704067200000,
+        "solar_flux": 145.2,
+        "proton_density": 4.8,
+        "plasma_speed": 412.5,
+        "plasma_temp": 89200,
+        "mag_field_bt": 6.2,
+        "mag_field_bz": -1.8,
+        "kp_index": 2.3,
+        "dst_index": -12
+      },
+      "geometry": null
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "time": 1704070800000,
+        "solar_flux": 147.8,
+        "proton_density": 5.1,
+        "plasma_speed": 418.2,
+        "plasma_temp": 91500,
+        "mag_field_bt": 6.5,
+        "mag_field_bz": -2.1,
+        "kp_index": 2.7,
+        "dst_index": -15
+      },
+      "geometry": null
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "time": 1704074400000,
+        "solar_flux": 152.3,
+        "proton_density": 6.2,
+        "plasma_speed": 445.8,
+        "plasma_temp": 102000,
+        "mag_field_bt": 7.8,
+        "mag_field_bz": -3.5,
+        "kp_index": 3.3,
+        "dst_index": -22
+      },
+      "geometry": null
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "time": 1704078000000,
+        "solar_flux": 168.5,
+        "proton_density": 8.9,
+        "plasma_speed": 512.4,
+        "plasma_temp": 145000,
+        "mag_field_bt": 12.4,
+        "mag_field_bz": -8.2,
+        "kp_index": 5.0,
+        "dst_index": -48
+      },
+      "geometry": null
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "time": 1704081600000,
+        "solar_flux": 182.1,
+        "proton_density": 12.3,
+        "plasma_speed": 598.7,
+        "plasma_temp": 198000,
+        "mag_field_bt": 18.6,
+        "mag_field_bz": -14.5,
+        "kp_index": 6.7,
+        "dst_index": -85
+      },
+      "geometry": null
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "time": 1704085200000,
+        "solar_flux": 175.4,
+        "proton_density": 10.8,
+        "plasma_speed": 565.2,
+        "plasma_temp": 175000,
+        "mag_field_bt": 15.2,
+        "mag_field_bz": -10.8,
+        "kp_index": 5.7,
+        "dst_index": -68
+      },
+      "geometry": null
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "time": 1704088800000,
+        "solar_flux": 162.8,
+        "proton_density": 8.2,
+        "plasma_speed": 498.5,
+        "plasma_temp": 138000,
+        "mag_field_bt": 11.4,
+        "mag_field_bz": -6.5,
+        "kp_index": 4.3,
+        "dst_index": -45
+      },
+      "geometry": null
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "time": 1704092400000,
+        "solar_flux": 155.2,
+        "proton_density": 6.5,
+        "plasma_speed": 458.2,
+        "plasma_temp": 115000,
+        "mag_field_bt": 8.8,
+        "mag_field_bz": -4.2,
+        "kp_index": 3.7,
+        "dst_index": -32
+      },
+      "geometry": null
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "time": 1704096000000,
+        "solar_flux": 148.6,
+        "proton_density": 5.4,
+        "plasma_speed": 428.5,
+        "plasma_temp": 95000,
+        "mag_field_bt": 7.2,
+        "mag_field_bz": -2.8,
+        "kp_index": 2.7,
+        "dst_index": -20
+      },
+      "geometry": null
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "time": 1704099600000,
+        "solar_flux": 144.8,
+        "proton_density": 4.9,
+        "plasma_speed": 415.2,
+        "plasma_temp": 88500,
+        "mag_field_bt": 6.4,
+        "mag_field_bz": -1.5,
+        "kp_index": 2.0,
+        "dst_index": -14
+      },
+      "geometry": null
+    }
+  ]
+}
