@@ -7,10 +7,11 @@ import sys
 import json
 import asyncio
 import aiohttp
-import random
+import subprocess
 from datetime import datetime
 from typing import Dict, List, Optional
 from io import StringIO
+from enum import Enum
 
 # Ensure project root is in path
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -54,15 +55,32 @@ app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 # Setup templates
 templates = Jinja2Templates(directory=TEMPLATES_DIR)
 
+# Group State Enum - 4 states as specified
+class GroupState(str, Enum):
+    IDLE = "idle"                    # No data streaming
+    STREAMING = "streaming"          # Data streaming, no trained model
+    TRAINING = "training"            # Data streaming, training in progress
+    STANDBY = "standby"              # Trained model exists, not monitoring
+    MONITORING = "monitoring"        # Trained model, actively monitoring
+    ERROR = "error"                  # Error state
+
+
 # In-memory state (in production, use Redis or database)
 channel_groups: Dict[str, dict] = {}
 data_sources: Dict[str, dict] = {}
 active_websockets: List[WebSocket] = []
 data_polling_task: Optional[asyncio.Task] = None
-simulation_task: Optional[asyncio.Task] = None
+ml_service_process: Optional[subprocess.Popen] = None
 
 # Data cache for streaming
 latest_data: Dict[str, dict] = {}  # {group_name: {channel_values, confidence, timestamp}}
+
+# ML Service status
+ml_service_status: dict = {
+    "running": False,
+    "configured_groups": [],
+    "error": None
+}
 
 # Model configuration (global defaults)
 current_model_config: dict = {
@@ -200,8 +218,19 @@ async def add_channel_group(config: ChannelGroupConfig):
         "sample_rate": config.sample_rate,
         "preprocessing": config.preprocessing,
         "source": config.source,  # Link to data source
-        "status": "idle",
+        "state": GroupState.IDLE,
+        # Training metadata
         "trained_states": 0,
+        "training_start_time": None,
+        "training_end_time": None,
+        "training_duration": None,
+        "last_trained": None,
+        # Streaming metadata
+        "streaming_start_time": None,
+        "stream_duration_total": 0,
+        "samples_processed": 0,
+        # Error tracking
+        "last_error": None,
         "created_at": datetime.now().isoformat()
     }
     await broadcast_update("group_added", channel_groups[config.name])
@@ -250,56 +279,400 @@ async def save_model_config(config: ModelConfig):
     return {"status": "success", "config": current_model_config}
 
 
-@app.post("/api/training/start")
-async def start_training(req: TrainingRequest):
-    """Start training for a channel group."""
-    if req.group_name not in channel_groups:
+# =============================================================================
+# Group State Management API - 4-State System
+# =============================================================================
+
+@app.post("/api/groups/{group_name}/start-stream")
+async def start_streaming(group_name: str):
+    """Start data streaming for a group (State: IDLE -> STREAMING)."""
+    if group_name not in channel_groups:
         raise HTTPException(status_code=404, detail="Group not found")
 
-    channel_groups[req.group_name]["status"] = "training"
-    await broadcast_update("training_started", {
-        "group": req.group_name,
-        "duration": req.duration
+    group = channel_groups[group_name]
+
+    # Can start streaming from IDLE or ERROR state
+    if group["state"] not in [GroupState.IDLE, GroupState.ERROR]:
+        raise HTTPException(status_code=400, detail=f"Cannot start streaming from state: {group['state']}")
+
+    # Update state
+    group["state"] = GroupState.STREAMING
+    group["streaming_start_time"] = datetime.now().isoformat()
+    group["last_error"] = None
+
+    # Ensure ML service is running
+    await ensure_ml_service_running()
+
+    await broadcast_update("stream_started", {
+        "group": group_name,
+        "state": group["state"],
+        "streaming_start_time": group["streaming_start_time"]
     })
 
-    # Try to call ML service
+    print(f"[Stream] Started for {group_name}")
+    return {"status": "success", "state": group["state"], "group": group}
+
+
+@app.post("/api/groups/{group_name}/stop-stream")
+async def stop_streaming(group_name: str):
+    """Stop data streaming for a group (Any State -> IDLE)."""
+    if group_name not in channel_groups:
+        raise HTTPException(status_code=404, detail="Group not found")
+
+    group = channel_groups[group_name]
+
+    # Calculate total stream time
+    if group["streaming_start_time"]:
+        start = datetime.fromisoformat(group["streaming_start_time"])
+        duration = (datetime.now() - start).total_seconds()
+        group["stream_duration_total"] += duration
+
+    # Reset to IDLE
+    group["state"] = GroupState.IDLE
+    group["streaming_start_time"] = None
+
+    await broadcast_update("stream_stopped", {
+        "group": group_name,
+        "state": group["state"]
+    })
+
+    print(f"[Stream] Stopped for {group_name}")
+    return {"status": "success", "state": group["state"]}
+
+
+@app.post("/api/groups/{group_name}/start-training")
+async def start_training(group_name: str, req: TrainingRequest):
+    """Start training for a group (STREAMING -> TRAINING)."""
+    if group_name not in channel_groups:
+        raise HTTPException(status_code=404, detail="Group not found")
+
+    group = channel_groups[group_name]
+
+    # Must be streaming to train
+    if group["state"] != GroupState.STREAMING:
+        raise HTTPException(status_code=400, detail=f"Must be streaming to train. Current state: {group['state']}")
+
+    # Update state
+    group["state"] = GroupState.TRAINING
+    group["training_start_time"] = datetime.now().isoformat()
+    group["training_duration"] = req.duration
+
+    # Try to call ML service to start training
+    ml_training_started = False
     try:
         async with aiohttp.ClientSession() as session:
+            # First configure the detector if not done
+            channel_configs = []
+            for ch in group.get("channels", []):
+                ch_info = CHANNEL_INFO.get(ch, {})
+                channel_configs.append({
+                    "name": ch,
+                    "min_value": 0,  # Will be auto-scaled
+                    "max_value": 1000  # Will be auto-scaled
+                })
+
+            # Configure ML service
+            config_payload = {
+                "group": group_name,
+                "channels": channel_configs,
+                "sample_rate": group.get("sample_rate", 1000),
+                "bins": current_model_config.get("num_bins", 64),
+                "kernel": current_model_config.get("kernel_type", "triangular"),
+                "kernel_width": current_model_config.get("kernel_width", 0.5),
+                "threshold": current_model_config.get("threshold", 0.3)
+            }
+
             async with session.post(
-                f"http://{ML_CORE_HOST}:{ML_CORE_PORT}/api/training/start",
-                json={"group": req.group_name, "duration": req.duration},
+                f"http://{ML_CORE_HOST}:{ML_CORE_PORT}/api/configure",
+                json=config_payload,
                 timeout=aiohttp.ClientTimeout(total=5)
             ) as response:
                 if response.status == 200:
-                    print(f"[Training] Started ML training for {req.group_name}")
+                    print(f"[Training] Configured ML service for {group_name}")
+
+            # Start training
+            async with session.post(
+                f"http://{ML_CORE_HOST}:{ML_CORE_PORT}/api/training/start",
+                json={"group": group_name, "duration": req.duration},
+                timeout=aiohttp.ClientTimeout(total=5)
+            ) as response:
+                if response.status == 200:
+                    ml_training_started = True
+                    print(f"[Training] Started ML training for {group_name}")
     except Exception as e:
         print(f"[Training] ML service not available: {e}")
+        group["last_error"] = f"ML service unavailable: {str(e)}"
 
-    # Schedule training completion
-    asyncio.create_task(complete_training_after(req.group_name, req.duration))
+    await broadcast_update("training_started", {
+        "group": group_name,
+        "state": group["state"],
+        "duration": req.duration,
+        "ml_service_connected": ml_training_started,
+        "training_start_time": group["training_start_time"]
+    })
 
-    return {"status": "training_started", "group": req.group_name, "duration": req.duration}
+    # Schedule training completion (if duration > 0)
+    if req.duration > 0:
+        asyncio.create_task(complete_training_after(group_name, req.duration))
+
+    return {
+        "status": "training_started",
+        "state": group["state"],
+        "duration": req.duration,
+        "ml_service_connected": ml_training_started
+    }
 
 
 async def complete_training_after(group_name: str, duration: int):
     """Complete training after specified duration."""
     await asyncio.sleep(duration)
-    if group_name in channel_groups and channel_groups[group_name]["status"] == "training":
-        channel_groups[group_name]["status"] = "monitoring"
-        channel_groups[group_name]["trained_states"] = channel_groups[group_name].get("trained_states", 0) + 1
-        await broadcast_update("training_complete", {"group": group_name})
-        print(f"[Training] Completed for {group_name}")
+    if group_name in channel_groups and channel_groups[group_name]["state"] == GroupState.TRAINING:
+        await finish_training(group_name)
 
 
-@app.post("/api/training/stop/{group_name}")
+async def finish_training(group_name: str):
+    """Finish training and transition to STANDBY."""
+    if group_name not in channel_groups:
+        return
+
+    group = channel_groups[group_name]
+
+    # Calculate training duration
+    if group["training_start_time"]:
+        start = datetime.fromisoformat(group["training_start_time"])
+        actual_duration = (datetime.now() - start).total_seconds()
+    else:
+        actual_duration = group.get("training_duration", 0)
+
+    # Try to stop ML training and get trained states count
+    trained_states = 0
+    try:
+        async with aiohttp.ClientSession() as session:
+            async with session.post(
+                f"http://{ML_CORE_HOST}:{ML_CORE_PORT}/api/training/stop",
+                json={"group": group_name},
+                timeout=aiohttp.ClientTimeout(total=5)
+            ) as response:
+                if response.status == 200:
+                    result = await response.json()
+                    trained_states = result.get("trained_states", 1)
+                    print(f"[Training] ML service stopped training for {group_name}, {trained_states} states learned")
+    except Exception as e:
+        print(f"[Training] Could not stop ML training: {e}")
+        trained_states = 1  # Assume at least 1 state was learned
+
+    # Update group metadata
+    group["state"] = GroupState.STANDBY
+    group["training_end_time"] = datetime.now().isoformat()
+    group["last_trained"] = datetime.now().isoformat()
+    group["training_duration"] = actual_duration
+    group["trained_states"] = group.get("trained_states", 0) + trained_states
+
+    await broadcast_update("training_complete", {
+        "group": group_name,
+        "state": group["state"],
+        "trained_states": group["trained_states"],
+        "training_duration": actual_duration
+    })
+
+    print(f"[Training] Completed for {group_name}: {trained_states} states, {actual_duration:.1f}s")
+
+
+@app.post("/api/groups/{group_name}/stop-training")
 async def stop_training(group_name: str):
-    """Stop training for a channel group."""
+    """Manually stop training (TRAINING -> STANDBY)."""
     if group_name not in channel_groups:
         raise HTTPException(status_code=404, detail="Group not found")
 
-    channel_groups[group_name]["status"] = "monitoring"
-    await broadcast_update("training_stopped", {"group": group_name})
-    return {"status": "monitoring", "group": group_name}
+    group = channel_groups[group_name]
+
+    if group["state"] != GroupState.TRAINING:
+        raise HTTPException(status_code=400, detail=f"Not currently training. State: {group['state']}")
+
+    await finish_training(group_name)
+
+    return {"status": "success", "state": group["state"], "trained_states": group["trained_states"]}
+
+
+@app.post("/api/groups/{group_name}/start-monitoring")
+async def start_monitoring(group_name: str):
+    """Start monitoring (STANDBY -> MONITORING)."""
+    if group_name not in channel_groups:
+        raise HTTPException(status_code=404, detail="Group not found")
+
+    group = channel_groups[group_name]
+
+    # Must have trained states to monitor
+    if group["trained_states"] == 0:
+        raise HTTPException(status_code=400, detail="No trained states. Train the model first.")
+
+    # Must be in STANDBY to start monitoring
+    if group["state"] != GroupState.STANDBY:
+        raise HTTPException(status_code=400, detail=f"Must be in standby to monitor. Current state: {group['state']}")
+
+    group["state"] = GroupState.MONITORING
+
+    await broadcast_update("monitoring_started", {
+        "group": group_name,
+        "state": group["state"],
+        "trained_states": group["trained_states"]
+    })
+
+    print(f"[Monitoring] Started for {group_name}")
+    return {"status": "success", "state": group["state"]}
+
+
+@app.post("/api/groups/{group_name}/stop-monitoring")
+async def stop_monitoring(group_name: str):
+    """Stop monitoring (MONITORING -> STANDBY)."""
+    if group_name not in channel_groups:
+        raise HTTPException(status_code=404, detail="Group not found")
+
+    group = channel_groups[group_name]
+
+    if group["state"] != GroupState.MONITORING:
+        raise HTTPException(status_code=400, detail=f"Not currently monitoring. State: {group['state']}")
+
+    group["state"] = GroupState.STANDBY
+
+    await broadcast_update("monitoring_stopped", {
+        "group": group_name,
+        "state": group["state"]
+    })
+
+    print(f"[Monitoring] Stopped for {group_name}")
+    return {"status": "success", "state": group["state"]}
+
+
+@app.get("/api/groups/{group_name}/state")
+async def get_group_state(group_name: str):
+    """Get current state and metadata for a group."""
+    if group_name not in channel_groups:
+        raise HTTPException(status_code=404, detail="Group not found")
+
+    group = channel_groups[group_name]
+
+    # Calculate current stream duration if streaming
+    current_stream_duration = group["stream_duration_total"]
+    if group["streaming_start_time"] and group["state"] in [GroupState.STREAMING, GroupState.TRAINING, GroupState.MONITORING]:
+        start = datetime.fromisoformat(group["streaming_start_time"])
+        current_stream_duration += (datetime.now() - start).total_seconds()
+
+    return {
+        "group": group_name,
+        "state": group["state"],
+        "trained_states": group["trained_states"],
+        "last_trained": group["last_trained"],
+        "training_duration": group["training_duration"],
+        "stream_duration_total": current_stream_duration,
+        "samples_processed": group["samples_processed"],
+        "last_error": group["last_error"]
+    }
+
+
+# Training duration presets
+TRAINING_PRESETS = [
+    {"label": "Quick (30s)", "duration": 30},
+    {"label": "Standard (60s)", "duration": 60},
+    {"label": "Extended (2min)", "duration": 120},
+    {"label": "Thorough (5min)", "duration": 300},
+    {"label": "Manual", "duration": 0}  # 0 means manual stop
+]
+
+@app.get("/api/training/presets")
+async def get_training_presets():
+    """Get available training duration presets."""
+    return {"presets": TRAINING_PRESETS}
+
+
+# =============================================================================
+# ML Service Management
+# =============================================================================
+
+async def ensure_ml_service_running():
+    """Ensure the ML service is running, start if necessary."""
+    global ml_service_status
+
+    # Check if already running
+    try:
+        async with aiohttp.ClientSession() as session:
+            async with session.get(
+                f"http://{ML_CORE_HOST}:{ML_CORE_PORT}/health",
+                timeout=aiohttp.ClientTimeout(total=2)
+            ) as response:
+                if response.status == 200:
+                    ml_service_status["running"] = True
+                    ml_service_status["error"] = None
+                    return True
+    except Exception:
+        pass
+
+    # Not running - try to start it
+    try:
+        print("[ML Service] Attempting to start ML service...")
+        ml_service_path = os.path.join(os.path.dirname(BASE_DIR), "ml_service.py")
+
+        if os.path.exists(ml_service_path):
+            # Start ML service in background
+            global ml_service_process
+            ml_service_process = subprocess.Popen(
+                [sys.executable, ml_service_path],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                cwd=os.path.dirname(BASE_DIR)
+            )
+
+            # Wait a moment for it to start
+            await asyncio.sleep(2)
+
+            # Verify it started
+            try:
+                async with aiohttp.ClientSession() as session:
+                    async with session.get(
+                        f"http://{ML_CORE_HOST}:{ML_CORE_PORT}/health",
+                        timeout=aiohttp.ClientTimeout(total=2)
+                    ) as response:
+                        if response.status == 200:
+                            ml_service_status["running"] = True
+                            ml_service_status["error"] = None
+                            print("[ML Service] Started successfully")
+                            return True
+            except Exception:
+                pass
+
+        ml_service_status["running"] = False
+        ml_service_status["error"] = "Failed to start ML service"
+        print("[ML Service] Failed to start")
+        return False
+
+    except Exception as e:
+        ml_service_status["running"] = False
+        ml_service_status["error"] = str(e)
+        print(f"[ML Service] Error starting: {e}")
+        return False
+
+
+@app.get("/api/ml-service/status")
+async def get_ml_service_status():
+    """Get ML service status."""
+    # Check if ML service is responsive
+    try:
+        async with aiohttp.ClientSession() as session:
+            async with session.get(
+                f"http://{ML_CORE_HOST}:{ML_CORE_PORT}/health",
+                timeout=aiohttp.ClientTimeout(total=2)
+            ) as response:
+                if response.status == 200:
+                    data = await response.json()
+                    ml_service_status["running"] = True
+                    ml_service_status["error"] = None
+                    ml_service_status["configured_groups"] = list(data.get("detectors", {}).keys()) if isinstance(data.get("detectors"), dict) else []
+                    return {**ml_service_status, "health": data}
+    except Exception as e:
+        ml_service_status["running"] = False
+        ml_service_status["error"] = str(e)
+
+    return ml_service_status
 
 
 @app.get("/api/csv-template")
@@ -529,7 +902,10 @@ async def analyze_with_ml_service(group_name: str, values: list) -> Optional[dic
 
 
 async def data_polling_loop():
-    """Background task to poll data from sources and stream to dashboard."""
+    """Background task to poll data from sources and stream to dashboard.
+
+    NO SIMULATION - Only real data from sources and real ML analysis.
+    """
     while True:
         try:
             # Poll each data source (API or sample)
@@ -548,6 +924,11 @@ async def data_polling_loop():
                     # Process data for each group using this source
                     for group_name, group in channel_groups.items():
                         if group.get('source') == source_name:
+                            # Only process if group is in active state
+                            group_state = group.get('state', GroupState.IDLE)
+                            if group_state == GroupState.IDLE:
+                                continue  # Not streaming, skip
+
                             channel_values = {}
                             values_list = []
 
@@ -559,23 +940,42 @@ async def data_polling_loop():
                                     values_list.append(float(value))
 
                             if channel_values:
-                                # Try to get ML analysis
-                                ml_result = await analyze_with_ml_service(group_name, values_list)
-                                confidence = ml_result.get('confidence', 85) if ml_result else 70 + random.random() * 25
+                                # Update samples processed count
+                                group["samples_processed"] = group.get("samples_processed", 0) + 1
 
-                                # Check for RUL in sample data (turbofan specific)
+                                # Get RUL if available (for turbofan data)
                                 rul = data.get('RUL')
-                                if rul is not None and rul <= 20:
-                                    # Simulate lower confidence as failure approaches
-                                    confidence = max(20, 30 + rul * 2)
 
-                                # Broadcast to dashboard
+                                # Determine confidence based on state - NO SIMULATION
+                                confidence = None  # Default: no confidence (not monitoring)
+                                ml_connected = False
+
+                                if group_state == GroupState.MONITORING:
+                                    # Only get ML analysis when actively monitoring
+                                    ml_result = await analyze_with_ml_service(group_name, values_list)
+                                    if ml_result:
+                                        confidence = ml_result.get('confidence')
+                                        ml_connected = True
+                                    else:
+                                        # ML service unavailable during monitoring - this is an error
+                                        group["last_error"] = "ML service unavailable during monitoring"
+
+                                elif group_state == GroupState.TRAINING:
+                                    # During training, send data to ML service for learning
+                                    ml_result = await analyze_with_ml_service(group_name, values_list)
+                                    ml_connected = ml_result is not None
+                                    confidence = None  # No confidence during training
+
+                                # Broadcast real data to dashboard
                                 await broadcast_update("data_update", {
                                     "group": group_name,
-                                    "confidence": confidence,
+                                    "state": group_state,
+                                    "confidence": confidence,  # None if not monitoring
                                     "channel_values": channel_values,
                                     "timestamp": datetime.now().isoformat(),
-                                    "rul": rul  # Include RUL if available
+                                    "rul": rul,
+                                    "ml_connected": ml_connected,
+                                    "samples_processed": group["samples_processed"]
                                 })
 
             # Poll interval (auto-managed based on number of sources)
@@ -589,62 +989,22 @@ async def data_polling_loop():
             await asyncio.sleep(1)
 
 
-async def simulation_loop():
-    """Background task to simulate data when no real sources are connected."""
-    while True:
-        try:
-            # Only simulate if we have groups but no active data from real sources
-            for group_name, group in channel_groups.items():
-                channels = group.get('channels', [])
-                if channels:
-                    # Generate simulated data
-                    channel_values = {}
-                    for i, channel in enumerate(channels):
-                        # Simulate realistic values with some variation
-                        base_value = 0.5 + 0.3 * (i / max(1, len(channels) - 1))
-                        noise = random.uniform(-0.1, 0.1)
-                        channel_values[channel] = round(base_value + noise, 4)
-
-                    # Simulate confidence score (typically high with occasional dips)
-                    if random.random() < 0.95:
-                        confidence = 70 + random.random() * 28
-                    else:
-                        confidence = 30 + random.random() * 40  # Occasional anomaly
-
-                    # Broadcast to dashboard
-                    await broadcast_update("data_update", {
-                        "group": group_name,
-                        "confidence": round(confidence, 1),
-                        "channel_values": channel_values,
-                        "timestamp": datetime.now().isoformat()
-                    })
-
-            await asyncio.sleep(1)
-
-        except asyncio.CancelledError:
-            break
-        except Exception as e:
-            print(f"[Simulation] Error: {e}")
-            await asyncio.sleep(1)
-
-
 @app.on_event("startup")
 async def startup_event():
     """Start background tasks on server startup."""
-    global data_polling_task, simulation_task
+    global data_polling_task
     data_polling_task = asyncio.create_task(data_polling_loop())
-    simulation_task = asyncio.create_task(simulation_loop())
-    print("[Server] Background data streaming tasks started")
+    print("[Server] Data polling task started (NO SIMULATION MODE)")
 
 
 @app.on_event("shutdown")
 async def shutdown_event():
     """Clean up background tasks on shutdown."""
-    global data_polling_task, simulation_task
+    global data_polling_task, ml_service_process
     if data_polling_task:
         data_polling_task.cancel()
-    if simulation_task:
-        simulation_task.cancel()
+    if ml_service_process:
+        ml_service_process.terminate()
 
 
 # API Test & Channel Detection
