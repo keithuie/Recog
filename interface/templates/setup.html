@@ -260,8 +260,9 @@
                             <div class="form-group">
                                 <label>Dataset</label>
                                 <select id="sample-dataset" class="form-select" onchange="updateDatasetInfo()">
-                                    <option value="NASA Turbofan Engine">NASA Turbofan Engine Degradation</option>
+                                    <!-- Populated dynamically from API -->
                                 </select>
+                                <div class="form-hint" id="dataset-loading">Loading available datasets...</div>
                             </div>
                             <div class="info-box" style="margin-top: 16px;">
                                 <div class="info-icon">
@@ -273,7 +274,7 @@
                                 </div>
                                 <div class="info-content" id="sample-dataset-info">
                                     <strong>NASA C-MAPSS Turbofan Engine Degradation</strong>
-                                    <p>Simulated run-to-failure sensor data from turbofan engines. Includes 21 sensor channels with RUL (Remaining Useful Life) countdown.</p>
+                                    <p>Select a dataset above to see its description.</p>
                                 </div>
                             </div>
                             <div class="form-group" style="margin-top: 16px;">
@@ -397,20 +398,49 @@
         let channelInfo = {};  // Detailed channel metadata
         let uploadedCSVData = null;
         let numSamples = 0;  // Track number of data samples
+        let sampleDatasets = [];  // Available sample datasets
 
-        // Load preprocessing info and channel metadata
+        // Load preprocessing info, channel metadata, and sample datasets
         async function loadConfigInfo() {
             try {
-                const [prepRes, channelRes] = await Promise.all([
+                const [prepRes, channelRes, datasetsRes] = await Promise.all([
                     fetch('/api/preprocessing-info'),
-                    fetch('/api/channel-info')
+                    fetch('/api/channel-info'),
+                    fetch('/api/sample-datasets')
                 ]);
                 preprocessingInfo = await prepRes.json();
                 channelInfo = await channelRes.json();
+                const datasetsData = await datasetsRes.json();
+                sampleDatasets = datasetsData.datasets || [];
+
                 renderPreprocessingOptions();
+                renderDatasetOptions();
             } catch (e) {
                 console.error('Failed to load config info:', e);
             }
+        }
+
+        // Render dataset dropdown options
+        function renderDatasetOptions() {
+            const select = document.getElementById('sample-dataset');
+            const loadingHint = document.getElementById('dataset-loading');
+
+            if (!select) return;
+
+            if (sampleDatasets.length === 0) {
+                select.innerHTML = '<option value="">No datasets available</option>';
+                loadingHint.textContent = 'No sample datasets found';
+                return;
+            }
+
+            select.innerHTML = sampleDatasets.map(ds =>
+                `<option value="${ds.name}">${ds.name}</option>`
+            ).join('');
+
+            loadingHint.style.display = 'none';
+
+            // Update info box with first dataset
+            updateDatasetInfo();
         }
 
         function renderPreprocessingOptions() {
@@ -558,12 +588,33 @@
         }
 
         function updateDatasetInfo() {
-            // Can be expanded for multiple datasets
+            const select = document.getElementById('sample-dataset');
             const info = document.getElementById('sample-dataset-info');
-            info.innerHTML = `
-                <strong>NASA C-MAPSS Turbofan Engine Degradation</strong>
-                <p>Simulated run-to-failure sensor data from turbofan engines. Includes 21 sensor channels with RUL (Remaining Useful Life) countdown.</p>
-            `;
+            const selectedName = select?.value;
+
+            if (!selectedName || sampleDatasets.length === 0) {
+                info.innerHTML = `
+                    <strong>NASA C-MAPSS Turbofan Engine Degradation</strong>
+                    <p>Select a dataset above to see its description.</p>
+                `;
+                return;
+            }
+
+            const dataset = sampleDatasets.find(ds => ds.name === selectedName);
+            if (dataset) {
+                info.innerHTML = `
+                    <strong>${dataset.name}</strong>
+                    <p>${dataset.description}</p>
+                    <div style="margin-top: 8px; font-size: 12px; color: var(--text-tertiary);">
+                        ${dataset.channels.length} sensor channels
+                    </div>
+                `;
+                // Update source name to match selected dataset
+                const nameInput = document.getElementById('sample-name');
+                if (nameInput && !nameInput.dataset.userEdited) {
+                    nameInput.value = dataset.name;
+                }
+            }
         }
 
         function updateChannelList() {

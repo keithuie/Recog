@@ -764,16 +764,45 @@ CHANNEL_INFO = {
 }
 
 SAMPLE_DATASETS = {
-    "NASA Turbofan Engine": {
-        "file": "turbofan_sample.json",
-        "description": "NASA C-MAPSS FD001 - Single operating condition, HPC degradation fault. 10 run-to-failure sequences.",
+    "NASA Turbofan - Normal Degradation": {
+        "file": "turbofan_normal.json",
+        "description": "Gradual HPC degradation over ~190 cycles. Good for training baseline patterns.",
         "channels": ["cycle", "T2", "T24", "T30", "T50", "P2", "P15", "P30", "Nf", "Nc", "epr",
                     "Ps30", "phi", "NRf", "NRc", "BPR", "farB", "htBleed", "Nf_dmd",
                     "W31", "W32", "RUL"],
         "poll_interval": 2,
-        "failure_cycles": [175, 185, 190, 191],
-        "operating_conditions": 1,
-        "fault_modes": 1
+        "total_cycles": 191,
+        "fault_mode": "HPC Degradation"
+    },
+    "NASA Turbofan - Rapid Failure": {
+        "file": "turbofan_rapid.json",
+        "description": "Accelerated failure in ~80 cycles. Tests anomaly detection responsiveness.",
+        "channels": ["cycle", "T2", "T24", "T30", "T50", "P2", "P15", "P30", "Nf", "Nc", "epr",
+                    "Ps30", "phi", "NRf", "NRc", "BPR", "farB", "htBleed", "Nf_dmd",
+                    "W31", "W32", "RUL"],
+        "poll_interval": 2,
+        "total_cycles": 82,
+        "fault_mode": "HPC Degradation (Accelerated)"
+    },
+    "NASA Turbofan - Extended Life": {
+        "file": "turbofan_extended.json",
+        "description": "Long-running engine with ~300 cycles. Extended monitoring scenario.",
+        "channels": ["cycle", "T2", "T24", "T30", "T50", "P2", "P15", "P30", "Nf", "Nc", "epr",
+                    "Ps30", "phi", "NRf", "NRc", "BPR", "farB", "htBleed", "Nf_dmd",
+                    "W31", "W32", "RUL"],
+        "poll_interval": 2,
+        "total_cycles": 305,
+        "fault_mode": "HPC Degradation (Slow)"
+    },
+    "NASA Turbofan - Multi-Fault": {
+        "file": "turbofan_multifault.json",
+        "description": "Combined HPC and fan degradation. Complex failure pattern.",
+        "channels": ["cycle", "T2", "T24", "T30", "T50", "P2", "P15", "P30", "Nf", "Nc", "epr",
+                    "Ps30", "phi", "NRf", "NRc", "BPR", "farB", "htBleed", "Nf_dmd",
+                    "W31", "W32", "RUL"],
+        "poll_interval": 2,
+        "total_cycles": 145,
+        "fault_mode": "HPC + Fan Degradation"
     }
 }
 
