@@ -1792,12 +1792,31 @@
 
         // Start training with specific duration (0 = manual stop)
         async function startTraining(groupName, duration) {
-            // Hide the menu and training prompt
-            const menu = document.getElementById(`train-menu-${groupName}`);
-            if (menu) menu.style.display = 'none';
+            console.log(`[Training] Starting training for ${groupName} with duration ${duration}s`);
 
+            // Hide the menu and training prompt immediately
+            const menu = document.getElementById(`train-menu-${groupName}`);
+            if (menu) {
+                menu.style.display = 'none';
+                console.log(`[Training] Hidden menu for ${groupName}`);
+            }
+
+            // Hide training prompt - try multiple ID formats
             const trainingPrompt = document.getElementById(`training-prompt-${groupName}`);
-            if (trainingPrompt) trainingPrompt.style.display = 'none';
+            if (trainingPrompt) {
+                trainingPrompt.style.display = 'none';
+                console.log(`[Training] Hidden training prompt for ${groupName}`);
+            } else {
+                // Also try to hide any visible training prompts in this panel
+                const panel = document.querySelector(`[data-group="${groupName}"]`);
+                if (panel) {
+                    const prompt = panel.querySelector('.training-prompt');
+                    if (prompt) {
+                        prompt.style.display = 'none';
+                        console.log(`[Training] Hidden training prompt via panel query`);
+                    }
+                }
+            }
 
             // Show loading state
             showLoadingState(groupName, 'Starting training...');
@@ -1809,7 +1828,11 @@
                     body: JSON.stringify({ duration: duration })
                 });
 
+                console.log(`[Training] Response status: ${response.status}`);
+
                 if (response.ok) {
+                    const result = await response.json();
+                    console.log(`[Training] Success:`, result);
                     updateGroupState(groupName, 'training');
 
                     // Setup training timer if duration specified
@@ -1820,14 +1843,22 @@
                         showToast('Training Started', 'Click Train again to stop', 'success', 3000);
                     }
                 } else {
-                    const error = await response.json();
-                    updateGroupState(groupName, 'streaming'); // Restore to streaming state
-                    showToast('Error', error.detail || 'Failed to start training', 'warning', 5000);
+                    let errorMessage = 'Failed to start training';
+                    try {
+                        const errorData = await response.json();
+                        console.log(`[Training] Error response:`, errorData);
+                        errorMessage = errorData.detail || JSON.stringify(errorData);
+                    } catch (parseError) {
+                        const textError = await response.text();
+                        errorMessage = textError || `HTTP ${response.status}`;
+                    }
+                    updateGroupState(groupName, 'streaming');
+                    showToast('Training Error', String(errorMessage), 'warning', 5000);
                 }
             } catch (e) {
-                console.error('Error starting training:', e);
-                updateGroupState(groupName, 'streaming'); // Restore to streaming state
-                showToast('Error', 'Failed to start training', 'warning', 5000);
+                console.error('[Training] Network error:', e);
+                updateGroupState(groupName, 'streaming');
+                showToast('Training Error', `Network error: ${e.message}`, 'warning', 5000);
             }
         }
 

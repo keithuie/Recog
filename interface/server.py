@@ -129,8 +129,7 @@ class ModelConfig(BaseModel):
 
 
 class TrainingRequest(BaseModel):
-    group_name: str
-    duration: int = 60
+    duration: int = 60  # group_name comes from URL path, not body
 
 
 # Page Routes
@@ -342,15 +341,23 @@ async def stop_streaming(group_name: str):
 
 @app.post("/api/groups/{group_name}/start-training")
 async def start_training(group_name: str, req: TrainingRequest):
-    """Start training for a group (STREAMING -> TRAINING)."""
+    """Start training for a group (from STREAMING, STANDBY, or MONITORING -> TRAINING)."""
+    print(f"[Training] Request to train group '{group_name}' for {req.duration}s")
+    print(f"[Training] Available groups: {list(channel_groups.keys())}")
+
     if group_name not in channel_groups:
-        raise HTTPException(status_code=404, detail="Group not found")
+        print(f"[Training] ERROR: Group '{group_name}' not found")
+        raise HTTPException(status_code=404, detail=f"Group '{group_name}' not found. Available groups: {list(channel_groups.keys())}")
 
     group = channel_groups[group_name]
+    current_state = group["state"]
+    print(f"[Training] Group '{group_name}' current state: {current_state}")
 
-    # Must be streaming to train
-    if group["state"] != GroupState.STREAMING:
-        raise HTTPException(status_code=400, detail=f"Must be streaming to train. Current state: {group['state']}")
+    # Can train from streaming, standby, or monitoring states
+    valid_states = [GroupState.STREAMING, GroupState.STANDBY, GroupState.MONITORING]
+    if current_state not in valid_states:
+        print(f"[Training] ERROR: Cannot train from state '{current_state}'")
+        raise HTTPException(status_code=400, detail=f"Cannot train from state '{current_state}'. Must be streaming, standby, or monitoring.")
 
     # Update state
     group["state"] = GroupState.TRAINING
