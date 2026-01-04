@@ -858,6 +858,7 @@
         .control-group {
             display: flex;
             gap: 4px;
+            position: relative;  /* For absolute positioning of train menu */
         }
 
         .control-btn {
@@ -921,9 +922,10 @@
         /* Training Duration Menu */
         .train-menu {
             position: absolute;
-            top: 100%;
-            left: 0;
-            z-index: 100;
+            top: calc(100% + 4px);
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 300;
             background: var(--bg-secondary);
             border: 1px solid var(--border-primary);
             border-radius: var(--radius-md);
@@ -1061,12 +1063,14 @@
             color: var(--text-secondary);
         }
 
-        /* Training Prompt Bubble */
+        /* Training Prompt Bubble - positioned below Train button */
         .training-prompt {
             position: absolute;
-            top: 50%;
+            top: 100%;
             left: 50%;
-            transform: translate(-50%, -50%);
+            transform: translateX(-50%);
+            margin-top: 12px;
+            z-index: 200;
         }
 
         .prompt-bubble {
@@ -1096,6 +1100,7 @@
             }
         }
 
+        /* Arrow pointing UP toward the Train button */
         .prompt-arrow {
             position: absolute;
             top: -8px;
@@ -1366,12 +1371,29 @@
                                             </svg>
                                             <span>Stream</span>
                                         </button>
-                                        <button class="control-btn train-btn" id="train-btn-{{ group.name }}" onclick="showTrainMenu('{{ group.name }}')" title="Train Model" disabled>
-                                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                                <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"></path>
-                                            </svg>
-                                            <span>Train</span>
-                                        </button>
+                                        <div class="train-btn-wrapper" id="train-wrapper-{{ group.name }}" style="position: relative;">
+                                            <button class="control-btn train-btn" id="train-btn-{{ group.name }}" onclick="showTrainMenu('{{ group.name }}', event)" title="Train Model" disabled>
+                                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                                    <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"></path>
+                                                </svg>
+                                                <span>Train</span>
+                                            </button>
+                                            <!-- Training Menu (hidden by default) -->
+                                            <div class="train-menu" id="train-menu-{{ group.name }}" style="display: none;">
+                                                <div class="train-menu-header">Training Duration</div>
+                                                <button onclick="startTraining('{{ group.name }}', 30)">Quick (30s)</button>
+                                                <button onclick="startTraining('{{ group.name }}', 60)">Standard (60s)</button>
+                                                <button onclick="startTraining('{{ group.name }}', 120)">Extended (2min)</button>
+                                                <button onclick="startTraining('{{ group.name }}', 0)">Manual Stop</button>
+                                            </div>
+                                            <!-- Training prompt bubble - appears when streaming without training -->
+                                            <div class="training-prompt" id="training-prompt-{{ group.name }}" style="display: none;">
+                                                <div class="prompt-bubble pulse">
+                                                    <span class="prompt-arrow"></span>
+                                                    Train model to detect anomalies
+                                                </div>
+                                            </div>
+                                        </div>
                                         <button class="control-btn monitor-btn" id="monitor-btn-{{ group.name }}" onclick="toggleMonitoring('{{ group.name }}')" title="Start/Stop Monitoring" disabled>
                                             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                                 <circle cx="12" cy="12" r="10"></circle>
@@ -1379,14 +1401,6 @@
                                             </svg>
                                             <span>Monitor</span>
                                         </button>
-                                    </div>
-                                    <!-- Training Menu (hidden by default) -->
-                                    <div class="train-menu" id="train-menu-{{ group.name }}" style="display: none;">
-                                        <div class="train-menu-header">Training Duration</div>
-                                        <button onclick="startTraining('{{ group.name }}', 30)">Quick (30s)</button>
-                                        <button onclick="startTraining('{{ group.name }}', 60)">Standard (60s)</button>
-                                        <button onclick="startTraining('{{ group.name }}', 120)">Extended (2min)</button>
-                                        <button onclick="startTraining('{{ group.name }}', 0)">Manual Stop</button>
                                     </div>
                                     <span class="panel-separator"></span>
                                     <!-- View Controls -->
@@ -1453,13 +1467,6 @@
                                                         </svg>
                                                     </span>
                                                     <span class="state-text" id="state-text-{{ group.name }}">Click Stream to begin</span>
-                                                </div>
-                                                <!-- Training prompt bubble -->
-                                                <div class="training-prompt" id="training-prompt-{{ group.name }}" style="display: none;">
-                                                    <div class="prompt-bubble pulse">
-                                                        <span class="prompt-arrow"></span>
-                                                        Train model first before monitoring
-                                                    </div>
                                                 </div>
                                             </div>
                                         </div>
@@ -1693,23 +1700,37 @@
         }
 
         // Show training menu with duration options
-        function showTrainMenu(groupName) {
-            // Hide any open menus first
-            document.querySelectorAll('.train-menu').forEach(m => m.style.display = 'none');
+        function showTrainMenu(groupName, event) {
+            // Stop propagation to prevent global handler from immediately closing
+            if (event) {
+                event.stopPropagation();
+            }
 
             const menu = document.getElementById(`train-menu-${groupName}`);
-            if (menu) {
-                menu.style.display = 'block';
+            if (!menu) return;
 
-                // Close menu when clicking outside
-                const closeMenu = (e) => {
-                    if (!e.target.closest('.train-menu') && !e.target.closest('.train-btn')) {
-                        menu.style.display = 'none';
-                        document.removeEventListener('click', closeMenu);
-                    }
-                };
-                setTimeout(() => document.addEventListener('click', closeMenu), 10);
+            // Toggle menu - if already open, close it
+            if (menu.style.display === 'block') {
+                menu.style.display = 'none';
+                return;
             }
+
+            // Hide any other open menus first
+            document.querySelectorAll('.train-menu').forEach(m => {
+                if (m !== menu) m.style.display = 'none';
+            });
+
+            // Show this menu
+            menu.style.display = 'block';
+
+            // Close menu when clicking outside
+            const closeMenu = (e) => {
+                if (!e.target.closest('.train-menu') && !e.target.closest('.train-btn')) {
+                    menu.style.display = 'none';
+                    document.removeEventListener('click', closeMenu);
+                }
+            };
+            setTimeout(() => document.addEventListener('click', closeMenu), 50);
         }
 
         // Start training with specific duration (0 = manual stop)
@@ -1869,9 +1890,9 @@
 
                 // If training, clicking should stop training
                 if (isTraining) {
-                    trainBtn.onclick = () => stopTraining(groupName);
+                    trainBtn.onclick = (e) => { e.stopPropagation(); stopTraining(groupName); };
                 } else {
-                    trainBtn.onclick = () => showTrainMenu(groupName);
+                    trainBtn.onclick = (e) => showTrainMenu(groupName, e);
                 }
             }
 
@@ -2809,13 +2830,6 @@
             document.addEventListener('click', (e) => {
                 if (!e.target.closest('.panel-action-btn') && !e.target.closest('.size-selector')) {
                     document.querySelectorAll('.size-selector').forEach(s => s.classList.remove('visible'));
-                }
-            });
-
-            // Close train menus on outside click
-            document.addEventListener('click', (e) => {
-                if (!e.target.closest('.train-menu') && !e.target.closest('.train-btn')) {
-                    document.querySelectorAll('.train-menu').forEach(m => m.style.display = 'none');
                 }
             });
         });
