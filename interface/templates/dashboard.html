@@ -847,6 +847,371 @@
             width: 100% !important;
             height: 100% !important;
         }
+
+        /* 4-State Control Buttons */
+        .panel-controls {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .control-group {
+            display: flex;
+            gap: 4px;
+        }
+
+        .control-btn {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            padding: 4px 10px;
+            border: 1px solid var(--border-primary);
+            border-radius: var(--radius-sm);
+            background: var(--bg-tertiary);
+            color: var(--text-secondary);
+            font-size: 11px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .control-btn:hover:not(:disabled) {
+            background: var(--bg-hover);
+            border-color: var(--accent-primary);
+            color: var(--text-primary);
+        }
+
+        .control-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .control-btn.active {
+            background: var(--accent-primary);
+            border-color: var(--accent-primary);
+            color: white;
+        }
+
+        .control-btn svg {
+            width: 14px;
+            height: 14px;
+        }
+
+        .stream-btn.active {
+            background: var(--accent-secondary);
+            border-color: var(--accent-secondary);
+        }
+
+        .train-btn.active {
+            background: var(--accent-warning);
+            border-color: var(--accent-warning);
+            animation: trainPulse 1.5s ease-in-out infinite;
+        }
+
+        @keyframes trainPulse {
+            0%, 100% { box-shadow: 0 0 0 0 rgba(255, 193, 7, 0.4); }
+            50% { box-shadow: 0 0 0 6px rgba(255, 193, 7, 0); }
+        }
+
+        .monitor-btn.active {
+            background: var(--accent-primary);
+            border-color: var(--accent-primary);
+        }
+
+        /* Training Duration Menu */
+        .train-menu {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            z-index: 100;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-primary);
+            border-radius: var(--radius-md);
+            padding: 8px 0;
+            min-width: 160px;
+            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+        }
+
+        .train-menu-header {
+            padding: 8px 12px;
+            font-size: 10px;
+            font-weight: 600;
+            color: var(--text-tertiary);
+            text-transform: uppercase;
+            border-bottom: 1px solid var(--border-primary);
+            margin-bottom: 4px;
+        }
+
+        .train-menu button {
+            display: block;
+            width: 100%;
+            padding: 8px 12px;
+            text-align: left;
+            background: none;
+            border: none;
+            color: var(--text-secondary);
+            font-size: 12px;
+            cursor: pointer;
+            transition: background 0.15s ease;
+        }
+
+        .train-menu button:hover {
+            background: var(--bg-hover);
+            color: var(--text-primary);
+        }
+
+        /* State Badge */
+        .state-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            padding: 2px 8px;
+            border-radius: 10px;
+            font-size: 10px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .state-badge[data-state="idle"] {
+            background: var(--bg-tertiary);
+            color: var(--text-tertiary);
+        }
+
+        .state-badge[data-state="streaming"] {
+            background: rgba(0, 200, 83, 0.15);
+            color: var(--accent-secondary);
+        }
+
+        .state-badge[data-state="training"] {
+            background: rgba(255, 193, 7, 0.15);
+            color: var(--accent-warning);
+            animation: badgePulse 1.5s ease-in-out infinite;
+        }
+
+        @keyframes badgePulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.6; }
+        }
+
+        .state-badge[data-state="standby"] {
+            background: rgba(123, 97, 255, 0.15);
+            color: var(--accent-primary);
+        }
+
+        .state-badge[data-state="monitoring"] {
+            background: rgba(0, 200, 83, 0.15);
+            color: var(--accent-secondary);
+        }
+
+        .state-badge[data-state="error"] {
+            background: rgba(255, 82, 82, 0.15);
+            color: var(--accent-danger);
+        }
+
+        /* Trained States Badge */
+        .trained-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            padding: 2px 8px;
+            border-radius: 10px;
+            font-size: 10px;
+            font-weight: 500;
+            background: rgba(123, 97, 255, 0.15);
+            color: var(--accent-primary);
+        }
+
+        /* State Overlay */
+        .state-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(19, 23, 34, 0.85);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 10;
+            border-radius: 4px;
+        }
+
+        .state-overlay.hidden {
+            display: none;
+        }
+
+        .state-message {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 8px;
+            text-align: center;
+        }
+
+        .state-icon {
+            color: var(--text-tertiary);
+            opacity: 0.7;
+        }
+
+        .state-text {
+            font-size: 12px;
+            font-weight: 500;
+            color: var(--text-secondary);
+        }
+
+        /* Training Prompt Bubble */
+        .training-prompt {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+        }
+
+        .prompt-bubble {
+            position: relative;
+            background: var(--accent-primary);
+            color: white;
+            padding: 10px 16px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 500;
+            white-space: nowrap;
+            box-shadow: 0 4px 12px rgba(123, 97, 255, 0.4);
+        }
+
+        .prompt-bubble.pulse {
+            animation: bubblePulse 2s ease-in-out infinite;
+        }
+
+        @keyframes bubblePulse {
+            0%, 100% {
+                transform: scale(1);
+                box-shadow: 0 4px 12px rgba(123, 97, 255, 0.4);
+            }
+            50% {
+                transform: scale(1.05);
+                box-shadow: 0 6px 20px rgba(123, 97, 255, 0.6);
+            }
+        }
+
+        .prompt-arrow {
+            position: absolute;
+            top: -8px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 0;
+            height: 0;
+            border-left: 8px solid transparent;
+            border-right: 8px solid transparent;
+            border-bottom: 8px solid var(--accent-primary);
+        }
+
+        /* Training Progress Bar */
+        .training-progress {
+            width: 100%;
+            margin-top: 8px;
+        }
+
+        .training-progress-bar {
+            height: 4px;
+            background: var(--bg-tertiary);
+            border-radius: 2px;
+            overflow: hidden;
+        }
+
+        .training-progress-fill {
+            height: 100%;
+            background: var(--accent-warning);
+            border-radius: 2px;
+            transition: width 0.5s ease;
+        }
+
+        .training-progress-text {
+            font-size: 10px;
+            color: var(--text-tertiary);
+            text-align: center;
+            margin-top: 4px;
+        }
+
+        /* Match Score - No Data State */
+        .match-summary.no-data .gauge-fill {
+            background: var(--bg-tertiary) !important;
+        }
+
+        .match-summary.no-data .gauge-value {
+            color: var(--text-tertiary) !important;
+        }
+
+        /* Modal Improvements */
+        .modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.7);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 10000;
+        }
+
+        .modal-content {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-primary);
+            border-radius: var(--radius-lg);
+            padding: 24px;
+            min-width: 320px;
+            max-width: 480px;
+        }
+
+        .modal-content h3 {
+            margin: 0 0 12px 0;
+            font-size: 18px;
+            font-weight: 600;
+        }
+
+        .modal-content p {
+            color: var(--text-secondary);
+            margin-bottom: 16px;
+            font-size: 14px;
+        }
+
+        .modal-actions {
+            display: flex;
+            gap: 8px;
+            justify-content: flex-end;
+            margin-top: 20px;
+        }
+
+        .form-group {
+            margin-bottom: 16px;
+        }
+
+        .form-group label {
+            display: block;
+            font-size: 12px;
+            font-weight: 500;
+            color: var(--text-secondary);
+            margin-bottom: 6px;
+        }
+
+        .form-select {
+            width: 100%;
+            padding: 10px 12px;
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-primary);
+            border-radius: var(--radius-sm);
+            color: var(--text-primary);
+            font-size: 14px;
+        }
+
+        .form-select:focus {
+            outline: none;
+            border-color: var(--accent-primary);
+        }
     </style>
 </head>
 <body>
@@ -978,16 +1343,53 @@
                 <div class="dashboard-grid" id="dashboard-grid">
                     {% if groups %}
                         {% for group in groups %}
-                        <div class="grid-panel panel-4x2" data-group="{{ group.name }}" data-size="4x2" data-channels="{{ group.channels | join(',') }}">
+                        <div class="grid-panel panel-4x2" data-group="{{ group.name }}" data-size="4x2" data-channels="{{ group.channels | join(',') }}" data-state="{{ group.state }}">
                             <div class="panel-header">
                                 <div class="panel-title">
                                     <span class="color-dot" style="background: {{ group.color }};"></span>
                                     {{ group.name }}
-                                    <span class="status-badge {{ group.status }}" style="font-size: 10px; padding: 2px 6px;">
-                                        {{ group.status }}
+                                    <span class="state-badge" id="state-badge-{{ group.name }}" data-state="{{ group.state }}">
+                                        {{ group.state }}
                                     </span>
+                                    {% if group.trained_states > 0 %}
+                                    <span class="trained-badge" title="Trained states: {{ group.trained_states }}">
+                                        {{ group.trained_states }} states
+                                    </span>
+                                    {% endif %}
                                 </div>
-                                <div class="panel-actions">
+                                <div class="panel-controls">
+                                    <!-- State Control Buttons -->
+                                    <div class="control-group" id="controls-{{ group.name }}">
+                                        <button class="control-btn stream-btn" id="stream-btn-{{ group.name }}" onclick="toggleStream('{{ group.name }}')" title="Start/Stop Streaming">
+                                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                                <polygon points="5 3 19 12 5 21 5 3"></polygon>
+                                            </svg>
+                                            <span>Stream</span>
+                                        </button>
+                                        <button class="control-btn train-btn" id="train-btn-{{ group.name }}" onclick="showTrainMenu('{{ group.name }}')" title="Train Model" disabled>
+                                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                                <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"></path>
+                                            </svg>
+                                            <span>Train</span>
+                                        </button>
+                                        <button class="control-btn monitor-btn" id="monitor-btn-{{ group.name }}" onclick="toggleMonitoring('{{ group.name }}')" title="Start/Stop Monitoring" disabled>
+                                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                                <circle cx="12" cy="12" r="10"></circle>
+                                                <polyline points="12 6 12 12 16 14"></polyline>
+                                            </svg>
+                                            <span>Monitor</span>
+                                        </button>
+                                    </div>
+                                    <!-- Training Menu (hidden by default) -->
+                                    <div class="train-menu" id="train-menu-{{ group.name }}" style="display: none;">
+                                        <div class="train-menu-header">Training Duration</div>
+                                        <button onclick="startTraining('{{ group.name }}', 30)">Quick (30s)</button>
+                                        <button onclick="startTraining('{{ group.name }}', 60)">Standard (60s)</button>
+                                        <button onclick="startTraining('{{ group.name }}', 120)">Extended (2min)</button>
+                                        <button onclick="startTraining('{{ group.name }}', 0)">Manual Stop</button>
+                                    </div>
+                                    <span class="panel-separator"></span>
+                                    <!-- View Controls -->
                                     <button class="panel-action-btn view-toggle active" data-view="charts" onclick="toggleView('{{ group.name }}', 'charts')" title="Stacked Charts">
                                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                             <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>
@@ -1023,30 +1425,16 @@
                                             <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"></path>
                                         </svg>
                                     </button>
-                                    <span class="panel-separator"></span>
-                                    <button class="panel-action-btn" onclick="togglePanelFullscreen('{{ group.name }}')" title="Fullscreen">
-                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                            <polyline points="15 3 21 3 21 9"></polyline>
-                                            <polyline points="9 21 3 21 3 15"></polyline>
-                                            <line x1="21" y1="3" x2="14" y2="10"></line>
-                                            <line x1="3" y1="21" x2="10" y2="14"></line>
-                                        </svg>
-                                    </button>
-                                    <button class="panel-action-btn" onclick="startTraining('{{ group.name }}', {{ group.trained_states }})" title="Train Model">
-                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                            <polygon points="5 3 19 12 5 21 5 3"></polygon>
-                                        </svg>
-                                    </button>
                                 </div>
                             </div>
                             <div class="panel-content">
                                 <!-- Stacked Charts View -->
                                 <div class="stacked-charts-view" id="charts-view-{{ group.name }}">
                                     <!-- SINGLE Anomaly Timeline Sparkline -->
-                                    <div class="anomaly-timeline-container">
+                                    <div class="anomaly-timeline-container" id="anomaly-container-{{ group.name }}">
                                         <div class="anomaly-timeline-header">
                                             <span class="anomaly-label">Anomaly Timeline</span>
-                                            <span class="anomaly-legend">
+                                            <span class="anomaly-legend" id="anomaly-legend-{{ group.name }}">
                                                 <span class="legend-item normal"><span class="dot"></span>Normal</span>
                                                 <span class="legend-item warning"><span class="dot"></span>Warning</span>
                                                 <span class="legend-item anomaly"><span class="dot"></span>Anomaly</span>
@@ -1054,6 +1442,26 @@
                                         </div>
                                         <div class="anomaly-sparkline-wrapper">
                                             <canvas id="anomaly-spark-{{ group.name }}" height="60"></canvas>
+                                            <!-- State Overlay - shown when not monitoring -->
+                                            <div class="state-overlay" id="state-overlay-{{ group.name }}">
+                                                <div class="state-message">
+                                                    <span class="state-icon">
+                                                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                                            <circle cx="12" cy="12" r="10"></circle>
+                                                            <line x1="12" y1="8" x2="12" y2="12"></line>
+                                                            <line x1="12" y1="16" x2="12.01" y2="16"></line>
+                                                        </svg>
+                                                    </span>
+                                                    <span class="state-text" id="state-text-{{ group.name }}">Click Stream to begin</span>
+                                                </div>
+                                                <!-- Training prompt bubble -->
+                                                <div class="training-prompt" id="training-prompt-{{ group.name }}" style="display: none;">
+                                                    <div class="prompt-bubble pulse">
+                                                        <span class="prompt-arrow"></span>
+                                                        Train model first before monitoring
+                                                    </div>
+                                                </div>
+                                            </div>
                                         </div>
                                     </div>
 
@@ -1202,13 +1610,14 @@
         let anomalyCharts = {};  // Anomaly timeline charts: {groupName: chart}
         let channelData = {};  // Historical data: {groupName: {channelName: []}}
         let anomalyData = {};  // Confidence history: {groupName: []}
+        let groupStates = {};  // Current state for each group: {groupName: 'idle'|'streaming'|'training'|'standby'|'monitoring'|'error'}
+        let trainingTimers = {};  // Training countdown timers: {groupName: {timer, endTime, duration}}
         let editMode = false;
         let currentTrainingGroup = null;
         let isRetraining = false;
         let lastDataUpdate = {};
         let updateCount = 0;
         let wsConnected = false;
-        let fallbackSimulationInterval = null;
         let timeRangeSeconds = 300;  // Default 5 minutes
         let refreshIntervalMs = 2000;  // Default 2 seconds
         let resizingPanel = null;
@@ -1239,11 +1648,296 @@
         // Refresh Interval Control
         function setRefreshInterval(ms) {
             refreshIntervalMs = parseInt(ms);
-            stopFallbackSimulation();
-            if (refreshIntervalMs > 0 && !wsConnected) {
-                startFallbackSimulation();
-            }
             console.log(`Refresh interval set to ${ms}ms`);
+        }
+
+        // ========================================
+        // 4-STATE SYSTEM MANAGEMENT
+        // ========================================
+
+        // Toggle streaming for a group
+        async function toggleStream(groupName) {
+            const currentState = groupStates[groupName] || 'idle';
+
+            if (currentState === 'idle' || currentState === 'error') {
+                // Start streaming
+                try {
+                    const response = await fetch(`/api/groups/${encodeURIComponent(groupName)}/start-stream`, {
+                        method: 'POST'
+                    });
+                    if (response.ok) {
+                        updateGroupState(groupName, 'streaming');
+                        showToast('Streaming Started', `Data streaming enabled for ${groupName}`, 'success', 3000);
+                    } else {
+                        const error = await response.json();
+                        showToast('Error', error.detail || 'Failed to start streaming', 'warning', 5000);
+                    }
+                } catch (e) {
+                    console.error('Error starting stream:', e);
+                    showToast('Error', 'Failed to start streaming', 'warning', 5000);
+                }
+            } else {
+                // Stop streaming (returns to idle)
+                try {
+                    const response = await fetch(`/api/groups/${encodeURIComponent(groupName)}/stop-stream`, {
+                        method: 'POST'
+                    });
+                    if (response.ok) {
+                        updateGroupState(groupName, 'idle');
+                        showToast('Streaming Stopped', `Data streaming disabled for ${groupName}`, 'info', 3000);
+                    }
+                } catch (e) {
+                    console.error('Error stopping stream:', e);
+                }
+            }
+        }
+
+        // Show training menu with duration options
+        function showTrainMenu(groupName) {
+            // Hide any open menus first
+            document.querySelectorAll('.train-menu').forEach(m => m.style.display = 'none');
+
+            const menu = document.getElementById(`train-menu-${groupName}`);
+            if (menu) {
+                menu.style.display = 'block';
+
+                // Close menu when clicking outside
+                const closeMenu = (e) => {
+                    if (!e.target.closest('.train-menu') && !e.target.closest('.train-btn')) {
+                        menu.style.display = 'none';
+                        document.removeEventListener('click', closeMenu);
+                    }
+                };
+                setTimeout(() => document.addEventListener('click', closeMenu), 10);
+            }
+        }
+
+        // Start training with specific duration (0 = manual stop)
+        async function startTraining(groupName, duration) {
+            // Hide the menu
+            const menu = document.getElementById(`train-menu-${groupName}`);
+            if (menu) menu.style.display = 'none';
+
+            try {
+                const response = await fetch(`/api/groups/${encodeURIComponent(groupName)}/start-training`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ duration: duration })
+                });
+
+                if (response.ok) {
+                    updateGroupState(groupName, 'training');
+
+                    // Setup training timer if duration specified
+                    if (duration > 0) {
+                        startTrainingTimer(groupName, duration);
+                        showToast('Training Started', `Learning patterns for ${duration}s`, 'success', 3000);
+                    } else {
+                        showToast('Training Started', 'Click Train again to stop', 'success', 3000);
+                    }
+                } else {
+                    const error = await response.json();
+                    showToast('Error', error.detail || 'Failed to start training', 'warning', 5000);
+                }
+            } catch (e) {
+                console.error('Error starting training:', e);
+                showToast('Error', 'Failed to start training', 'warning', 5000);
+            }
+        }
+
+        // Stop training manually
+        async function stopTraining(groupName) {
+            try {
+                const response = await fetch(`/api/groups/${encodeURIComponent(groupName)}/stop-training`, {
+                    method: 'POST'
+                });
+
+                if (response.ok) {
+                    clearTrainingTimer(groupName);
+                    updateGroupState(groupName, 'standby');
+                    showToast('Training Complete', 'Model is ready for monitoring', 'success', 3000);
+                }
+            } catch (e) {
+                console.error('Error stopping training:', e);
+            }
+        }
+
+        // Toggle monitoring for a group
+        async function toggleMonitoring(groupName) {
+            const currentState = groupStates[groupName];
+
+            if (currentState === 'standby') {
+                // Start monitoring
+                try {
+                    const response = await fetch(`/api/groups/${encodeURIComponent(groupName)}/start-monitoring`, {
+                        method: 'POST'
+                    });
+                    if (response.ok) {
+                        updateGroupState(groupName, 'monitoring');
+                        showToast('Monitoring Active', `Anomaly detection enabled for ${groupName}`, 'success', 3000);
+                    }
+                } catch (e) {
+                    console.error('Error starting monitoring:', e);
+                }
+            } else if (currentState === 'monitoring') {
+                // Stop monitoring (return to standby)
+                try {
+                    const response = await fetch(`/api/groups/${encodeURIComponent(groupName)}/stop-monitoring`, {
+                        method: 'POST'
+                    });
+                    if (response.ok) {
+                        updateGroupState(groupName, 'standby');
+                        showToast('Monitoring Paused', 'Anomaly detection paused', 'info', 3000);
+                    }
+                } catch (e) {
+                    console.error('Error stopping monitoring:', e);
+                }
+            }
+        }
+
+        // Training timer management
+        function startTrainingTimer(groupName, duration) {
+            clearTrainingTimer(groupName);
+
+            const endTime = Date.now() + (duration * 1000);
+
+            trainingTimers[groupName] = {
+                duration: duration,
+                endTime: endTime,
+                timer: setInterval(() => {
+                    const remaining = Math.max(0, Math.ceil((endTime - Date.now()) / 1000));
+                    updateTrainingProgress(groupName, duration - remaining, duration);
+
+                    if (remaining <= 0) {
+                        clearTrainingTimer(groupName);
+                        // Training auto-completes
+                        stopTraining(groupName);
+                    }
+                }, 500)
+            };
+        }
+
+        function clearTrainingTimer(groupName) {
+            if (trainingTimers[groupName]) {
+                clearInterval(trainingTimers[groupName].timer);
+                delete trainingTimers[groupName];
+            }
+        }
+
+        function updateTrainingProgress(groupName, elapsed, total) {
+            const stateText = document.getElementById(`state-text-${groupName}`);
+            if (stateText && groupStates[groupName] === 'training') {
+                const remaining = Math.max(0, total - elapsed);
+                stateText.textContent = `Training... ${remaining}s remaining`;
+            }
+        }
+
+        // Update UI based on group state
+        function updateGroupState(groupName, newState) {
+            groupStates[groupName] = newState;
+
+            // Update state badge
+            const badge = document.getElementById(`state-badge-${groupName}`);
+            if (badge) {
+                badge.dataset.state = newState;
+                badge.textContent = newState;
+            }
+
+            // Update panel data-state
+            const panel = document.querySelector(`[data-group="${groupName}"]`);
+            if (panel) {
+                panel.dataset.state = newState;
+            }
+
+            // Update control buttons
+            const streamBtn = document.getElementById(`stream-btn-${groupName}`);
+            const trainBtn = document.getElementById(`train-btn-${groupName}`);
+            const monitorBtn = document.getElementById(`monitor-btn-${groupName}`);
+
+            if (streamBtn) {
+                const isStreaming = ['streaming', 'training', 'standby', 'monitoring'].includes(newState);
+                streamBtn.classList.toggle('active', isStreaming);
+                streamBtn.querySelector('span').textContent = isStreaming ? 'Stop' : 'Stream';
+            }
+
+            if (trainBtn) {
+                const canTrain = ['streaming', 'standby', 'monitoring'].includes(newState);
+                const isTraining = newState === 'training';
+                trainBtn.disabled = !canTrain && !isTraining;
+                trainBtn.classList.toggle('active', isTraining);
+                trainBtn.querySelector('span').textContent = isTraining ? 'Stop' : 'Train';
+
+                // If training, clicking should stop training
+                if (isTraining) {
+                    trainBtn.onclick = () => stopTraining(groupName);
+                } else {
+                    trainBtn.onclick = () => showTrainMenu(groupName);
+                }
+            }
+
+            if (monitorBtn) {
+                const canMonitor = ['standby', 'monitoring'].includes(newState);
+                const isMonitoring = newState === 'monitoring';
+                monitorBtn.disabled = !canMonitor;
+                monitorBtn.classList.toggle('active', isMonitoring);
+                monitorBtn.querySelector('span').textContent = isMonitoring ? 'Stop' : 'Monitor';
+            }
+
+            // Update state overlay on anomaly timeline
+            const overlay = document.getElementById(`state-overlay-${groupName}`);
+            const stateText = document.getElementById(`state-text-${groupName}`);
+            const trainingPrompt = document.getElementById(`training-prompt-${groupName}`);
+            const matchSummary = panel?.querySelector('.match-summary');
+
+            if (overlay && stateText) {
+                switch (newState) {
+                    case 'idle':
+                        overlay.classList.remove('hidden');
+                        stateText.textContent = 'Click Stream to begin';
+                        if (trainingPrompt) trainingPrompt.style.display = 'none';
+                        if (matchSummary) matchSummary.classList.add('no-data');
+                        break;
+                    case 'streaming':
+                        overlay.classList.remove('hidden');
+                        stateText.textContent = 'No trained model - Train to detect anomalies';
+                        if (trainingPrompt) trainingPrompt.style.display = 'block';
+                        if (matchSummary) matchSummary.classList.add('no-data');
+                        break;
+                    case 'training':
+                        overlay.classList.remove('hidden');
+                        stateText.textContent = 'Training in progress...';
+                        if (trainingPrompt) trainingPrompt.style.display = 'none';
+                        if (matchSummary) matchSummary.classList.add('no-data');
+                        break;
+                    case 'standby':
+                        overlay.classList.remove('hidden');
+                        stateText.textContent = 'Model ready - Click Monitor to start';
+                        if (trainingPrompt) trainingPrompt.style.display = 'none';
+                        if (matchSummary) matchSummary.classList.add('no-data');
+                        break;
+                    case 'monitoring':
+                        overlay.classList.add('hidden');
+                        if (trainingPrompt) trainingPrompt.style.display = 'none';
+                        if (matchSummary) matchSummary.classList.remove('no-data');
+                        break;
+                    case 'error':
+                        overlay.classList.remove('hidden');
+                        stateText.textContent = 'Error - Check data source connection';
+                        if (trainingPrompt) trainingPrompt.style.display = 'none';
+                        if (matchSummary) matchSummary.classList.add('no-data');
+                        break;
+                }
+            }
+        }
+
+        // Initialize group states from server
+        async function initializeGroupStates() {
+            document.querySelectorAll('.grid-panel[data-group]').forEach(panel => {
+                const groupName = panel.dataset.group;
+                const initialState = panel.dataset.state || 'idle';
+                groupStates[groupName] = initialState;
+                updateGroupState(groupName, initialState);
+            });
         }
 
         // WebSocket connection
@@ -1255,7 +1949,6 @@
                 console.log('WebSocket connected');
                 wsConnected = true;
                 updateConnectionStatus(true);
-                stopFallbackSimulation();
                 // Subscribe to all groups
                 document.querySelectorAll('.grid-panel[data-group]').forEach(panel => {
                     ws.send(JSON.stringify({ type: 'subscribe', group: panel.dataset.group }));
@@ -1266,7 +1959,6 @@
                 console.log('WebSocket disconnected');
                 wsConnected = false;
                 updateConnectionStatus(false);
-                startFallbackSimulation();
                 setTimeout(connectWebSocket, 3000);
             };
 
@@ -1285,23 +1977,98 @@
         }
 
         function handleWebSocketMessage(message) {
+            const data = message.data || {};
+            const groupName = data.group;
+
             switch (message.type) {
                 case 'data_update':
-                    updateGroupData(message.data);
+                    updateGroupData(data);
                     break;
+
+                // State change events from server
+                case 'state_change':
+                case 'stream_started':
+                case 'stream_stopped':
+                case 'monitoring_started':
+                case 'monitoring_stopped':
+                    if (groupName && data.state) {
+                        updateGroupState(groupName, data.state);
+                        if (data.trained_states !== undefined) {
+                            updateTrainedStatesDisplay(groupName, data.trained_states);
+                        }
+                    }
+                    break;
+
                 case 'training_started':
-                    updateGroupStatus(message.data.group, 'training');
+                    if (groupName) {
+                        updateGroupState(groupName, 'training');
+                    }
                     break;
+
+                case 'training_progress':
+                    // Update training progress from server
+                    if (groupName) {
+                        const stateText = document.getElementById(`state-text-${groupName}`);
+                        if (stateText) {
+                            const remaining = data.remaining || 0;
+                            const states = data.trained_states || 0;
+                            stateText.textContent = `Training... ${remaining}s remaining (${states} states learned)`;
+                        }
+                    }
+                    break;
+
                 case 'training_stopped':
                 case 'training_complete':
-                    updateGroupStatus(message.data.group, 'monitoring');
+                    if (groupName) {
+                        clearTrainingTimer(groupName);
+                        updateGroupState(groupName, 'standby');
+                        if (data.trained_states) {
+                            updateTrainedStatesDisplay(groupName, data.trained_states);
+                        }
+                    }
                     break;
+
                 case 'anomaly_detected':
-                    showAnomalyAlert(message.data);
+                    showAnomalyAlert(data);
                     break;
+
+                case 'error':
+                    if (groupName) {
+                        updateGroupState(groupName, 'error');
+                    }
+                    showToast('Error', data.message || 'An error occurred', 'warning', 5000);
+                    break;
+
                 case 'pong':
                     // Keep-alive response
                     break;
+
+                default:
+                    console.log('Unknown message type:', message.type, data);
+            }
+        }
+
+        function updateTrainedStatesDisplay(groupName, count) {
+            const panel = document.querySelector(`[data-group="${groupName}"]`);
+            if (!panel) return;
+
+            let trainedBadge = panel.querySelector('.trained-badge');
+            if (count > 0) {
+                if (!trainedBadge) {
+                    // Create trained badge
+                    const title = panel.querySelector('.panel-title');
+                    if (title) {
+                        trainedBadge = document.createElement('span');
+                        trainedBadge.className = 'trained-badge';
+                        title.appendChild(trainedBadge);
+                    }
+                }
+                if (trainedBadge) {
+                    trainedBadge.textContent = `${count} states`;
+                    trainedBadge.title = `Trained states: ${count}`;
+                }
+            } else if (trainedBadge) {
+                trainedBadge.remove();
             }
         }
 
@@ -2016,72 +2783,18 @@
             updateCount = 0;
         }
 
-        // Simulate data for demo (fallback when WebSocket disconnected)
-        function simulateData() {
-            document.querySelectorAll('.grid-panel[data-group]').forEach(panel => {
-                const groupName = panel.dataset.group;
-                // Simulate varying confidence - lower as RUL approaches 0
-                const confidence = 60 + Math.random() * 35;
-
-                // Get channels from data attribute
-                const channelsAttr = panel.dataset.channels || '';
-                const channels = channelsAttr.split(',').filter(c => c);
-
-                // Simulate channel values
-                const channelValues = {};
-                channels.forEach(channel => {
-                    // Generate realistic values for each channel type
-                    let value;
-                    if (channel === 'cycle') {
-                        value = 100 + Math.random() * 90;
-                    } else if (channel.startsWith('T')) {
-                        value = 600 + Math.random() * 100;  // Temperature
-                    } else if (channel.startsWith('P')) {
-                        value = 20 + Math.random() * 40;    // Pressure
-                    } else if (channel.startsWith('N')) {
-                        value = 2300 + Math.random() * 100; // Speed
-                    } else if (channel === 'RUL') {
-                        value = Math.floor(50 + Math.random() * 150);
-                    } else {
-                        value = Math.random() * 100;
-                    }
-                    channelValues[channel] = parseFloat(value.toFixed(2));
-                });
-
-                updateGroupData({
-                    group: groupName,
-                    confidence: confidence,
-                    channel_values: channelValues
-                });
-            });
-        }
-
-        function startFallbackSimulation() {
-            if (!fallbackSimulationInterval && refreshIntervalMs > 0) {
-                console.log(`Starting fallback simulation at ${refreshIntervalMs}ms interval`);
-                fallbackSimulationInterval = setInterval(simulateData, refreshIntervalMs);
-            }
-        }
-
-        function stopFallbackSimulation() {
-            if (fallbackSimulationInterval) {
-                console.log('Stopping fallback simulation');
-                clearInterval(fallbackSimulationInterval);
-                fallbackSimulationInterval = null;
-            }
-        }
+        // NOTE: Simulation code removed - only real data from ML core is displayed
+        // The 4-state system ensures users know when they're receiving real analysis
 
         // Initialize
         document.addEventListener('DOMContentLoaded', () => {
             loadLayout();
             initCharts();
+            initializeGroupStates();  // Initialize 4-state UI
             connectWebSocket();
 
             // Update rate display
             setInterval(updateRateDisplay, 5000);
-
-            // Start fallback simulation initially (will be stopped when WS connects)
-            startFallbackSimulation();
 
             // Close modals on outside click
             document.querySelectorAll('.modal').forEach(modal => {
@@ -2096,6 +2809,13 @@
             document.addEventListener('click', (e) => {
                 if (!e.target.closest('.panel-action-btn') && !e.target.closest('.size-selector')) {
                     document.querySelectorAll('.size-selector').forEach(s => s.classList.remove('visible'));
+                }
+            });
+
+            // Close train menus on outside click
+            document.addEventListener('click', (e) => {
+                if (!e.target.closest('.train-menu') && !e.target.closest('.train-btn')) {
+                    document.querySelectorAll('.train-menu').forEach(m => m.style.display = 'none');
                 }
             });
         });
