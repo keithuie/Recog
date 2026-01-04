@@ -1882,22 +1882,40 @@
         // Toggle monitoring for a group
         async function toggleMonitoring(groupName) {
             const currentState = groupStates[groupName];
+            console.log(`[Monitor] Toggle monitoring for ${groupName}, current state: ${currentState}`);
 
             if (currentState === 'standby') {
                 // Start monitoring
+                showLoadingState(groupName, 'Starting monitoring...');
                 try {
                     const response = await fetch(`/api/groups/${encodeURIComponent(groupName)}/start-monitoring`, {
                         method: 'POST'
                     });
+                    console.log(`[Monitor] Response status: ${response.status}`);
+
                     if (response.ok) {
                         updateGroupState(groupName, 'monitoring');
                         showToast('Monitoring Active', `Anomaly detection enabled for ${groupName}`, 'success', 3000);
+                    } else {
+                        let errorMessage = 'Failed to start monitoring';
+                        try {
+                            const errorData = await response.json();
+                            console.log(`[Monitor] Error response:`, errorData);
+                            errorMessage = errorData.detail || JSON.stringify(errorData);
+                        } catch (e) {
+                            errorMessage = `HTTP ${response.status}`;
+                        }
+                        updateGroupState(groupName, 'standby');
+                        showToast('Monitor Error', String(errorMessage), 'warning', 5000);
                     }
                 } catch (e) {
-                    console.error('Error starting monitoring:', e);
+                    console.error('[Monitor] Network error:', e);
+                    updateGroupState(groupName, 'standby');
+                    showToast('Monitor Error', `Network error: ${e.message}`, 'warning', 5000);
                 }
             } else if (currentState === 'monitoring') {
                 // Stop monitoring (return to standby)
+                showLoadingState(groupName, 'Stopping monitoring...');
                 try {
                     const response = await fetch(`/api/groups/${encodeURIComponent(groupName)}/stop-monitoring`, {
                         method: 'POST'
@@ -1905,10 +1923,22 @@
                     if (response.ok) {
                         updateGroupState(groupName, 'standby');
                         showToast('Monitoring Paused', 'Anomaly detection paused', 'info', 3000);
+                    } else {
+                        let errorMessage = 'Failed to stop monitoring';
+                        try {
+                            const errorData = await response.json();
+                            errorMessage = errorData.detail || JSON.stringify(errorData);
+                        } catch (e) {
+                            errorMessage = `HTTP ${response.status}`;
+                        }
+                        showToast('Monitor Error', String(errorMessage), 'warning', 5000);
                     }
                 } catch (e) {
-                    console.error('Error stopping monitoring:', e);
+                    console.error('[Monitor] Error stopping monitoring:', e);
                 }
+            } else {
+                console.log(`[Monitor] Cannot toggle from state: ${currentState}`);
+                showToast('Cannot Monitor', `Must be in standby state. Current: ${currentState}`, 'warning', 3000);
             }
         }
 

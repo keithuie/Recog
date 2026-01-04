@@ -504,18 +504,25 @@ async def stop_training(group_name: str):
 @app.post("/api/groups/{group_name}/start-monitoring")
 async def start_monitoring(group_name: str):
     """Start monitoring (STANDBY -> MONITORING)."""
+    print(f"[Monitor] Request to start monitoring for '{group_name}'")
+
     if group_name not in channel_groups:
-        raise HTTPException(status_code=404, detail="Group not found")
+        print(f"[Monitor] ERROR: Group '{group_name}' not found")
+        raise HTTPException(status_code=404, detail=f"Group '{group_name}' not found")
 
     group = channel_groups[group_name]
+    print(f"[Monitor] Group state: {group['state']}, trained_states: {group['trained_states']}")
 
     # Must have trained states to monitor
     if group["trained_states"] == 0:
+        print(f"[Monitor] ERROR: No trained states")
         raise HTTPException(status_code=400, detail="No trained states. Train the model first.")
 
-    # Must be in STANDBY to start monitoring
-    if group["state"] != GroupState.STANDBY:
-        raise HTTPException(status_code=400, detail=f"Must be in standby to monitor. Current state: {group['state']}")
+    # Can start monitoring from STANDBY or STREAMING (if already trained)
+    valid_states = [GroupState.STANDBY, GroupState.STREAMING]
+    if group["state"] not in valid_states:
+        print(f"[Monitor] ERROR: Invalid state '{group['state']}'")
+        raise HTTPException(status_code=400, detail=f"Cannot monitor from state '{group['state']}'. Must be standby or streaming.")
 
     group["state"] = GroupState.MONITORING
 
