@@ -1149,6 +1149,38 @@
             color: var(--text-tertiary) !important;
         }
 
+        /* Loading Spinner */
+        .loading-spinner {
+            width: 40px;
+            height: 40px;
+            border: 3px solid var(--bg-tertiary);
+            border-top-color: var(--accent-primary);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .state-overlay.loading .state-icon {
+            display: none;
+        }
+
+        .state-overlay.loading .loading-spinner {
+            display: block;
+        }
+
+        .state-overlay .loading-spinner {
+            display: none;
+        }
+
+        /* Panel loading state */
+        .grid-panel.loading .stacked-charts-container {
+            opacity: 0.3;
+            pointer-events: none;
+        }
+
         /* Modal Improvements */
         .modal {
             position: fixed;
@@ -1459,6 +1491,7 @@
                                             <!-- State Overlay - shown when not monitoring -->
                                             <div class="state-overlay" id="state-overlay-{{ group.name }}">
                                                 <div class="state-message">
+                                                    <div class="loading-spinner"></div>
                                                     <span class="state-icon">
                                                         <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                                             <circle cx="12" cy="12" r="10"></circle>
@@ -1576,28 +1609,6 @@
         Exit Fullscreen (Esc)
     </button>
 
-    <!-- Training Modal -->
-    <div id="training-modal" class="modal" style="display: none;">
-        <div class="modal-content">
-            <h3 id="training-modal-title">Start Training</h3>
-            <p id="training-modal-desc">Select training duration for learning normal patterns:</p>
-            <div class="form-group">
-                <label>Duration</label>
-                <select id="training-duration" class="form-select">
-                    <option value="30">30 seconds</option>
-                    <option value="60" selected>1 minute</option>
-                    <option value="120">2 minutes</option>
-                    <option value="300">5 minutes</option>
-                    <option value="600">10 minutes</option>
-                </select>
-            </div>
-            <div class="modal-actions">
-                <button class="btn btn-secondary" onclick="closeModal()">Cancel</button>
-                <button class="btn btn-primary" id="confirm-training-btn" onclick="confirmTraining()">Start</button>
-            </div>
-        </div>
-    </div>
-
     <!-- Details Modal -->
     <div id="details-modal" class="modal" style="display: none;">
         <div class="modal-content" style="max-width: 600px;">
@@ -1667,6 +1678,9 @@
             const currentState = groupStates[groupName] || 'idle';
 
             if (currentState === 'idle' || currentState === 'error') {
+                // Show loading state
+                showLoadingState(groupName, 'Starting data stream...');
+
                 // Start streaming
                 try {
                     const response = await fetch(`/api/groups/${encodeURIComponent(groupName)}/start-stream`, {
@@ -1677,13 +1691,18 @@
                         showToast('Streaming Started', `Data streaming enabled for ${groupName}`, 'success', 3000);
                     } else {
                         const error = await response.json();
+                        updateGroupState(groupName, 'error');
                         showToast('Error', error.detail || 'Failed to start streaming', 'warning', 5000);
                     }
                 } catch (e) {
                     console.error('Error starting stream:', e);
+                    updateGroupState(groupName, 'error');
                     showToast('Error', 'Failed to start streaming', 'warning', 5000);
                 }
             } else {
+                // Show loading state
+                showLoadingState(groupName, 'Stopping stream...');
+
                 // Stop streaming (returns to idle)
                 try {
                     const response = await fetch(`/api/groups/${encodeURIComponent(groupName)}/stop-stream`, {
@@ -1695,7 +1714,39 @@
                     }
                 } catch (e) {
                     console.error('Error stopping stream:', e);
+                    updateGroupState(groupName, currentState); // Restore state
                 }
+            }
+        }
+
+        // Show loading state with spinner
+        function showLoadingState(groupName, message) {
+            const overlay = document.getElementById(`state-overlay-${groupName}`);
+            const stateText = document.getElementById(`state-text-${groupName}`);
+            const panel = document.querySelector(`[data-group="${groupName}"]`);
+
+            if (overlay) {
+                overlay.classList.remove('hidden');
+                overlay.classList.add('loading');
+            }
+            if (stateText) {
+                stateText.textContent = message || 'Loading...';
+            }
+            if (panel) {
+                panel.classList.add('loading');
+            }
+        }
+
+        // Hide loading state
+        function hideLoadingState(groupName) {
+            const overlay = document.getElementById(`state-overlay-${groupName}`);
+            const panel = document.querySelector(`[data-group="${groupName}"]`);
+
+            if (overlay) {
+                overlay.classList.remove('loading');
+            }
+            if (panel) {
+                panel.classList.remove('loading');
             }
         }
 
@@ -1708,6 +1759,12 @@
 
             const menu = document.getElementById(`train-menu-${groupName}`);
             if (!menu) return;
+
+            // Hide training prompt when train button is clicked
+            const trainingPrompt = document.getElementById(`training-prompt-${groupName}`);
+            if (trainingPrompt) {
+                trainingPrompt.style.display = 'none';
+            }
 
             // Toggle menu - if already open, close it
             if (menu.style.display === 'block') {
@@ -1735,9 +1792,15 @@
 
         // Start training with specific duration (0 = manual stop)
         async function startTraining(groupName, duration) {
-            // Hide the menu
+            // Hide the menu and training prompt
             const menu = document.getElementById(`train-menu-${groupName}`);
             if (menu) menu.style.display = 'none';
+
+            const trainingPrompt = document.getElementById(`training-prompt-${groupName}`);
+            if (trainingPrompt) trainingPrompt.style.display = 'none';
+
+            // Show loading state
+            showLoadingState(groupName, 'Starting training...');
 
             try {
                 const response = await fetch(`/api/groups/${encodeURIComponent(groupName)}/start-training`, {
@@ -1758,10 +1821,12 @@
                     }
                 } else {
                     const error = await response.json();
+                    updateGroupState(groupName, 'streaming'); // Restore to streaming state
                     showToast('Error', error.detail || 'Failed to start training', 'warning', 5000);
                 }
             } catch (e) {
                 console.error('Error starting training:', e);
+                updateGroupState(groupName, 'streaming'); // Restore to streaming state
                 showToast('Error', 'Failed to start training', 'warning', 5000);
             }
         }
@@ -1857,17 +1922,21 @@
         function updateGroupState(groupName, newState) {
             groupStates[groupName] = newState;
 
+            // Always remove loading state when state changes
+            hideLoadingState(groupName);
+
             // Update state badge
             const badge = document.getElementById(`state-badge-${groupName}`);
             if (badge) {
                 badge.dataset.state = newState;
-                badge.textContent = newState;
+                badge.textContent = newState.toUpperCase();
             }
 
             // Update panel data-state
             const panel = document.querySelector(`[data-group="${groupName}"]`);
             if (panel) {
                 panel.dataset.state = newState;
+                panel.classList.remove('loading');
             }
 
             // Update control buttons
@@ -2589,57 +2658,6 @@
         function resetLayout() {
             localStorage.removeItem('dashboardLayout');
             location.reload();
-        }
-
-        // Training
-        function startTraining(groupName, trainedStates) {
-            currentTrainingGroup = groupName;
-            isRetraining = trainedStates > 0;
-
-            const title = document.getElementById('training-modal-title');
-            const desc = document.getElementById('training-modal-desc');
-            const btn = document.getElementById('confirm-training-btn');
-
-            if (isRetraining) {
-                title.textContent = 'Re-Train Model?';
-                desc.innerHTML = '<strong style="color: var(--accent-warning);">Warning:</strong> This will replace the existing model.';
-                btn.textContent = 'Re-Train';
-            } else {
-                title.textContent = 'Start Training';
-                desc.textContent = 'Select training duration:';
-                btn.textContent = 'Start';
-            }
-
-            document.getElementById('training-modal').style.display = 'flex';
-        }
-
-        function closeModal() {
-            document.getElementById('training-modal').style.display = 'none';
-        }
-
-        function confirmTraining() {
-            const duration = parseInt(document.getElementById('training-duration').value);
-            fetch('/api/training/start', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ group_name: currentTrainingGroup, duration })
-            }).then(() => {
-                closeModal();
-                updateGroupStatus(currentTrainingGroup, 'training');
-            });
-        }
-
-        function updateGroupStatus(groupName, status) {
-            const panel = document.querySelector(`[data-group="${groupName}"]`);
-            if (panel) {
-                const badge = panel.querySelector('.status-badge');
-                if (badge) {
-                    badge.className = `status-badge ${status}`;
-                    badge.textContent = status;
-                    badge.style.fontSize = '10px';
-                    badge.style.padding = '2px 6px';
-                }
-            }
         }
 
         // Details
