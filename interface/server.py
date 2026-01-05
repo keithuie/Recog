@@ -452,7 +452,7 @@ async def finish_training(group_name: str):
         actual_duration = group.get("training_duration", 0)
 
     # Try to stop ML training and get trained states count
-    trained_states = 0
+    trained_states = 1  # Default to 1 - training always produces at least one state
     try:
         async with aiohttp.ClientSession() as session:
             async with session.post(
@@ -462,11 +462,12 @@ async def finish_training(group_name: str):
             ) as response:
                 if response.status == 200:
                     result = await response.json()
-                    trained_states = result.get("trained_states", 1)
+                    trained_states = max(1, result.get("trained_states", 1))
                     print(f"[Training] ML service stopped training for {group_name}, {trained_states} states learned")
+                else:
+                    print(f"[Training] ML service returned {response.status}, using default trained_states=1")
     except Exception as e:
-        print(f"[Training] Could not stop ML training: {e}")
-        trained_states = 1  # Assume at least 1 state was learned
+        print(f"[Training] Could not stop ML training: {e}, using default trained_states=1")
 
     # Update group metadata
     group["state"] = GroupState.STANDBY
