@@ -84,13 +84,12 @@ class DataSourceStep(WizardStep):
         "USGS Earthquake Data (GeoJSON)": "https://earthquake.usgs.gov/fdsnws/event/1/query?format=geojson&limit=10",
     }
 
-    # Available sample datasets (NASA, etc.)
+    # Available sample datasets (NASA CMAPSS turbofan engine data)
     SAMPLE_DATASETS = {
-        "NASA Space Weather": {
-            "description": "Solar flux, plasma density, magnetic field, and geomagnetic indices",
-            "channels": ["solar_flux", "proton_density", "plasma_speed", "plasma_temp",
-                        "mag_field_bt", "mag_field_bz", "kp_index", "dst_index"],
-            "poll_interval": 5
+        "NASA CMAPSS Turbofan": {
+            "description": "Turbofan engine run-to-failure sensor data (temperatures, pressures, speeds)",
+            "channels": ["s_2", "s_3", "s_4", "s_7", "s_8", "s_9", "s_11", "s_12"],
+            "poll_interval": 1
         }
     }
 
@@ -249,8 +248,8 @@ class DataSourceStep(WizardStep):
         self.opcua_group.hide()
         self.content_layout.addWidget(self.opcua_group)
 
-        # NASA Sample Data configuration
-        self.sample_group = QGroupBox("NASA Sample Data")
+        # NASA CMAPSS Sample Data configuration
+        self.sample_group = QGroupBox("NASA CMAPSS Turbofan Data")
         sample_layout = QVBoxLayout(self.sample_group)
 
         # Dataset selection dropdown
@@ -278,8 +277,8 @@ class DataSourceStep(WizardStep):
         # Source name input
         name_form = QFormLayout()
         self.sample_name = QLineEdit()
-        self.sample_name.setPlaceholderText("NASA Space Weather Monitor")
-        self.sample_name.setText("NASA Space Weather")
+        self.sample_name.setPlaceholderText("Turbofan Engine Monitor")
+        self.sample_name.setText("NASA CMAPSS Turbofan")
         name_form.addRow("Source Name:", self.sample_name)
 
         self.sample_interval = QSpinBox()
@@ -316,8 +315,8 @@ class DataSourceStep(WizardStep):
 
         # Help text
         sample_help = QLabel(
-            "NASA sample data provides simulated space weather telemetry for testing "
-            "anomaly detection without needing a live data connection."
+            "NASA CMAPSS provides real turbofan engine run-to-failure data for testing "
+            "anomaly detection. Watch engines degrade over time and detect failures."
         )
         sample_help.setStyleSheet(f"color: {COLORS['text_tertiary']}; font-size: 11px;")
         sample_help.setWordWrap(True)

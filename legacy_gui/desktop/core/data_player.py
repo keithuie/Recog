@@ -534,149 +534,104 @@ class APIDataSource(DataSource):
             self._stop_event.wait(self.poll_interval)
 
 
-class SampleDataSource(DataSource):
+class CMAPSSDataSource(DataSource):
     """
-    Sample data source for testing with local JSON files.
+    NASA CMAPSS Turbofan Engine Dataset source.
 
-    Serves local sample data files as if they were a REST API.
-    Supports the same data formats as APIDataSource (GeoJSON, flat JSON, arrays).
+    Streams real turbofan engine degradation data from the NASA CMAPSS dataset.
+    Emulates a real-time API by streaming one cycle at a time.
+    This is real sensor data from simulated engine run-to-failure tests.
     """
+
+    # Import loader lazily to avoid circular imports
+    _loader = None
+    _loader_initialized = False
 
     # Available sample datasets
     SAMPLE_DATASETS = {
-        "NASA Space Weather": {
-            "file": "nasa_sample.json",
-            "description": "Solar and geomagnetic activity data",
-            "poll_interval": 5.0
+        "NASA CMAPSS Turbofan": {
+            "description": "Turbofan engine run-to-failure sensor data (21 sensors)",
+            "poll_interval": 1.0
         }
     }
 
-    def __init__(self, name: str, sample_name: str = None, poll_interval: float = 5.0):
+    # Default sensors with good diagnostic value
+    DEFAULT_SENSORS = ['s_2', 's_3', 's_4', 's_7', 's_8', 's_9', 's_11', 's_12']
+
+    def __init__(self, name: str, sample_name: str = None, poll_interval: float = 1.0,
+                 engine_unit: int = 1, sensors: List[str] = None):
         super().__init__(name)
-        self.sample_name = sample_name
+        self.sample_name = sample_name or "NASA CMAPSS Turbofan"
         self.poll_interval = poll_interval
+        self.engine_unit = engine_unit
+        self.sensors = sensors or self.DEFAULT_SENSORS.copy()
         self._connected = False
         self._polling_thread: Optional[threading.Thread] = None
         self._stop_event = threading.Event()
-        self._data: Optional[Any] = None
+        self._engine_data: List[Dict] = []
         self._current_index: int = 0
-        self._data_path: Optional[str] = None
-        self._channel_map: Dict[str, str] = {}
+        self._total_cycles: int = 0
         self._on_status_callback: Optional[Callable[[str], None]] = None
+        self._progress_callback: Optional[Callable[[float, int, int], None]] = None
 
     @classmethod
-    def get_sample_data_path(cls) -> Path:
-        """Get the path to the sample data directory"""
-        return Path(__file__).parent.parent / "data"
+    def _get_loader(cls):
+        """Get or create the NASA CMAPSS loader (lazy initialization)"""
+        if cls._loader is None:
+            try:
+                from miq.samples.nasa_cmapss import NASACMAPSSLoader
+                cls._loader = NASACMAPSSLoader()
+                cls._loader_initialized = True
+            except ImportError:
+                cls._loader_initialized = False
+        return cls._loader
 
     @classmethod
     def get_available_samples(cls) -> Dict[str, dict]:
         """Get available sample datasets"""
         return cls.SAMPLE_DATASETS.copy()
 
+    @classmethod
+    def is_available(cls) -> bool:
+        """Check if NASA CMAPSS loader is available"""
+        cls._get_loader()
+        return cls._loader_initialized
+
     def set_status_callback(self, callback: Callable[[str], None]):
         """Set callback for status updates"""
         self._on_status_callback = callback
+
+    def set_progress_callback(self, callback: Callable[[float, int, int], None]):
+        """Set callback for progress updates (progress, current_cycle, rul)"""
+        self._progress_callback = callback
 
     def _emit_status(self, status: str):
         """Emit status to callback"""
         if self._on_status_callback:
             self._on_status_callback(status)
 
-    def _load_sample_data(self) -> Optional[Any]:
-        """Load sample data from local JSON file"""
-        if not self.sample_name or self.sample_name not in self.SAMPLE_DATASETS:
-            return None
+    def _emit_progress(self, progress: float, cycle: int, rul: int):
+        """Emit progress to callback"""
+        if self._progress_callback:
+            self._progress_callback(progress, cycle, rul)
 
-        sample_info = self.SAMPLE_DATASETS[self.sample_name]
-        file_path = self.get_sample_data_path() / sample_info["file"]
+    def _ensure_data_loaded(self) -> bool:
+        """Ensure NASA CMAPSS data is downloaded and loaded"""
+        loader = self._get_loader()
+        if loader is None:
+            return False
 
-        if not file_path.exists():
-            return None
+        if not loader.is_loaded():
+            self._emit_status("Downloading NASA CMAPSS dataset...")
+            try:
+                def progress_cb(pct, msg):
+                    self._emit_status(f"Loading: {msg}")
+                loader.download_and_load(progress_callback=progress_cb)
+            except Exception as e:
+                self._emit_status(f"Download failed: {str(e)[:50]}")
+                return False
 
-        with open(file_path, 'r') as f:
-            return json.load(f)
-
-    def _extract_channels_from_response(self, data: Any) -> List[str]:
-        """Extract channel names from sample data (same logic as APIDataSource)"""
-        channels = []
-
-        # Handle GeoJSON
-        if isinstance(data, dict) and data.get('type') == 'FeatureCollection':
-            features = data.get('features', [])
-            if features and isinstance(features[0], dict):
-                props = features[0].get('properties', {})
-                for key, value in props.items():
-                    if isinstance(value, (int, float)) and key not in ('time', 'updated', 'tz'):
-                        channels.append(key)
-                self._data_path = 'features'
-                self._channel_map = {ch: f'properties.{ch}' for ch in channels}
-            return channels
-
-        # Handle array of objects
-        if isinstance(data, list) and len(data) > 0:
-            item = data[0]
-            if isinstance(item, dict):
-                for key, value in item.items():
-                    if isinstance(value, (int, float)) and key not in ('timestamp', 'time'):
-                        channels.append(key)
-            return channels
-
-        # Handle flat dict
-        if isinstance(data, dict):
-            for key, value in data.items():
-                if isinstance(value, (int, float)) and key not in ('timestamp', 'time'):
-                    channels.append(key)
-            return channels
-
-        return channels
-
-    def _parse_data_point(self, feature_index: int = 0) -> Optional[DataPoint]:
-        """Parse a data point from sample data at given index"""
-        if not self._data:
-            return None
-
-        timestamp = datetime.now()
-        values = {}
-
-        # Handle GeoJSON
-        if isinstance(self._data, dict) and self._data.get('type') == 'FeatureCollection':
-            features = self._data.get('features', [])
-            if not features or feature_index >= len(features):
-                return None
-
-            feature = features[feature_index]
-            props = feature.get('properties', {})
-
-            # Try to get timestamp
-            if 'time' in props:
-                try:
-                    ts_val = props['time']
-                    if isinstance(ts_val, (int, float)) and ts_val > 1e10:
-                        timestamp = datetime.fromtimestamp(ts_val / 1000)
-                    elif isinstance(ts_val, (int, float)):
-                        timestamp = datetime.fromtimestamp(ts_val)
-                except (ValueError, OSError):
-                    pass
-
-            # Extract channel values
-            for channel in self._channels:
-                path = self._channel_map.get(channel, channel)
-                try:
-                    if '.' in path:
-                        parts = path.split('.')
-                        val = props
-                        for part in parts[1:]:
-                            val = val.get(part, 0)
-                    else:
-                        val = props.get(channel, 0)
-                    values[channel] = float(val) if val is not None else 0.0
-                except (ValueError, TypeError, AttributeError):
-                    values[channel] = 0.0
-
-            return DataPoint(timestamp=timestamp, values=values)
-
-        return None
+        return True
 
     def test_connection(self) -> tuple:
         """
@@ -685,34 +640,54 @@ class SampleDataSource(DataSource):
         Returns:
             (success: bool, channels: List[str], message: str)
         """
-        if not self.sample_name:
-            return False, [], "No sample dataset selected"
+        if not self.is_available():
+            return False, [], "NASA CMAPSS loader not available"
 
         try:
-            data = self._load_sample_data()
-            if data is None:
-                return False, [], "Sample data file not found"
+            if not self._ensure_data_loaded():
+                return False, [], "Failed to load NASA CMAPSS data"
 
-            self._data = data
-            channels = self._extract_channels_from_response(data)
+            loader = self._get_loader()
+
+            # Get sensor info
+            sensor_info = loader.get_sensor_info()
+            available_sensors = sensor_info.get('all_sensors', [])
+
+            # Use requested sensors or defaults
+            channels = [s for s in self.sensors if s in available_sensors]
+            if not channels:
+                channels = sensor_info.get('default_sensors', self.DEFAULT_SENSORS)
+
             self._channels = channels
 
-            if channels:
-                return True, channels, f"Found {len(channels)} channels"
-            else:
-                return True, [], "Connected but no numeric channels found"
+            # Get engine list to verify data
+            engines = loader.get_engine_list()
+            if not engines:
+                return False, [], "No engine data found"
+
+            return True, channels, f"Found {len(channels)} sensors, {len(engines)} engines"
 
         except Exception as e:
             return False, [], f"Load failed: {str(e)}"
 
     def connect(self) -> bool:
-        """Start serving sample data"""
+        """Start streaming engine data"""
         try:
-            self._emit_status("Loading sample data...")
+            self._emit_status("Loading NASA CMAPSS data...")
 
             success, channels, message = self.test_connection()
             if not success:
                 self._emit_status(f"Failed: {message}")
+                return False
+
+            loader = self._get_loader()
+
+            # Load engine data
+            self._engine_data = loader.get_engine_data(self.engine_unit, self.sensors)
+            self._total_cycles = len(self._engine_data)
+
+            if self._total_cycles == 0:
+                self._emit_status(f"No data for engine {self.engine_unit}")
                 return False
 
             self._channels = channels
@@ -720,7 +695,7 @@ class SampleDataSource(DataSource):
             self._current_index = 0
             self._stop_event.clear()
 
-            self._emit_status(f"Connected: {len(channels)} channels")
+            self._emit_status(f"Engine {self.engine_unit}: {self._total_cycles} cycles")
 
             self._polling_thread = threading.Thread(target=self._poll_loop, daemon=True)
             self._polling_thread.start()
@@ -731,7 +706,7 @@ class SampleDataSource(DataSource):
             return False
 
     def disconnect(self):
-        """Stop serving data"""
+        """Stop streaming data"""
         self._stop_event.set()
         if self._polling_thread:
             self._polling_thread.join(timeout=2.0)
@@ -741,33 +716,63 @@ class SampleDataSource(DataSource):
     def is_connected(self) -> bool:
         return self._connected
 
+    def get_engine_info(self) -> Dict:
+        """Get information about current engine"""
+        return {
+            'engine_unit': self.engine_unit,
+            'total_cycles': self._total_cycles,
+            'current_cycle': self._current_index,
+            'sensors': self._channels
+        }
+
+    def set_engine(self, engine_unit: int):
+        """Change to a different engine (restarts streaming)"""
+        was_connected = self._connected
+        if was_connected:
+            self.disconnect()
+        self.engine_unit = engine_unit
+        self._current_index = 0
+        if was_connected:
+            self.connect()
+
     def _poll_loop(self):
-        """Background loop to serve sample data"""
-        poll_count = 0
-
-        # Get total features count
-        total_features = 0
-        if isinstance(self._data, dict) and self._data.get('type') == 'FeatureCollection':
-            total_features = len(self._data.get('features', []))
-
-        while not self._stop_event.is_set():
+        """Background loop to stream engine data"""
+        while not self._stop_event.is_set() and self._current_index < self._total_cycles:
             try:
-                # Cycle through sample data
-                if total_features > 0:
-                    point = self._parse_data_point(self._current_index % total_features)
-                    self._current_index += 1
+                record = self._engine_data[self._current_index]
 
-                    if point:
-                        # Update timestamp to now for real-time feel
-                        point = DataPoint(timestamp=datetime.now(), values=point.values)
-                        self._emit_data(point)
-                        poll_count += 1
-                        self._emit_status(f"Streaming: {poll_count} samples")
+                # Build data point
+                values = {}
+                for sensor in self._channels:
+                    values[sensor] = float(record.get(sensor, 0.0))
+
+                cycle = int(record.get('time_cycles', self._current_index + 1))
+                rul = int(record.get('rul', self._total_cycles - self._current_index - 1))
+                progress = (self._current_index + 1) / self._total_cycles
+
+                point = DataPoint(timestamp=datetime.now(), values=values)
+                self._emit_data(point)
+                self._emit_progress(progress, cycle, rul)
+
+                # Update status with RUL
+                self._emit_status(f"Cycle {cycle}/{self._total_cycles} | RUL: {rul}")
+
+                self._current_index += 1
+
+                # Check if we've reached the end (failure)
+                if self._current_index >= self._total_cycles:
+                    self._emit_status(f"Engine {self.engine_unit} FAILURE - End of data")
+                    # Loop back to start for continuous streaming
+                    self._current_index = 0
 
             except Exception as e:
                 self._emit_status(f"Error: {str(e)[:50]}")
 
             self._stop_event.wait(self.poll_interval)
+
+
+# Alias for backward compatibility
+SampleDataSource = CMAPSSDataSource
 
 
 class DataPlayer:

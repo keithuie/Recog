@@ -24,6 +24,16 @@ except ImportError:
     NASA_LOADER_AVAILABLE = False
     print("[Warning] NASA CMAPSS loader not available")
 
+# Import ML Core detector
+try:
+    import numpy as np
+    from miq.core.detector import MIQDetector, DetectorConfig, DetectorState
+    from miq.core.kernels import KernelType
+    ML_DETECTOR_AVAILABLE = True
+except ImportError:
+    ML_DETECTOR_AVAILABLE = False
+    print("[Warning] ML detector not available")
+
 from fastapi import FastAPI, Request, WebSocket, WebSocketDisconnect, HTTPException
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -85,6 +95,10 @@ nasa_streaming_state: Dict = {
     'sensors': [],
     'paused': False
 }
+
+# ML Detector instances (per group)
+group_detectors: Dict[str, 'MIQDetector'] = {}
+detector_channel_ranges: Dict[str, Dict[str, tuple]] = {}  # {group_name: {channel: (min, max)}}
 
 # Model configuration (global defaults)
 current_model_config: dict = {
@@ -282,27 +296,66 @@ async def save_model_config(config: ModelConfig):
 @app.post("/api/training/start")
 async def start_training(req: TrainingRequest):
     """Start training for a channel group."""
+    global group_detectors, detector_channel_ranges
+
     if req.group_name not in channel_groups:
         raise HTTPException(status_code=404, detail="Group not found")
+
+    group = channel_groups[req.group_name]
+    channels = group.get("channels", [])
+
+    # Create and configure detector if ML is available
+    if ML_DETECTOR_AVAILABLE and channels:
+        # Get channel ranges from stored data or use defaults from CMAPSS
+        channel_ranges = detector_channel_ranges.get(req.group_name, {})
+
+        # If no ranges stored, use NASA CMAPSS statistics
+        if not channel_ranges and NASA_LOADER_AVAILABLE and nasa_loader:
+            stats = nasa_loader.get_statistics()
+            sensor_ranges = stats.get('sensor_ranges', {})
+            for ch in channels:
+                if ch in sensor_ranges:
+                    r = sensor_ranges[ch]
+                    channel_ranges[ch] = (r['min'], r['max'])
+                else:
+                    channel_ranges[ch] = (0.0, 1000.0)  # Default range
+
+        # Create detector config from current model config
+        kernel_type = KernelType.TRIANGULAR if current_model_config["kernel_type"] == "triangular" else KernelType.PARABOLIC
+        config = DetectorConfig(
+            bins_per_channel=current_model_config["num_bins"],
+            kernel_type=kernel_type,
+            kernel_width=current_model_config["kernel_width"]
+        )
+
+        # Create detector
+        detector = MIQDetector(config)
+
+        # Configure channels with ranges
+        channel_configs = []
+        for ch in channels:
+            min_val, max_val = channel_ranges.get(ch, (0.0, 1000.0))
+            channel_configs.append({
+                "name": ch,
+                "min_value": min_val,
+                "max_value": max_val
+            })
+
+        detector.configure_channels(channel_configs)
+        detector.anomaly_threshold = current_model_config["threshold"]
+        detector.start_learning()
+
+        # Store detector
+        group_detectors[req.group_name] = detector
+        detector_channel_ranges[req.group_name] = channel_ranges
+
+        print(f"[Training] Created detector for {req.group_name} with {len(channels)} channels")
 
     channel_groups[req.group_name]["status"] = "training"
     await broadcast_update("training_started", {
         "group": req.group_name,
         "duration": req.duration
     })
-
-    # Try to call ML service
-    try:
-        async with aiohttp.ClientSession() as session:
-            async with session.post(
-                f"http://{ML_CORE_HOST}:{ML_CORE_PORT}/api/training/start",
-                json={"group": req.group_name, "duration": req.duration},
-                timeout=aiohttp.ClientTimeout(total=5)
-            ) as response:
-                if response.status == 200:
-                    print(f"[Training] Started ML training for {req.group_name}")
-    except Exception as e:
-        print(f"[Training] ML service not available: {e}")
 
     # Schedule training completion
     asyncio.create_task(complete_training_after(req.group_name, req.duration))
@@ -312,23 +365,52 @@ async def start_training(req: TrainingRequest):
 
 async def complete_training_after(group_name: str, duration: int):
     """Complete training after specified duration."""
+    global group_detectors
+
     await asyncio.sleep(duration)
     if group_name in channel_groups and channel_groups[group_name]["status"] == "training":
+        # Stop detector learning
+        if group_name in group_detectors:
+            detector = group_detectors[group_name]
+            detector.stop_learning()
+            trained_states = detector.num_trained_states
+            print(f"[Training] Detector learned {trained_states} unique states for {group_name}")
+            channel_groups[group_name]["trained_states"] = trained_states
+        else:
+            channel_groups[group_name]["trained_states"] = 0
+
         channel_groups[group_name]["status"] = "monitoring"
-        channel_groups[group_name]["trained_states"] = channel_groups[group_name].get("trained_states", 0) + 1
-        await broadcast_update("training_complete", {"group": group_name})
+        await broadcast_update("training_complete", {
+            "group": group_name,
+            "trained_states": channel_groups[group_name]["trained_states"]
+        })
         print(f"[Training] Completed for {group_name}")
 
 
 @app.post("/api/training/stop/{group_name}")
 async def stop_training(group_name: str):
     """Stop training for a channel group."""
+    global group_detectors
+
     if group_name not in channel_groups:
         raise HTTPException(status_code=404, detail="Group not found")
 
+    # Stop detector learning if active
+    trained_states = 0
+    if group_name in group_detectors:
+        detector = group_detectors[group_name]
+        if detector.is_learning:
+            detector.stop_learning()
+        trained_states = detector.num_trained_states
+        print(f"[Training] Stopped detector for {group_name}, learned {trained_states} states")
+
     channel_groups[group_name]["status"] = "monitoring"
-    await broadcast_update("training_stopped", {"group": group_name})
-    return {"status": "monitoring", "group": group_name}
+    channel_groups[group_name]["trained_states"] = trained_states
+    await broadcast_update("training_stopped", {
+        "group": group_name,
+        "trained_states": trained_states
+    })
+    return {"status": "monitoring", "group": group_name, "trained_states": trained_states}
 
 
 @app.get("/api/csv-template")
@@ -707,8 +789,8 @@ async def set_nasa_stream_speed(request: Request):
 
 
 async def nasa_data_streaming_loop():
-    """Background task to stream NASA engine data."""
-    global nasa_loader, nasa_streaming_state
+    """Background task to stream NASA engine data with real ML detection."""
+    global nasa_loader, nasa_streaming_state, group_detectors
 
     engine_nr = nasa_streaming_state['engine_nr']
     sensors = nasa_streaming_state['sensors']
@@ -723,6 +805,15 @@ async def nasa_data_streaming_loop():
         return
 
     print(f"[NASA] Starting stream for Engine {engine_nr}: {len(engine_data)} cycles")
+
+    # Get detector for this group if it exists
+    detector = group_detectors.get(group_name)
+    is_trained = detector is not None and detector.is_monitoring
+
+    if is_trained:
+        print(f"[NASA] Using trained detector with {detector.num_trained_states} states")
+    else:
+        print(f"[NASA] No trained detector - will show untrained status")
 
     try:
         for i, record in enumerate(engine_data):
@@ -744,37 +835,61 @@ async def nasa_data_streaming_loop():
 
             # Prepare channel values
             channel_values = {s: record[s] for s in sensors if s in record}
-
-            # Calculate confidence based on RUL (simulates degradation detection)
             rul = int(record['rul'])
-            total_cycles = nasa_streaming_state['total_cycles']
 
-            # Simulate confidence: starts high, degrades as RUL decreases
-            # Add some realistic noise
-            if rul > total_cycles * 0.7:
-                # Healthy phase: high confidence
-                base_confidence = 85 + random.uniform(-5, 10)
-            elif rul > total_cycles * 0.3:
-                # Wear phase: confidence starts dropping
-                progress = 1 - (rul / (total_cycles * 0.7))
-                base_confidence = 85 - (progress * 30) + random.uniform(-8, 8)
+            # Process through detector if available and trained
+            confidence = 0.0
+            is_anomaly = False
+            anomaly_score = 0.0
+            top_contributors = []
+
+            # Refresh detector reference (may have been trained during stream)
+            detector = group_detectors.get(group_name)
+
+            if detector and ML_DETECTOR_AVAILABLE:
+                # Build feature vector in channel order
+                feature_vector = np.array([channel_values.get(ch, 0.0) for ch in sensors], dtype=np.float32)
+
+                if detector.is_learning:
+                    # During training, feed data to detector
+                    detector.process(feature_vector)
+                    confidence = 50.0  # Show 50% during training
+                    is_trained = False
+                elif detector.is_monitoring:
+                    # During monitoring, get real detection result
+                    result = detector.process(feature_vector)
+                    if result:
+                        confidence = result.match_strength * 100
+                        is_anomaly = result.is_anomaly
+                        anomaly_score = result.anomaly_score * 100
+                        top_contributors = [
+                            {"channel": ch, "score": round(score, 2)}
+                            for ch, score in result.get_top_contributors(3)
+                        ]
+                    is_trained = True
+                else:
+                    # Detector exists but not started
+                    confidence = 0.0
+                    is_trained = False
             else:
-                # Failure approaching: low confidence, high variance
-                progress = 1 - (rul / (total_cycles * 0.3))
-                base_confidence = 55 - (progress * 35) + random.uniform(-15, 10)
+                # No detector - show untrained status
+                confidence = 0.0
+                is_trained = False
 
-            confidence = max(5, min(98, base_confidence))
-
-            # Broadcast data update
+            # Broadcast data update with real ML results
             await broadcast_update("data_update", {
                 "group": group_name,
                 "confidence": round(confidence, 1),
+                "anomaly_score": round(anomaly_score, 1),
+                "is_anomaly": is_anomaly,
                 "channel_values": channel_values,
                 "cycle": nasa_streaming_state['current_cycle'],
                 "rul": rul,
                 "progress": (i + 1) / len(engine_data),
                 "timestamp": datetime.now().isoformat(),
-                "is_trained": True
+                "is_trained": is_trained,
+                "trained_states": detector.num_trained_states if detector else 0,
+                "top_contributors": top_contributors
             })
 
             # Calculate sleep based on speed multiplier
@@ -793,6 +908,8 @@ async def nasa_data_streaming_loop():
         print(f"[NASA] Stream cancelled for Engine {engine_nr}")
     except Exception as e:
         print(f"[NASA] Stream error: {e}")
+        import traceback
+        traceback.print_exc()
     finally:
         nasa_streaming_state['active'] = False
 

@@ -187,9 +187,9 @@ class MachineIQApp:
                 self._add_to_dataflow('api', url, None, interval, api_name)
 
         elif source_type == 'NASA Sample Data':
-            sample_dataset = data_source.get('sample_dataset', 'NASA Space Weather')
-            interval = data_source.get('interval', 5)
-            source_name = data_source.get('name', 'NASA Space Weather')
+            sample_dataset = data_source.get('sample_dataset', 'NASA CMAPSS Turbofan')
+            interval = data_source.get('interval', 1)
+            source_name = data_source.get('name', 'NASA CMAPSS Turbofan')
             self._setup_sample_source(sample_dataset, interval, source_name)
             # Add to Dataflow page
             self._add_to_dataflow('sample', sample_dataset, None, interval, source_name)
@@ -520,9 +520,9 @@ class MachineIQApp:
             self._setup_api_source(config.get('url', ''), config.get('interval', 5))
             self.dataflow.set_source_status(name, "Monitoring")
         elif config.get('type') == 'sample':
-            # NASA or other sample data sources
-            sample_dataset = config.get('sample_dataset', 'NASA Space Weather')
-            self._setup_sample_source(sample_dataset, config.get('interval', 5), name)
+            # NASA CMAPSS turbofan engine data
+            sample_dataset = config.get('sample_dataset', 'NASA CMAPSS Turbofan')
+            self._setup_sample_source(sample_dataset, config.get('interval', 1), name)
             self.dataflow.set_source_status(name, "Streaming")
         elif config.get('type') == 'csv':
             self._setup_csv_source(config.get('path', ''), config.get('timestamp_column', 'timestamp'), name)

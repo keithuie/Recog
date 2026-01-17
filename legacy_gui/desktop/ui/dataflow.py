@@ -36,13 +36,12 @@ SAMPLE_APIS = {
     },
 }
 
-# Sample datasets available (local data, no network required)
+# Sample datasets available (NASA CMAPSS turbofan data)
 SAMPLE_DATASETS = {
-    'NASA Space Weather': {
-        'description': 'Solar flux, plasma density, magnetic field, and geomagnetic indices',
-        'channels': ['solar_flux', 'proton_density', 'plasma_speed', 'plasma_temp',
-                    'mag_field_bt', 'mag_field_bz', 'kp_index', 'dst_index'],
-        'interval': 5
+    'NASA CMAPSS Turbofan': {
+        'description': 'Turbofan engine run-to-failure sensor data (temperatures, pressures, speeds)',
+        'channels': ['s_2', 's_3', 's_4', 's_7', 's_8', 's_9', 's_11', 's_12'],
+        'interval': 1
     }
 }
 
