@@ -20,7 +20,7 @@ from datetime import datetime, timedelta
 import json
 
 # NASA CMAPSS Data URL (reliable GitHub mirror)
-NASA_DATA_URL = "https://raw.githubusercontent.com/biswajitsahoo1111/rul_codes_open/master/cmapss_data/train_FD001.txt"
+NASA_DATA_URL = "https://raw.githubusercontent.com/hankroark/Turbofan-Engine-Degradation/master/CMAPSSData/train_FD001.txt"
 
 # Column definitions for the raw data (no headers in file)
 INDEX_COLS = ['unit_nr', 'time_cycles']
