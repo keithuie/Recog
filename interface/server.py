@@ -711,15 +711,26 @@ async def start_nasa_stream(config: NASAStreamConfig):
         "created_at": datetime.now().isoformat()
     }
 
+    # Build channel info with descriptions
+    channel_info = {}
+    for s in sensors:
+        info = SENSOR_DICTIONARY.get(s, {})
+        channel_info[s] = {
+            "name": info.get('name', s),
+            "unit": info.get('unit', ''),
+            "type": info.get('type', 'sensor')
+        }
+
     channel_groups[group_name] = {
         "name": group_name,
         "channels": sensors,
+        "channel_info": channel_info,
         "color": "#5794f2",
         "sample_rate": 1.0,
         "preprocessing": "basic",
         "source": source_name,
-        "status": "monitoring",
-        "trained_states": 1,  # Pre-trained for demo
+        "status": "idle",  # Start as idle, not monitoring
+        "trained_states": 0,
         "created_at": datetime.now().isoformat(),
         "channel_preprocessing": {s: "basic" for s in sensors}
     }
@@ -897,12 +908,19 @@ async def nasa_data_streaming_loop():
             sleep_time = base_interval / nasa_streaming_state['speed_multiplier']
             await asyncio.sleep(sleep_time)
 
-        # Stream complete
-        print(f"[NASA] Stream complete for Engine {engine_nr}")
+        # Stream complete - restart from beginning for continuous monitoring
+        print(f"[NASA] Stream complete for Engine {engine_nr} - restarting from cycle 1")
         await broadcast_update("nasa_stream_complete", {
             "engine": engine_nr,
-            "total_cycles": len(engine_data)
+            "total_cycles": len(engine_data),
+            "restarting": True
         })
+
+        # Restart the stream (loop continuously until stopped)
+        if nasa_streaming_state['active']:
+            nasa_streaming_state['current_cycle'] = 0
+            # Recursive call to restart
+            await nasa_data_streaming_loop()
 
     except asyncio.CancelledError:
         print(f"[NASA] Stream cancelled for Engine {engine_nr}")

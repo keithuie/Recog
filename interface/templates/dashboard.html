@@ -297,6 +297,19 @@
             margin-left: 4px;
         }
 
+        .legend-desc {
+            font-size: 10px;
+            color: var(--grafana-text-secondary);
+            flex: 1;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .legend-desc small {
+            color: var(--grafana-text-tertiary);
+        }
+
         /* Confidence Gauge - Grafana gauge style */
         .confidence-gauge {
             display: flex;
@@ -982,10 +995,13 @@
                                 <!-- Legend -->
                                 <div class="chart-legend" id="legend-{{ group.name }}">
                                     {% for channel in group.channels %}
+                                    {% set ch_info = group.channel_info[channel] if group.channel_info else {} %}
                                     <div class="legend-item" data-channel="{{ channel }}" data-index="{{ loop.index0 }}"
-                                         onclick="toggleSeries('{{ group.name }}', {{ loop.index0 }})">
+                                         onclick="toggleSeries('{{ group.name }}', {{ loop.index0 }})"
+                                         title="{{ ch_info.name if ch_info else channel }}{% if ch_info.unit %} ({{ ch_info.unit }}){% endif %}">
                                         <span class="legend-color" id="legend-color-{{ group.name }}-{{ loop.index0 }}"></span>
                                         <span class="legend-label">{{ channel }}</span>
+                                        <span class="legend-desc">{{ ch_info.name[:20] if ch_info.name else '' }}{% if ch_info.unit %} <small>({{ ch_info.unit }})</small>{% endif %}</span>
                                         <span class="legend-value" id="legend-value-{{ group.name }}-{{ loop.index0 }}">--</span>
                                     </div>
                                     {% endfor %}
