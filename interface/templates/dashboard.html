@@ -1789,7 +1789,11 @@
             const charts = state.charts[group];
             const chartData = state.chartData[group];
 
-            if (!charts || !chartData) return;
+            if (!charts || !chartData) {
+                console.warn('[Data] No charts/data for group:', group, '- Available groups:', Object.keys(state.charts));
+                return;
+            }
+            console.log('[Data] Processing', group, '- confidence:', confidence, '- channels:', Object.keys(channelValues).length);
 
             // Update each channel
             Object.entries(channelValues).forEach(([channelName, value], idx) => {
@@ -1979,8 +1983,10 @@
         }
 
         function handleWSMessage(msg) {
+            console.log('[WS] Received:', msg.type, msg.data?.group || '');
             switch (msg.type) {
                 case 'data_update':
+                    console.log('[WS] Data update for', msg.data.group, '- channels:', Object.keys(msg.data.channel_values || {}).length);
                     updateGroupData(msg.data);
                     break;
                 case 'training_started':
@@ -1990,6 +1996,17 @@
                     hideTrainingOverlay(msg.data.group);
                     state.trainedGroups.add(msg.data.group);
                     showToast('Training Complete', `Model for ${msg.data.group} is ready`, 'success');
+                    break;
+                case 'group_added':
+                    // New group added - check if we need to reload to show it
+                    const groupName = msg.data.name;
+                    if (!state.charts[groupName]) {
+                        showToast('New Data Source', `${groupName} connected - refreshing...`, 'info');
+                        setTimeout(() => window.location.reload(), 1000);
+                    }
+                    break;
+                case 'nasa_stream_complete':
+                    showToast('Stream Complete', `Engine #${msg.data.engine} completed ${msg.data.total_cycles} cycles`, 'info');
                     break;
             }
         }
