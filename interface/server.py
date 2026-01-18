@@ -844,8 +844,8 @@ async def nasa_data_streaming_loop():
             # Update state
             nasa_streaming_state['current_cycle'] = int(record['time_cycles'])
 
-            # Prepare channel values
-            channel_values = {s: record[s] for s in sensors if s in record}
+            # Prepare channel values (convert to Python floats for JSON serialization)
+            channel_values = {s: float(record[s]) for s in sensors if s in record}
             rul = int(record['rul'])
 
             # Process through detector if available and trained
@@ -870,11 +870,11 @@ async def nasa_data_streaming_loop():
                     # During monitoring, get real detection result
                     result = detector.process(feature_vector)
                     if result:
-                        confidence = result.match_strength * 100
-                        is_anomaly = result.is_anomaly
-                        anomaly_score = result.anomaly_score * 100
+                        confidence = float(result.match_strength * 100)
+                        is_anomaly = bool(result.is_anomaly)
+                        anomaly_score = float(result.anomaly_score * 100)
                         top_contributors = [
-                            {"channel": ch, "score": round(score, 2)}
+                            {"channel": ch, "score": float(round(score, 2))}
                             for ch, score in result.get_top_contributors(3)
                         ]
                     is_trained = True
